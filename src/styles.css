@@ -1,0 +1,251 @@
+:root {
+  color-scheme: dark;
+  --bg: #101115;
+  --panel: rgba(21, 24, 30, 0.92);
+  --panel-strong: rgba(31, 35, 43, 0.96);
+  --text: #f6f1e7;
+  --muted: #a9afba;
+  --line: rgba(255, 255, 255, 0.13);
+  --cyan: #5de2d1;
+  --green: #96e072;
+  --amber: #f1c15b;
+  --red: #ef6a70;
+  --blue: #72a5ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #101115;
+  color: var(--text);
+  font-family:
+    Inter, "Segoe UI", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+}
+
+button {
+  font: inherit;
+}
+
+.game-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 36%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 34px),
+    var(--bg);
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: end;
+  padding: 18px clamp(16px, 3vw, 32px) 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--cyan);
+  font-size: 0.76rem;
+  letter-spacing: 0;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0;
+  font-size: clamp(1.35rem, 3vw, 2.2rem);
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.hud {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: min(680px, 100%);
+}
+
+.hud span {
+  min-width: 94px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.hud strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.stage {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.chapter-status {
+  position: absolute;
+  left: clamp(14px, 2.4vw, 28px);
+  top: clamp(14px, 2.4vw, 28px);
+  z-index: 2;
+  display: grid;
+  gap: 6px;
+  width: min(360px, calc(100% - 28px));
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(16, 17, 21, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.chapter-status span {
+  color: var(--cyan);
+  font-size: 0.76rem;
+}
+
+.chapter-status strong {
+  color: var(--text);
+  font-size: 0.96rem;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+#gameCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  min-height: 470px;
+}
+
+.event-panel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(520px, calc(100% - 32px));
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+}
+
+.event-panel.hidden {
+  display: none;
+}
+
+.event-kicker {
+  margin-bottom: 8px;
+  color: var(--cyan);
+  font-size: 0.78rem;
+}
+
+.event-panel h2 {
+  margin-bottom: 10px;
+  font-size: 1.25rem;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.event-panel p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.choice-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.choice-button {
+  width: 100%;
+  min-height: 54px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.065);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.choice-button:hover,
+.choice-button:focus-visible {
+  outline: none;
+  transform: translateY(-1px);
+  border-color: rgba(93, 226, 209, 0.65);
+  background: rgba(93, 226, 209, 0.12);
+}
+
+.choice-button.primary {
+  text-align: center;
+  background: rgba(93, 226, 209, 0.18);
+  border-color: rgba(93, 226, 209, 0.58);
+}
+
+.choice-title {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+
+.choice-effect {
+  display: block;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.ticker {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 9px clamp(16px, 3vw, 32px);
+  border-top: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.16);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .hud {
+    justify-content: stretch;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hud span {
+    min-width: 0;
+  }
+
+  #gameCanvas {
+    min-height: 520px;
+  }
+}

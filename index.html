@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>世界 Bug 值班室</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">都市异常轻肉鸽 RPG 原型</p>
+          <h1>世界 Bug 值班室</h1>
+        </div>
+        <div class="hud" aria-live="polite">
+          <span>生命 <strong id="hpValue">100</strong></span>
+          <span>bug点数 <strong id="bugValue">0</strong></span>
+          <span>反噬 <strong id="backlashValue">0%</strong></span>
+          <span>已处理 <strong id="fixedValue">0/7</strong></span>
+        </div>
+      </header>
+
+      <section class="stage">
+        <canvas id="gameCanvas" width="1280" height="720"></canvas>
+
+        <div class="chapter-status" aria-live="polite">
+          <span id="chapterTitle">第一章：凌晨 03:32</span>
+          <strong id="objectiveText">调查办公室异常</strong>
+        </div>
+
+        <aside id="storyPanel" class="event-panel hidden" aria-modal="true">
+          <p id="storySpeaker" class="event-kicker">林野</p>
+          <h2 id="storyTitle">凌晨 03:32</h2>
+          <p id="storyText"></p>
+          <div id="storyChoices" class="choice-grid"></div>
+        </aside>
+
+        <aside id="eventPanel" class="event-panel hidden" aria-modal="true">
+          <p id="eventKicker" class="event-kicker">异常弹幕</p>
+          <h2 id="eventTitle">同事头顶冒出弹幕</h2>
+          <p id="eventText"></p>
+          <div id="eventChoices" class="choice-grid"></div>
+        </aside>
+
+        <aside id="upgradePanel" class="event-panel hidden" aria-modal="true">
+          <p class="event-kicker">系统补丁</p>
+          <h2>选择一个临时补丁</h2>
+          <div id="upgradeChoices" class="choice-grid"></div>
+        </aside>
+
+        <aside id="resultPanel" class="event-panel hidden" aria-modal="true">
+          <p id="resultKicker" class="event-kicker">今日结算</p>
+          <h2 id="resultTitle"></h2>
+          <p id="resultText"></p>
+          <button id="restartButton" class="choice-button primary">再来一天</button>
+        </aside>
+      </section>
+
+      <footer class="ticker">
+        <span id="logLine">凌晨 03:32，林野从键盘上醒来。</span>
+      </footer>
+    </main>
+
+    <script defer src="./src/data/game-data.js"></script>
+    <script defer src="./src/main.js"></script>
+  </body>
+</html>
