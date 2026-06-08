@@ -1,5 +1,6 @@
 ﻿const canvas = document.querySelector("#gameCanvas");
 const ctx = canvas.getContext("2d");
+ctx.imageSmoothingEnabled = false;
 
 const ui = {
   hp: document.querySelector("#hpValue"),
@@ -61,6 +62,7 @@ let player;
 let bugNodes;
 let enemies;
 let particles;
+let bullets;
 let cleaners;
 let activeEvent = null;
 let nextUpgradeAt = 2;
@@ -75,19 +77,125 @@ const desks = [
   { x: 472, y: 236, w: 136, h: 54, tag: "弹幕" },
   { x: 742, y: 132, w: 210, h: 74, tag: "会议室" },
   { x: 1006, y: 132, w: 152, h: 74, tag: "老板室" },
-  { x: 742, y: 420, w: 416, h: 78, tag: "归零机房" },
+  { x: 742, y: 420, w: 416, h: 78, tag: "0号服务器间" },
 ];
 
 const gameData = window.GameData ?? { eventDeck: [], upgrades: [] };
 const bugEvents = gameData.eventDeck;
 const upgrades = gameData.upgrades;
 const chapterOne = gameData.chapterOne;
+const weaponDefinitions = [
+  {
+    id: "paperclip",
+    name: "回形针弹弓",
+    desc: "单发高速，适合点掉追击中的异常。",
+    color: "#5de2d1",
+    damage: 28,
+    cooldown: 0.34,
+    bulletSpeed: 620,
+    range: 560,
+    projectileCount: 1,
+    spread: 0,
+    bulletSize: 4,
+    pierce: 0,
+  },
+  {
+    id: "keyboard",
+    name: "键盘宏飞弹",
+    desc: "一次打出三枚按键弹，覆盖面更稳。",
+    color: "#72a5ff",
+    damage: 18,
+    cooldown: 0.46,
+    bulletSpeed: 520,
+    range: 480,
+    projectileCount: 3,
+    spread: 0.22,
+    bulletSize: 4,
+    pierce: 0,
+  },
+  {
+    id: "correction-fluid",
+    name: "修正液喷枪",
+    desc: "近距离高频净化，压住贴脸的小怪。",
+    color: "#f7b4d8",
+    damage: 12,
+    cooldown: 0.16,
+    bulletSpeed: 430,
+    range: 310,
+    projectileCount: 2,
+    spread: 0.18,
+    bulletSize: 5,
+    pierce: 0,
+  },
+];
+const weaponUpgrades = [
+  {
+    id: "weapon-damage",
+    title: "错误码磨尖",
+    effect: "当前武器伤害 +7",
+    actions: [
+      { type: "modifyWeapon", stat: "damage", add: 7 },
+      { type: "log", message: "武器的错误码边缘变锋利了。" },
+    ],
+  },
+  {
+    id: "weapon-cooldown",
+    title: "冷却缓存",
+    effect: "当前武器发射冷却 -15%",
+    actions: [
+      { type: "modifyWeapon", stat: "cooldown", multiply: 0.85, min: 0.08 },
+      { type: "log", message: "武器开始提前预读下一次攻击。" },
+    ],
+  },
+  {
+    id: "weapon-projectile",
+    title: "弹幕分叉",
+    effect: "当前武器子弹数 +1，散射略增",
+    actions: [
+      { type: "modifyWeapon", stat: "projectileCount", add: 1, max: 7 },
+      { type: "modifyWeapon", stat: "spread", add: 0.04, max: 0.46 },
+      { type: "log", message: "弹道分裂成更热闹的 bug 弧线。" },
+    ],
+  },
+  {
+    id: "weapon-pierce",
+    title: "穿透注释",
+    effect: "当前武器穿透 +1，射程 +70",
+    actions: [
+      { type: "modifyWeapon", stat: "pierce", add: 1, max: 3 },
+      { type: "modifyWeapon", stat: "range", add: 70 },
+      { type: "log", message: "子弹学会了穿过第一层异常注释。" },
+    ],
+  },
+  {
+    id: "weapon-speed",
+    title: "弹道加速",
+    effect: "当前武器弹速 +110，射程 +50",
+    actions: [
+      { type: "modifyWeapon", stat: "bulletSpeed", add: 110 },
+      { type: "modifyWeapon", stat: "range", add: 50 },
+      { type: "log", message: "子弹像被老板催过一样冲了出去。" },
+    ],
+  },
+  {
+    id: "weapon-fat-bullet",
+    title: "加粗高亮",
+    effect: "当前武器子弹变大，伤害 +4，反噬 +5",
+    actions: [
+      { type: "modifyWeapon", stat: "bulletSize", add: 2, max: 10 },
+      { type: "modifyWeapon", stat: "damage", add: 4 },
+      { type: "gain", backlash: 5 },
+      { type: "log", message: "攻击被加粗高亮，系统也多看了你一眼。" },
+    ],
+  },
+];
 
 function resetGame() {
   player = { ...playerBase };
   bugNodes = [];
   enemies = [];
   particles = [];
+  bullets = [];
   cleaners = [];
   activeEvent = null;
   nextUpgradeAt = 2;
@@ -105,9 +213,9 @@ function resetGame() {
   world.cameraShake = 0;
   hidePanels();
   setChapterObjective("调查办公室异常");
-  setLog("凌晨 03:32，林野从键盘上醒来。");
+  setLog("凌晨 03:32，安渡从键盘上醒来。先从抽屉里摸一件趁手工具。");
   syncHud();
-  openStory(chapterOne.opening);
+  openWeaponSelect();
 }
 
 function createBugNode(x = random(90, world.width - 90), y = random(96, world.height - 86), eventId = null) {
@@ -182,6 +290,10 @@ function applyActions(actions = []) {
       player[action.stat] = clamp(next, action.min ?? -Infinity, action.max ?? Infinity);
     }
 
+    if (action.type === "modifyWeapon") {
+      modifyWeapon(action);
+    }
+
     if (action.type === "log") {
       setLog(action.message);
     }
@@ -228,6 +340,44 @@ function setLog(message) {
 function setChapterObjective(objective) {
   ui.chapterTitle.textContent = chapterOne.title;
   ui.objectiveText.textContent = objective;
+}
+
+function openWeaponSelect() {
+  world.mode = "story";
+  ui.storySpeaker.textContent = "系统弹窗";
+  ui.storyTitle.textContent = "选择初始武器";
+  ui.storyText.textContent = "变量城的夜间异常已经开始显形。安渡从抽屉里摸出一件工具，决定先活过这个凌晨。武器会自动锁定最近的异常实体发射子弹。";
+  ui.storyChoices.innerHTML = "";
+
+  for (const weapon of weaponDefinitions) {
+    const button = document.createElement("button");
+    button.className = "choice-button";
+    button.innerHTML = `<span class="choice-title">${weapon.name}</span><span class="choice-effect">${weapon.desc}</span>`;
+    button.addEventListener("click", () => {
+      equipWeapon(weapon);
+      ui.storyPanel.classList.add("hidden");
+      openStory(chapterOne.opening);
+    });
+    ui.storyChoices.appendChild(button);
+  }
+
+  ui.storyPanel.classList.remove("hidden");
+}
+
+function equipWeapon(weapon) {
+  player.weapon = { ...weapon, cooldownLeft: 0, level: 1 };
+  setLog(`已装备：${weapon.name}。它会自动攻击最近的异常实体。`);
+}
+
+function modifyWeapon({ stat, add = 0, multiply = 1, min = -Infinity, max = Infinity }) {
+  if (!player.weapon) {
+    return;
+  }
+
+  const current = player.weapon[stat] ?? 0;
+  const next = current * multiply + add;
+  player.weapon[stat] = clamp(next, min, max);
+  player.weapon.level += stat === "level" ? 0 : 0.25;
 }
 
 function openStory(story) {
@@ -306,6 +456,7 @@ function hidePanels() {
 function syncHud() {
   ui.hp.textContent = `${Math.ceil(player.hp)}/${player.maxHp}`;
   ui.bug.textContent = player.bugPoints;
+  ui.bug.parentElement.title = player.weapon ? `当前武器：${player.weapon.name}` : "";
   ui.backlash.textContent = `${Math.round(player.backlash)}%`;
   ui.fixed.textContent = `${chapterState?.resolvedTotal ?? 0}/7`;
 }
@@ -331,6 +482,8 @@ function updatePlaying(dt) {
   world.cameraShake = Math.max(0, world.cameraShake - dt);
 
   movePlayer(dt);
+  updateWeapon(dt);
+  updateBullets(dt);
   updateEnemies(dt);
   updateParticles(dt);
   checkBugCollision();
@@ -377,6 +530,63 @@ function handleActions() {
   }
 }
 
+function updateWeapon(dt) {
+  const weapon = player.weapon;
+  if (!weapon) {
+    return;
+  }
+
+  weapon.cooldownLeft = Math.max(0, weapon.cooldownLeft - dt);
+  if (weapon.cooldownLeft > 0) {
+    return;
+  }
+
+  const target = findNearestHostile(weapon.range);
+  if (!target) {
+    return;
+  }
+
+  fireWeaponAt(target);
+  weapon.cooldownLeft = weapon.cooldown;
+}
+
+function findNearestHostile(range) {
+  let nearest = null;
+  let nearestDistance = range;
+  for (const enemy of [...enemies, ...cleaners]) {
+    const currentDistance = distance(player, enemy);
+    if (currentDistance < nearestDistance) {
+      nearest = enemy;
+      nearestDistance = currentDistance;
+    }
+  }
+  return nearest;
+}
+
+function fireWeaponAt(target) {
+  const weapon = player.weapon;
+  const count = Math.max(1, Math.round(weapon.projectileCount));
+  const baseAngle = Math.atan2(target.y - player.y, target.x - player.x);
+  const spread = weapon.spread ?? 0;
+
+  for (let index = 0; index < count; index += 1) {
+    const centered = index - (count - 1) / 2;
+    const angle = baseAngle + centered * spread;
+    bullets.push({
+      x: player.x,
+      y: player.y - 8,
+      vx: Math.cos(angle) * weapon.bulletSpeed,
+      vy: Math.sin(angle) * weapon.bulletSpeed,
+      radius: weapon.bulletSize,
+      damage: weapon.damage,
+      color: weapon.color,
+      life: weapon.range / weapon.bulletSpeed,
+      pierce: Math.round(weapon.pierce),
+      hitTargets: new Set(),
+    });
+  }
+}
+
 function dash() {
   let dx = 0;
   let dy = 0;
@@ -413,7 +623,51 @@ function repairPulse() {
   }
   enemies = enemies.filter((enemy) => enemy.hp > 0);
   cleaners = cleaners.filter((enemy) => enemy.hp > 0);
-  setLog("林野把错误码拍成了一圈蓝色涟漪。");
+  setLog("安渡把错误码拍成了一圈蓝色涟漪。");
+}
+
+function updateBullets(dt) {
+  for (const bullet of bullets) {
+    bullet.x += bullet.vx * dt;
+    bullet.y += bullet.vy * dt;
+    bullet.life -= dt;
+
+    const hostiles = [...enemies, ...cleaners];
+    for (const enemy of hostiles) {
+      if (bullet.hitTargets.has(enemy) || distance(bullet, enemy) > bullet.radius + enemy.radius) {
+        continue;
+      }
+
+      enemy.hp -= bullet.damage;
+      enemy.hitFlash = 0.14;
+      bullet.hitTargets.add(enemy);
+      burst(enemy.x, enemy.y, bullet.color, 7);
+
+      if (bullet.pierce <= 0) {
+        bullet.life = 0;
+        break;
+      }
+      bullet.pierce -= 1;
+    }
+  }
+
+  enemies = enemies.filter((enemy) => {
+    if (enemy.hp > 0) {
+      return true;
+    }
+    burst(enemy.x, enemy.y, "#ef6a70", 14);
+    return false;
+  });
+  cleaners = cleaners.filter((enemy) => {
+    if (enemy.hp > 0) {
+      return true;
+    }
+    burst(enemy.x, enemy.y, "#72a5ff", 20);
+    return false;
+  });
+  bullets = bullets.filter((bullet) => {
+    return bullet.life > 0 && bullet.x > -40 && bullet.x < world.width + 40 && bullet.y > 40 && bullet.y < world.height + 40;
+  });
 }
 
 function updateEnemies(dt) {
@@ -430,7 +684,7 @@ function updateEnemies(dt) {
       player.invulnerable = 0.55;
       world.cameraShake = 0.18;
       burst(player.x, player.y, "#ef6a70", 10);
-      setLog(enemy.type === "cleaner" ? "程序清洁工擦掉了你的一段状态。" : "压力实体撞上来，报表又多了一页。");
+      setLog(enemy.type === "cleaner" ? "白箱巡检员擦掉了你的一段状态。" : "压力实体撞上来，报表又多了一页。");
     }
   }
 }
@@ -439,7 +693,7 @@ function maybeEscalateBacklash(dt) {
   const cleanerCanAppear = chapterState.finished || chapterState.stepIndex >= 3;
   if (cleanerCanAppear && player.backlash >= 75 && cleaners.length === 0) {
     spawnEnemyNear(world.width - 110, 96, "cleaner");
-    setLog("程序清洁工上线，正在清理异常变量：林野。");
+    setLog("白箱巡检员上线，正在归档异常变量：安渡。");
   }
 
   if (player.backlash >= 100) {
@@ -509,7 +763,9 @@ function resolveEvent(choice) {
 function openUpgrade() {
   world.mode = "upgrade";
   ui.upgradeChoices.innerHTML = "";
-  const pool = [...upgrades].sort(() => Math.random() - 0.5).slice(0, 3);
+  const generalPool = [...upgrades].sort(() => Math.random() - 0.5).slice(0, 2);
+  const weaponPool = [...weaponUpgrades].sort(() => Math.random() - 0.5).slice(0, 1);
+  const pool = [...weaponPool, ...generalPool].sort(() => Math.random() - 0.5);
 
   for (const upgrade of pool) {
     const button = document.createElement("button");
@@ -539,11 +795,11 @@ function resumeAndSpawnBug() {
 
 function endGame(victory) {
   world.mode = "result";
-  ui.resultKicker.textContent = victory ? "今日存活" : "今日归零";
-  ui.resultTitle.textContent = victory ? "第一个异常日被你扛过去了" : "林野被清理出当前版本";
+  ui.resultKicker.textContent = victory ? "今日存活" : "今日重置";
+  ui.resultTitle.textContent = victory ? "第一个异常夜班被你扛过去了" : "安渡被移出当前巡检版本";
   ui.resultText.textContent = victory
-    ? "世界程序没有恢复正常，但它承认你暂时有资格继续上班。"
-    : "bug点数散落在工位缝里，清洁工把凌晨重新擦回了凌晨。";
+    ? "公共规则引擎没有恢复正常，但它承认你暂时有资格继续上班。"
+    : "bug点数散落在工位缝里，白箱巡检员把凌晨重新归档为凌晨。";
   ui.resultPanel.classList.remove("hidden");
 }
 
@@ -555,6 +811,7 @@ function draw(dt) {
   ctx.translate(shakeX, shakeY);
   drawOffice();
   drawBugNodes(dt);
+  drawBullets();
   drawEnemies();
   drawAllies();
   drawPlayer();
@@ -594,13 +851,18 @@ function drawOffice() {
     drawDesk(desk);
   }
 
+  if ((chapterState?.stepIndex ?? -1) >= 3 || player.fixed >= 3) {
+    drawLaoLiangSprite(1080, 118, 0.88);
+    drawLabel("老梁", 1062, 84, "#f1c15b");
+  }
+
   ctx.fillStyle = "#26333a";
   ctx.fillRect(34, 618, 206, 50);
   ctx.fillStyle = "#5de2d1";
   ctx.globalAlpha = 0.18;
   ctx.fillRect(44, 628, 186, 30);
   ctx.globalAlpha = 1;
-  drawLabel("林野工位", 78, 650, "#dbe8e6");
+  drawLabel("安渡工位", 78, 650, "#dbe8e6");
 }
 
 function drawDesk(desk) {
@@ -641,12 +903,29 @@ function drawBugNodes(dt) {
   }
 }
 
+function drawBullets() {
+  for (const bullet of bullets) {
+    ctx.save();
+    ctx.translate(bullet.x, bullet.y);
+    ctx.fillStyle = bullet.color;
+    ctx.globalAlpha = 0.24;
+    ctx.beginPath();
+    ctx.arc(0, 0, bullet.radius + 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillRect(-bullet.radius, -bullet.radius, bullet.radius * 2, bullet.radius * 2);
+    ctx.fillStyle = "#f6f1e7";
+    ctx.fillRect(-1, -bullet.radius - 2, 2, 2);
+    ctx.restore();
+  }
+}
+
 function drawEnemies() {
   for (const enemy of enemies) {
-    drawEnemy(enemy, "#ef6a70", "#581f28");
+    drawEnemy(enemy);
   }
   for (const cleaner of cleaners) {
-    drawEnemy(cleaner, "#f6f1e7", "#283242");
+  drawPatrolSprite(cleaner.x, cleaner.y, 0.82, cleaner.hitFlash > 0);
     ctx.strokeStyle = "#72a5ff";
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -656,7 +935,7 @@ function drawEnemies() {
 }
 
 function drawAllies() {
-  if (!chapterState.allies.includes("chen-yuyuan")) {
+  if (!chapterState.allies.includes("qiao-you")) {
     return;
   }
 
@@ -664,52 +943,26 @@ function drawAllies() {
   const x = clamp(player.x - 42, 24, world.width - 24);
   const y = clamp(player.y + 28 + bob, 88, world.height - 24);
 
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.fillStyle = "#f7b4d8";
-  ctx.beginPath();
-  ctx.arc(0, 0, 15, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#2b2431";
-  ctx.fillRect(-8, -5, 16, 10);
-  ctx.strokeStyle = "rgba(247, 180, 216, 0.7)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(0, 0, 22, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
+  drawQiaoYouSprite(x, y, 0.74);
 
-  drawLabel("陈芋圆", x - 19, y - 24, "#ffd7ea");
+  drawLabel("乔柚", x - 14, y - 33, "#ffd7ea");
 }
 
-function drawEnemy(enemy, fill, core) {
-  ctx.save();
-  ctx.translate(enemy.x, enemy.y);
-  ctx.fillStyle = enemy.hitFlash > 0 ? "#ffffff" : fill;
-  ctx.beginPath();
-  ctx.arc(0, 0, enemy.radius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = core;
-  ctx.fillRect(-enemy.radius * 0.45, -enemy.radius * 0.25, enemy.radius * 0.9, enemy.radius * 0.5);
-  ctx.restore();
+function drawEnemy(enemy) {
+  if (enemy.type === "deadline") {
+    drawDeadlineBug(enemy.x, enemy.y, 0.76, enemy.hitFlash > 0);
+    return;
+  }
+
+  drawEmoFluff(enemy.x, enemy.y, 0.78, enemy.hitFlash > 0);
 }
 
 function drawPlayer() {
   ctx.save();
-  ctx.translate(player.x, player.y);
   if (player.invulnerable > 0) {
     ctx.globalAlpha = 0.62 + Math.sin(performance.now() / 45) * 0.25;
   }
-
-  ctx.fillStyle = "#5de2d1";
-  ctx.beginPath();
-  ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "#101115";
-  ctx.fillRect(-9, -6, 18, 12);
-  ctx.fillStyle = "#f1c15b";
-  ctx.fillRect(-3, -23, 6, 12);
+  drawAnduSprite(player.x, player.y, 0.82);
   ctx.restore();
 
   if (world.pulseCooldown > 0.38) {
@@ -719,6 +972,231 @@ function drawPlayer() {
     ctx.arc(player.x, player.y, player.pulseRadius * (1 - world.pulseCooldown / 0.55), 0, Math.PI * 2);
     ctx.stroke();
   }
+}
+
+function drawAnduSprite(x, y, scale = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  drawPixelShadow(0, 25, 40, 10);
+
+  rect(-15, 8, 10, 17, "#17202d");
+  rect(5, 8, 10, 17, "#17202d");
+  rect(-17, 23, 14, 5, "#101115");
+  rect(3, 23, 14, 5, "#101115");
+  rect(-19, -10, 38, 24, "#f6f1e7");
+  rect(-22, -7, 8, 14, "#f6f1e7");
+  rect(14, -7, 8, 14, "#f6f1e7");
+  rect(-4, -10, 8, 21, "#183a65");
+  rect(-2, 9, 4, 7, "#72a5ff");
+  rect(-7, 2, 14, 10, "rgba(114, 165, 255, 0.22)");
+  rect(-30, -4, 10, 17, "#162133");
+  rect(-28, -2, 6, 10, "#78dff1");
+  rect(21, -2, 10, 10, "#5de2d1");
+  rect(23, 0, 6, 6, "#101115");
+
+  rect(-15, -29, 30, 21, "#ffd2a4");
+  rect(-18, -23, 5, 9, "#f2a46f");
+  rect(13, -23, 5, 9, "#f2a46f");
+  rect(-10, -19, 5, 5, "#11131a");
+  rect(5, -19, 5, 5, "#11131a");
+  rect(-2, -13, 6, 2, "#d9745d");
+
+  rect(-17, -38, 34, 10, "#191817");
+  rect(-21, -33, 12, 11, "#191817");
+  rect(9, -34, 14, 12, "#191817");
+  rect(-11, -44, 9, 12, "#22211f");
+  rect(-3, -42, 11, 13, "#1a1918");
+  rect(8, -41, 8, 12, "#2a2724");
+  rect(-24, -26, 9, 9, "#201e1b");
+  rect(16, -27, 8, 9, "#201e1b");
+  rect(-19, -33, 4, 4, "#3a3029");
+  ctx.restore();
+}
+
+function drawQiaoYouSprite(x, y, scale = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  drawPixelShadow(0, 25, 42, 10);
+
+  drawBubble(-36, -24, 6, "#dcb9ff");
+  drawBubble(34, -13, 4, "#ffb8d8");
+  drawEmoFluff(-33, 16, 0.42, false);
+
+  rect(-14, 10, 8, 15, "#f1c6de");
+  rect(6, 10, 8, 15, "#f1c6de");
+  rect(-16, 23, 12, 5, "#5c3b2f");
+  rect(4, 23, 12, 5, "#5c3b2f");
+  rect(-17, -8, 34, 17, "#ffe7c7");
+  rect(-20, 2, 40, 12, "#cc72b2");
+  rect(-13, 11, 26, 8, "#f4d2e8");
+  rect(20, 0, 8, 18, "#f6f1e7");
+  rect(22, 3, 5, 10, "#8f62bd");
+
+  fillCircle(-19, -19, 13, "#8b4e21");
+  fillCircle(19, -19, 13, "#8b4e21");
+  rect(-31, -21, 8, 7, "#d88bdd");
+  rect(23, -21, 8, 7, "#d88bdd");
+  rect(-15, -31, 30, 22, "#f5b780");
+  rect(-18, -32, 36, 12, "#9a5a25");
+  rect(-22, -27, 9, 13, "#8b4e21");
+  rect(13, -27, 9, 13, "#8b4e21");
+  rect(-9, -21, 5, 6, "#11131a");
+  rect(5, -21, 5, 6, "#11131a");
+  rect(-3, -14, 7, 3, "#e4745c");
+  rect(-3, -37, 6, 7, "#b276e2");
+  ctx.restore();
+}
+
+function drawLaoLiangSprite(x, y, scale = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  drawPixelShadow(0, 25, 42, 10);
+
+  rect(-13, 8, 10, 16, "#18191d");
+  rect(4, 8, 10, 16, "#18191d");
+  rect(-16, -9, 32, 22, "#1b1b1f");
+  rect(-21, -7, 9, 16, "#1b1b1f");
+  rect(13, -7, 9, 16, "#1b1b1f");
+  rect(-5, -8, 10, 18, "#f1c15b");
+  rect(-2, -7, 4, 16, "#7f3b12");
+  drawPieCoin(-26, 3, 15);
+  rect(22, 1, 9, 17, "#c97913");
+  rect(24, 4, 5, 3, "#f7d06e");
+  rect(24, 10, 5, 3, "#f7d06e");
+
+  rect(-14, -30, 28, 20, "#f4c08d");
+  rect(-17, -24, 5, 10, "#e29b6d");
+  rect(12, -24, 5, 10, "#e29b6d");
+  rect(-16, -33, 8, 12, "#151413");
+  rect(8, -33, 8, 12, "#151413");
+  rect(-7, -36, 14, 6, "#f5d1a5");
+  strokeCircle(-7, -21, 7, "#2b1d0f", 3);
+  strokeCircle(7, -21, 7, "#2b1d0f", 3);
+  rect(-1, -22, 2, 2, "#2b1d0f");
+  rect(-9, -13, 18, 5, "#2b1d0f");
+  rect(-4, -16, 8, 3, "#3a2414");
+  ctx.restore();
+}
+
+function drawPatrolSprite(x, y, scale = 1, hitFlash = false) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  drawPixelShadow(0, 28, 46, 12);
+
+  const shell = hitFlash ? "#ffffff" : "#d8e0e8";
+  rect(-17, -25, 34, 27, shell);
+  rect(-12, -35, 24, 14, shell);
+  rect(-8, -40, 5, 8, "#72a5ff");
+  rect(3, -40, 5, 8, "#72a5ff");
+  rect(-10, -31, 20, 7, "#101115");
+  rect(-7, -29, 14, 3, "#5de2d1");
+  rect(-12, -16, 24, 11, "#101115");
+  drawSmallText(hitFlash ? "HIT" : "ERROR", -10, -8, hitFlash ? "#ef6a70" : "#5de2d1", 8);
+  rect(-10, 1, 20, 20, "#c9d2dc");
+  rect(-5, 7, 10, 8, "#f1c15b");
+  rect(-27, -10, 10, 20, shell);
+  rect(17, -10, 10, 20, shell);
+  rect(-29, 9, 14, 7, "#93a7b8");
+  rect(15, 9, 14, 7, "#93a7b8");
+
+  ctx.strokeStyle = "#1c2634";
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(18, 8);
+  ctx.quadraticCurveTo(42, 15, 38, 31);
+  ctx.stroke();
+  rect(32, 25, 20, 9, "#a9b5c3");
+  rect(47, 22, 8, 15, "#283242");
+  ctx.restore();
+}
+
+function drawEmoFluff(x, y, scale = 1, hitFlash = false) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  drawPixelShadow(0, 18, 33, 8);
+
+  const body = hitFlash ? "#ffffff" : "#272838";
+  fillCircle(-10, -1, 13, body);
+  fillCircle(8, -2, 15, body);
+  fillCircle(0, 9, 16, body);
+  rect(-17, -16, 7, 8, "#1d1e2a");
+  rect(9, -18, 8, 9, "#1d1e2a");
+  rect(-8, -3, 5, 7, "#f6f1e7");
+  rect(6, -3, 5, 7, "#f6f1e7");
+  rect(-6, 9, 16, 4, "#171820");
+  rect(-18, 6, 4, 10, "#4f3a6b");
+  rect(16, 4, 4, 11, "#4f3a6b");
+  ctx.restore();
+}
+
+function drawDeadlineBug(x, y, scale = 1, hitFlash = false) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  drawPixelShadow(0, 20, 34, 8);
+
+  const body = hitFlash ? "#ffffff" : "#ef6a70";
+  rect(-17, -13, 34, 27, body);
+  rect(-12, -20, 24, 9, "#f1c15b");
+  rect(-21, -4, 7, 7, "#f1c15b");
+  rect(14, -4, 7, 7, "#f1c15b");
+  rect(-9, -7, 5, 6, "#171820");
+  rect(5, -7, 5, 6, "#171820");
+  rect(-7, 6, 14, 4, "#581f28");
+  rect(-2, -26, 4, 10, "#72a5ff");
+  strokeCircle(0, -28, 7, "#72a5ff", 2);
+  ctx.restore();
+}
+
+function drawPixelShadow(x, y, width, height) {
+  ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
+  ctx.fillRect(x - width / 2, y - height / 2, width, height);
+}
+
+function drawPieCoin(x, y, radius) {
+  fillCircle(x, y, radius, "#c97913");
+  fillCircle(x, y, radius - 4, "#f1c15b");
+  rect(x - 5, y - 9, 10, 18, "#7f3b12");
+  rect(x - 8, y - 2, 16, 4, "#7f3b12");
+}
+
+function drawBubble(x, y, radius, color) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+function drawSmallText(text, x, y, color, size) {
+  ctx.fillStyle = color;
+  ctx.font = `${size}px Microsoft YaHei, Segoe UI, sans-serif`;
+  ctx.fillText(text, x, y);
+}
+
+function rect(x, y, width, height, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
+}
+
+function fillCircle(x, y, radius, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function strokeCircle(x, y, radius, color, width) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.stroke();
 }
 
 function drawParticles() {
@@ -796,4 +1274,3 @@ ui.restartButton.addEventListener("click", resetGame);
 
 resetGame();
 requestAnimationFrame(update);
-
