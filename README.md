@@ -27,3 +27,6 @@
 - `src/main.js`：游戏逻辑
 - `src/data/game-data.js`：世界观、角色、事件、补丁数据
 - `docs/world-bible.md`：世界观圣经与游戏化方向
+- `docs/design/00-game-pillars.md`：长期项目定位与设计支柱
+- `docs/design/01-long-term-roadmap.md`：长期制作路线与双周节奏
+- `docs/design/02-content-templates.md`：地图、武器、能力、敌人与羁绊模板
