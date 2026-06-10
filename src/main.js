@@ -84,111 +84,9 @@ const gameData = window.GameData ?? { eventDeck: [], upgrades: [] };
 const bugEvents = gameData.eventDeck;
 const upgrades = gameData.upgrades;
 const chapterOne = gameData.chapterOne;
-const weaponDefinitions = [
-  {
-    id: "paperclip",
-    name: "回形针弹弓",
-    desc: "单发高速，适合点掉追击中的异常。",
-    color: "#5de2d1",
-    damage: 28,
-    cooldown: 0.34,
-    bulletSpeed: 620,
-    range: 560,
-    projectileCount: 1,
-    spread: 0,
-    bulletSize: 4,
-    pierce: 0,
-  },
-  {
-    id: "keyboard",
-    name: "键盘宏飞弹",
-    desc: "一次打出三枚按键弹，覆盖面更稳。",
-    color: "#72a5ff",
-    damage: 18,
-    cooldown: 0.46,
-    bulletSpeed: 520,
-    range: 480,
-    projectileCount: 3,
-    spread: 0.22,
-    bulletSize: 4,
-    pierce: 0,
-  },
-  {
-    id: "correction-fluid",
-    name: "修正液喷枪",
-    desc: "近距离高频净化，压住贴脸的小怪。",
-    color: "#f7b4d8",
-    damage: 12,
-    cooldown: 0.16,
-    bulletSpeed: 430,
-    range: 310,
-    projectileCount: 2,
-    spread: 0.18,
-    bulletSize: 5,
-    pierce: 0,
-  },
-];
-const weaponUpgrades = [
-  {
-    id: "weapon-damage",
-    title: "错误码磨尖",
-    effect: "当前武器伤害 +7",
-    actions: [
-      { type: "modifyWeapon", stat: "damage", add: 7 },
-      { type: "log", message: "武器的错误码边缘变锋利了。" },
-    ],
-  },
-  {
-    id: "weapon-cooldown",
-    title: "冷却缓存",
-    effect: "当前武器发射冷却 -15%",
-    actions: [
-      { type: "modifyWeapon", stat: "cooldown", multiply: 0.85, min: 0.08 },
-      { type: "log", message: "武器开始提前预读下一次攻击。" },
-    ],
-  },
-  {
-    id: "weapon-projectile",
-    title: "弹幕分叉",
-    effect: "当前武器子弹数 +1，散射略增",
-    actions: [
-      { type: "modifyWeapon", stat: "projectileCount", add: 1, max: 7 },
-      { type: "modifyWeapon", stat: "spread", add: 0.04, max: 0.46 },
-      { type: "log", message: "弹道分裂成更热闹的 bug 弧线。" },
-    ],
-  },
-  {
-    id: "weapon-pierce",
-    title: "穿透注释",
-    effect: "当前武器穿透 +1，射程 +70",
-    actions: [
-      { type: "modifyWeapon", stat: "pierce", add: 1, max: 3 },
-      { type: "modifyWeapon", stat: "range", add: 70 },
-      { type: "log", message: "子弹学会了穿过第一层异常注释。" },
-    ],
-  },
-  {
-    id: "weapon-speed",
-    title: "弹道加速",
-    effect: "当前武器弹速 +110，射程 +50",
-    actions: [
-      { type: "modifyWeapon", stat: "bulletSpeed", add: 110 },
-      { type: "modifyWeapon", stat: "range", add: 50 },
-      { type: "log", message: "子弹像被老板催过一样冲了出去。" },
-    ],
-  },
-  {
-    id: "weapon-fat-bullet",
-    title: "加粗高亮",
-    effect: "当前武器子弹变大，伤害 +4，反噬 +5",
-    actions: [
-      { type: "modifyWeapon", stat: "bulletSize", add: 2, max: 10 },
-      { type: "modifyWeapon", stat: "damage", add: 4 },
-      { type: "gain", backlash: 5 },
-      { type: "log", message: "攻击被加粗高亮，系统也多看了你一眼。" },
-    ],
-  },
-];
+const weaponDefinitions = gameData.weapons ?? [];
+const weaponUpgrades = gameData.weaponUpgrades ?? [];
+const enemyTypes = gameData.enemyTypes ?? {};
 
 function resetGame() {
   player = { ...playerBase };
@@ -236,16 +134,25 @@ function getEventById(eventId) {
 }
 
 function spawnEnemyNear(x, y, type = "stress") {
+  const definition = enemyTypes[type] ?? enemyTypes.stress ?? {};
+  const speedMin = definition.speedMin ?? 72;
+  const speedMax = definition.speedMax ?? speedMin;
   const enemy = {
     x: clamp(x + random(-40, 40), 40, world.width - 40),
     y: clamp(y + random(-40, 40), 80, world.height - 40),
-    radius: type === "cleaner" ? 24 : 15,
-    hp: type === "cleaner" ? 130 : 55,
-    speed: type === "cleaner" ? 112 : random(72, 98),
+    radius: definition.radius ?? 15,
+    hp: definition.hp ?? 55,
+    speed: random(speedMin, speedMax),
+    damage: definition.damage ?? 10,
+    render: definition.render ?? "emo",
+    deathColor: definition.deathColor ?? "#ef6a70",
+    hitLog: definition.hitLog ?? "异常实体撞上来，报表又多了一页。",
     type,
     hitFlash: 0,
+    slowTimer: 0,
+    slowFactor: 1,
   };
-  if (type === "cleaner") {
+  if (definition.role === "cleaner" || type === "cleaner") {
     cleaners.push(enemy);
   } else {
     enemies.push(enemy);
@@ -292,6 +199,10 @@ function applyActions(actions = []) {
 
     if (action.type === "modifyWeapon") {
       modifyWeapon(action);
+    }
+
+    if (action.type === "boostWeaponTrait") {
+      boostWeaponTrait();
     }
 
     if (action.type === "log") {
@@ -352,7 +263,7 @@ function openWeaponSelect() {
   for (const weapon of weaponDefinitions) {
     const button = document.createElement("button");
     button.className = "choice-button";
-    button.innerHTML = `<span class="choice-title">${weapon.name}</span><span class="choice-effect">${weapon.desc}</span>`;
+    button.innerHTML = `<span class="choice-title">${weapon.name} · ${weapon.role}</span><span class="choice-effect">${weapon.desc}<br>${weapon.traitText}</span>`;
     button.addEventListener("click", () => {
       equipWeapon(weapon);
       ui.storyPanel.classList.add("hidden");
@@ -365,7 +276,7 @@ function openWeaponSelect() {
 }
 
 function equipWeapon(weapon) {
-  player.weapon = { ...weapon, cooldownLeft: 0, level: 1 };
+  player.weapon = { ...JSON.parse(JSON.stringify(weapon)), cooldownLeft: 0, level: 1, shotsFired: 0 };
   setLog(`已装备：${weapon.name}。它会自动攻击最近的异常实体。`);
 }
 
@@ -378,6 +289,29 @@ function modifyWeapon({ stat, add = 0, multiply = 1, min = -Infinity, max = Infi
   const next = current * multiply + add;
   player.weapon[stat] = clamp(next, min, max);
   player.weapon.level += stat === "level" ? 0 : 0.25;
+}
+
+function boostWeaponTrait() {
+  if (!player.weapon?.trait) {
+    return;
+  }
+
+  const trait = player.weapon.trait;
+  if (trait.type === "chargedShot") {
+    trait.every = Math.max(2, trait.every - 1);
+    trait.damageMultiplier += 0.25;
+    return;
+  }
+
+  if (trait.type === "knockback") {
+    trait.force += 8;
+    return;
+  }
+
+  if (trait.type === "slowOnHit") {
+    trait.duration += 0.25;
+    trait.factor = Math.max(0.35, trait.factor - 0.05);
+  }
 }
 
 function openStory(story) {
@@ -568,6 +502,9 @@ function fireWeaponAt(target) {
   const count = Math.max(1, Math.round(weapon.projectileCount));
   const baseAngle = Math.atan2(target.y - player.y, target.x - player.x);
   const spread = weapon.spread ?? 0;
+  weapon.shotsFired += 1;
+  const trait = weapon.trait;
+  const charged = trait?.type === "chargedShot" && weapon.shotsFired % trait.every === 0;
 
   for (let index = 0; index < count; index += 1) {
     const centered = index - (count - 1) / 2;
@@ -577,11 +514,14 @@ function fireWeaponAt(target) {
       y: player.y - 8,
       vx: Math.cos(angle) * weapon.bulletSpeed,
       vy: Math.sin(angle) * weapon.bulletSpeed,
-      radius: weapon.bulletSize,
-      damage: weapon.damage,
-      color: weapon.color,
+      radius: weapon.bulletSize + (charged ? trait.bulletSizeAdd : 0),
+      damage: weapon.damage * (charged ? trait.damageMultiplier : 1),
+      color: charged ? trait.color : weapon.color,
       life: weapon.range / weapon.bulletSpeed,
       pierce: Math.round(weapon.pierce),
+      knockback: trait?.type === "knockback" ? trait.force : 0,
+      slowFactor: trait?.type === "slowOnHit" ? trait.factor : 1,
+      slowDuration: trait?.type === "slowOnHit" ? trait.duration : 0,
       hitTargets: new Set(),
     });
   }
@@ -642,6 +582,15 @@ function updateBullets(dt) {
       enemy.hitFlash = 0.14;
       bullet.hitTargets.add(enemy);
       burst(enemy.x, enemy.y, bullet.color, 7);
+      if (bullet.knockback > 0) {
+        const angle = Math.atan2(enemy.y - player.y, enemy.x - player.x);
+        enemy.x = clamp(enemy.x + Math.cos(angle) * bullet.knockback, enemy.radius, world.width - enemy.radius);
+        enemy.y = clamp(enemy.y + Math.sin(angle) * bullet.knockback, 76, world.height - enemy.radius);
+      }
+      if (bullet.slowDuration > 0) {
+        enemy.slowTimer = Math.max(enemy.slowTimer, bullet.slowDuration);
+        enemy.slowFactor = Math.min(enemy.slowFactor, bullet.slowFactor);
+      }
 
       if (bullet.pierce <= 0) {
         bullet.life = 0;
@@ -655,14 +604,14 @@ function updateBullets(dt) {
     if (enemy.hp > 0) {
       return true;
     }
-    burst(enemy.x, enemy.y, "#ef6a70", 14);
+    burst(enemy.x, enemy.y, enemy.deathColor, 14);
     return false;
   });
   cleaners = cleaners.filter((enemy) => {
     if (enemy.hp > 0) {
       return true;
     }
-    burst(enemy.x, enemy.y, "#72a5ff", 20);
+    burst(enemy.x, enemy.y, enemy.deathColor, 20);
     return false;
   });
   bullets = bullets.filter((bullet) => {
@@ -673,18 +622,22 @@ function updateBullets(dt) {
 function updateEnemies(dt) {
   for (const enemy of [...enemies, ...cleaners]) {
     const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
-    enemy.x += Math.cos(angle) * enemy.speed * dt;
-    enemy.y += Math.sin(angle) * enemy.speed * dt;
+    enemy.slowTimer = Math.max(0, enemy.slowTimer - dt);
+    if (enemy.slowTimer <= 0) {
+      enemy.slowFactor = 1;
+    }
+    const speed = enemy.speed * enemy.slowFactor;
+    enemy.x += Math.cos(angle) * speed * dt;
+    enemy.y += Math.sin(angle) * speed * dt;
     enemy.hitFlash = Math.max(0, enemy.hitFlash - dt);
     resolveDeskCollision(enemy);
 
     if (distance(enemy, player) < enemy.radius + player.radius && player.invulnerable <= 0) {
-      const damage = enemy.type === "cleaner" ? 24 : 10;
-      player.hp -= damage;
+      player.hp -= enemy.damage;
       player.invulnerable = 0.55;
       world.cameraShake = 0.18;
       burst(player.x, player.y, "#ef6a70", 10);
-      setLog(enemy.type === "cleaner" ? "白箱巡检员擦掉了你的一段状态。" : "压力实体撞上来，报表又多了一页。");
+      setLog(enemy.hitLog);
     }
   }
 }
@@ -925,7 +878,7 @@ function drawEnemies() {
     drawEnemy(enemy);
   }
   for (const cleaner of cleaners) {
-  drawPatrolSprite(cleaner.x, cleaner.y, 0.82, cleaner.hitFlash > 0);
+    drawEnemy(cleaner);
     ctx.strokeStyle = "#72a5ff";
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -949,8 +902,13 @@ function drawAllies() {
 }
 
 function drawEnemy(enemy) {
-  if (enemy.type === "deadline") {
+  if (enemy.render === "deadline") {
     drawDeadlineBug(enemy.x, enemy.y, 0.76, enemy.hitFlash > 0);
+    return;
+  }
+
+  if (enemy.render === "patrol") {
+    drawPatrolSprite(enemy.x, enemy.y, 0.82, enemy.hitFlash > 0);
     return;
   }
 
