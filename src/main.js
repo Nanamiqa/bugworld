@@ -22,6 +22,11 @@ const ui = {
   storySpeaker: document.querySelector("#storySpeaker"),
   storyTitle: document.querySelector("#storyTitle"),
   storyText: document.querySelector("#storyText"),
+  storyAvatarFrame: document.querySelector("#storyAvatarFrame"),
+  storyAvatar: document.querySelector("#storyAvatar"),
+  storyAvatarFallback: document.querySelector("#storyAvatarFallback"),
+  storyProgress: document.querySelector("#storyProgress"),
+  storyContinue: document.querySelector("#storyContinue"),
   storyChoices: document.querySelector("#storyChoices"),
   upgradePanel: document.querySelector("#upgradePanel"),
   upgradeChoices: document.querySelector("#upgradeChoices"),
@@ -72,9 +77,12 @@ let particles;
 let bullets;
 let bugPickups;
 let cleaners;
+let boss;
+let protocolHazards;
 let activeEvent = null;
 let nextUpgradeAt = 2;
 let chapterState;
+let storyState = null;
 
 const desks = [
   { x: 84, y: 104, w: 136, h: 54, tag: "Q3报表" },
@@ -95,6 +103,39 @@ const chapterOne = gameData.chapterOne;
 const weaponDefinitions = gameData.weapons ?? [];
 const weaponUpgrades = gameData.weaponUpgrades ?? [];
 const enemyTypes = gameData.enemyTypes ?? {};
+const assetSources = {
+  andu: "docs/art/安渡：游戏内小人.png",
+  qiaoYou: "docs/art/乔柚：游戏内小人.png",
+  laoLiang: "docs/art/老梁：游戏内小人.png",
+  inspector: "docs/art/白箱巡检员：游戏内小人.png",
+};
+const storyAvatarSources = {
+  安渡: "docs/art/安渡：头像.png",
+  乔柚: "docs/art/乔柚：头像.png",
+  老梁: "docs/art/老梁：头像.png",
+  白箱巡检员: "docs/art/白箱巡检员：头像.png",
+  andu: "docs/art/安渡：头像.png",
+  qiaoYou: "docs/art/乔柚：头像.png",
+  laoLiang: "docs/art/老梁：头像.png",
+  inspector: "docs/art/白箱巡检员：头像.png",
+};
+const assets = loadGameAssets(assetSources);
+
+function loadGameAssets(sources) {
+  const loaded = {};
+  for (const [key, src] of Object.entries(sources)) {
+    const image = new Image();
+    image.onload = () => {
+      loaded[key].ready = true;
+    };
+    image.onerror = () => {
+      loaded[key].ready = false;
+    };
+    loaded[key] = { image, ready: false };
+    image.src = encodeURI(src);
+  }
+  return loaded;
+}
 
 function resetGame() {
   player = { ...playerBase };
@@ -104,6 +145,8 @@ function resetGame() {
   bullets = [];
   bugPickups = [];
   cleaners = [];
+  boss = null;
+  protocolHazards = [];
   activeEvent = null;
   nextUpgradeAt = 2;
   chapterState = {
@@ -111,6 +154,7 @@ function resetGame() {
     resolvedInStep: 0,
     resolvedTotal: 0,
     allies: [],
+    bossCleared: false,
     finished: false,
   };
   world.mode = "playing";
@@ -119,9 +163,10 @@ function resetGame() {
   world.dashCooldown = 0;
   world.cameraShake = 0;
   hidePanels();
+  storyState = null;
   seedOfficeBugPickups();
   setChapterObjective("调查办公室异常");
-  setLog("凌晨 03:32，安渡从键盘上醒来。先从抽屉里摸一件趁手工具。");
+  setLog("凌晨 03:32，安渡从键盘上醒来。手机显示：外卖订单已超时 999 分钟。");
   syncHud();
   openWeaponSelect();
 }
@@ -233,6 +278,10 @@ function applyActions(actions = []) {
       spawnEnemyNear(action.x, action.y, "cleaner");
     }
 
+    if (action.type === "startBossFight") {
+      startBossFight(action.bossId);
+    }
+
     if (action.type === "addAlly" && !chapterState.allies.includes(action.allyId)) {
       chapterState.allies.push(action.allyId);
     }
@@ -267,10 +316,15 @@ function setChapterObjective(objective) {
 
 function openWeaponSelect() {
   world.mode = "story";
+  storyState = null;
   ui.storySpeaker.textContent = "系统弹窗";
   ui.storyTitle.textContent = "选择初始武器";
   ui.storyText.textContent = "变量城的夜间异常已经开始显形。安渡从抽屉里摸出一件工具，决定先活过这个凌晨。武器会自动锁定最近的异常实体发射子弹。";
+  ui.storyProgress.textContent = "";
+  ui.storyContinue.textContent = "";
+  renderStoryAvatar("系统弹窗");
   ui.storyChoices.innerHTML = "";
+  ui.storyPanel.classList.add("has-choices");
 
   for (const weapon of weaponDefinitions) {
     const button = document.createElement("button");
@@ -370,23 +424,101 @@ function spawnBugPickup(x, y, bugValue = 1, xpValue = 2) {
 
 function openStory(story) {
   world.mode = "story";
-  ui.storySpeaker.textContent = story.speaker;
-  ui.storyTitle.textContent = story.title;
-  ui.storyText.textContent = story.text;
-  ui.storyChoices.innerHTML = "";
+  const lines = normalizeStoryLines(story);
+  storyState = {
+    story,
+    lines,
+    index: 0,
+  };
+  renderStoryLine();
+  ui.storyPanel.classList.remove("hidden");
+}
 
-  for (const choice of story.choices) {
+function normalizeStoryLines(story) {
+  if (Array.isArray(story.lines) && story.lines.length > 0) {
+    return story.lines.map((line) => ({
+      speaker: line.speaker ?? story.speaker,
+      title: line.title ?? story.title,
+      text: line.text ?? "",
+      avatar: line.avatar ?? story.avatar,
+    }));
+  }
+
+  return [
+    {
+      speaker: story.speaker,
+      title: story.title,
+      text: story.text,
+      avatar: story.avatar,
+    },
+  ];
+}
+
+function renderStoryLine() {
+  if (!storyState) {
+    return;
+  }
+
+  const line = storyState.lines[storyState.index];
+  const isLastLine = storyState.index >= storyState.lines.length - 1;
+  ui.storySpeaker.textContent = line.speaker;
+  ui.storyTitle.textContent = line.title;
+  ui.storyText.textContent = line.text;
+  ui.storyProgress.textContent = `${storyState.index + 1}/${storyState.lines.length}`;
+  ui.storyChoices.innerHTML = "";
+  renderStoryAvatar(line.speaker, line.avatar);
+
+  if (isLastLine) {
+    renderStoryChoices(storyState.story.choices ?? []);
+    ui.storyContinue.textContent = (storyState.story.choices ?? []).length > 0 ? "选择回应" : "";
+    ui.storyPanel.classList.toggle("has-choices", (storyState.story.choices ?? []).length > 0);
+    return;
+  }
+
+  ui.storyContinue.textContent = "点击继续";
+  ui.storyPanel.classList.remove("has-choices");
+}
+
+function renderStoryChoices(choices) {
+  for (const choice of choices) {
     const button = document.createElement("button");
     button.className = "choice-button";
     button.innerHTML = `<span class="choice-title">${choice.title}</span><span class="choice-effect">${choice.effect}</span>`;
-    button.addEventListener("click", () => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
       ui.storyPanel.classList.add("hidden");
+      ui.storyPanel.classList.remove("has-choices");
+      storyState = null;
       applyActions(choice.actions);
     });
     ui.storyChoices.appendChild(button);
   }
+}
 
-  ui.storyPanel.classList.remove("hidden");
+function advanceStory() {
+  if (!storyState || storyState.index >= storyState.lines.length - 1) {
+    return;
+  }
+  storyState.index += 1;
+  renderStoryLine();
+}
+
+function renderStoryAvatar(speaker, avatarKey = null) {
+  const source = storyAvatarSources[avatarKey] ?? storyAvatarSources[speaker];
+  const fallbackText = (speaker || "?").replace(/[：: ].*$/, "").slice(0, 1) || "?";
+  ui.storyAvatarFallback.textContent = fallbackText;
+  ui.storyAvatar.onerror = () => {
+    ui.storyAvatarFrame.classList.add("is-empty");
+  };
+
+  if (!source) {
+    ui.storyAvatar.removeAttribute("src");
+    ui.storyAvatarFrame.classList.add("is-empty");
+    return;
+  }
+
+  ui.storyAvatarFrame.classList.remove("is-empty");
+  ui.storyAvatar.src = encodeURI(source);
 }
 
 function startChapterStep(stepIndex) {
@@ -415,6 +547,38 @@ function spawnChapterNodes(step) {
   world.mode = "playing";
 }
 
+function startBossFight() {
+  bugNodes = [];
+  enemies = enemies.slice(0, 4);
+  cleaners = [];
+  protocolHazards = [];
+  boss = {
+    id: "delivery-rider",
+    name: "协议骑手·周行",
+    x: 1034,
+    y: 548,
+    radius: 34,
+    hp: 1250,
+    maxHp: 1250,
+    speed: 98,
+    damage: 18,
+    phase: 1,
+    state: "idle",
+    stateTimer: 0.85,
+    attackCooldown: 0.8,
+    hitFlash: 0,
+    slowTimer: 0,
+    slowFactor: 1,
+    dash: null,
+    lastRoute: null,
+    logTimer: 0,
+  };
+  chapterState.stepIndex = 4;
+  setChapterObjective("打断错误配送协议，救回外卖小哥周行");
+  setLog("Boss 战开始：订单被误识别成网络数据包。躲开路线，打掉大件包。");
+  world.mode = "playing";
+}
+
 function handleChapterEventResolved(removedNode) {
   if (removedNode.chapterStep !== chapterState.stepIndex || chapterState.finished) {
     return false;
@@ -436,6 +600,7 @@ function handleChapterEventResolved(removedNode) {
 
 function hidePanels() {
   ui.storyPanel.classList.add("hidden");
+  ui.storyPanel.classList.remove("has-choices");
   ui.eventPanel.classList.add("hidden");
   ui.upgradePanel.classList.add("hidden");
   ui.resultPanel.classList.add("hidden");
@@ -449,7 +614,9 @@ function syncHud() {
   ui.weapon.textContent = player.weapon ? `${player.weapon.name} Lv.${Math.floor(player.weapon.level)}` : "未选择";
   ui.bug.parentElement.title = player.weapon ? `当前武器：${player.weapon.name}` : "";
   ui.backlash.textContent = `${Math.round(player.backlash)}%`;
-  ui.fixed.textContent = `${chapterState?.resolvedTotal ?? 0}/7`;
+  const totalObjectives = chapterOne.totalObjectives ?? 7;
+  const bossProgress = chapterState?.bossCleared ? 1 : 0;
+  ui.fixed.textContent = `${(chapterState?.resolvedTotal ?? 0) + bossProgress}/${totalObjectives}`;
 }
 
 function update(time) {
@@ -475,6 +642,8 @@ function updatePlaying(dt) {
   movePlayer(dt);
   updateWeapon(dt);
   updateBullets(dt);
+  updateBoss(dt);
+  updateProtocolHazards(dt);
   updateEnemies(dt);
   updateBugPickups(dt);
   if (world.mode !== "playing") {
@@ -485,9 +654,10 @@ function updatePlaying(dt) {
   handleActions();
   maybeEscalateBacklash(dt);
 
+  const bossActive = Boolean(boss && boss.hp > 0);
   const spawnEvery = chapterState.stepIndex >= 2 ? 1.75 : 2.6;
   const maxEnemies = chapterState.stepIndex >= 3 ? 18 : 13;
-  if (world.spawnTimer > spawnEvery && enemies.length < maxEnemies) {
+  if (!bossActive && world.spawnTimer > spawnEvery && enemies.length < maxEnemies) {
     world.spawnTimer = 0;
     spawnEnemyWave(chapterState.stepIndex >= 3 ? 3 : 2);
   }
@@ -550,7 +720,11 @@ function updateWeapon(dt) {
 function findNearestHostile(range) {
   let nearest = null;
   let nearestDistance = range;
-  for (const enemy of [...enemies, ...cleaners]) {
+  const hostiles = [...enemies, ...cleaners];
+  if (boss && boss.hp > 0) {
+    hostiles.push(boss);
+  }
+  for (const enemy of hostiles) {
     const currentDistance = distance(player, enemy);
     if (currentDistance < nearestDistance) {
       nearest = enemy;
@@ -632,13 +806,24 @@ function repairPulse() {
   burst(player.x, player.y, "#72a5ff", 30);
 
   const allHostiles = [...enemies, ...cleaners];
+  if (boss && boss.hp > 0) {
+    allHostiles.push(boss);
+  }
   for (const enemy of allHostiles) {
     if (distance(enemy, player) <= player.pulseRadius + enemy.radius) {
       enemy.hp -= player.pulseDamage;
       enemy.hitFlash = 0.16;
     }
   }
+  for (const hazard of protocolHazards) {
+    if (hazard.destructible && distance(hazard, player) <= player.pulseRadius + hazard.radius) {
+      hazard.hp -= player.pulseDamage;
+      hazard.hitFlash = 0.16;
+    }
+  }
   clearDefeatedHostiles();
+  clearResolvedProtocolHazards();
+  checkBossDefeat();
   setLog("安渡把错误码拍成了一圈蓝色涟漪。");
 }
 
@@ -649,6 +834,9 @@ function updateBullets(dt) {
     bullet.life -= dt;
 
     const hostiles = [...enemies, ...cleaners];
+    if (boss && boss.hp > 0) {
+      hostiles.push(boss);
+    }
     for (const enemy of hostiles) {
       if (bullet.hitTargets.has(enemy) || distance(bullet, enemy) > bullet.radius + enemy.radius) {
         continue;
@@ -674,9 +862,30 @@ function updateBullets(dt) {
       }
       bullet.pierce -= 1;
     }
+
+    if (bullet.life <= 0) {
+      continue;
+    }
+
+    for (const hazard of protocolHazards) {
+      if (!hazard.destructible || bullet.hitTargets.has(hazard) || distance(bullet, hazard) > bullet.radius + hazard.radius) {
+        continue;
+      }
+      hazard.hp -= bullet.damage;
+      hazard.hitFlash = 0.14;
+      bullet.hitTargets.add(hazard);
+      burst(hazard.x, hazard.y, bullet.color, 7);
+      if (bullet.pierce <= 0) {
+        bullet.life = 0;
+        break;
+      }
+      bullet.pierce -= 1;
+    }
   }
 
   clearDefeatedHostiles();
+  clearResolvedProtocolHazards();
+  checkBossDefeat();
   bullets = bullets.filter((bullet) => {
     return bullet.life > 0 && bullet.x > -40 && bullet.x < world.width + 40 && bullet.y > 40 && bullet.y < world.height + 40;
   });
@@ -707,6 +916,314 @@ function defeatEnemy(enemy, particleCount) {
   }
 }
 
+function updateBoss(dt) {
+  if (!boss || boss.hp <= 0) {
+    return;
+  }
+
+  boss.hitFlash = Math.max(0, boss.hitFlash - dt);
+  boss.logTimer = Math.max(0, boss.logTimer - dt);
+  boss.slowTimer = Math.max(0, boss.slowTimer - dt);
+  if (boss.slowTimer <= 0) {
+    boss.slowFactor = 1;
+  }
+
+  const previousPhase = boss.phase;
+  if (boss.hp <= boss.maxHp * 0.35) {
+    boss.phase = 3;
+  } else if (boss.hp <= boss.maxHp * 0.65) {
+    boss.phase = 2;
+  } else {
+    boss.phase = 1;
+  }
+
+  if (boss.phase !== previousPhase) {
+    const phaseLog = boss.phase === 2 ? "周行的外卖箱开始触发超时重传。" : "错误路线开始 DNS 解析，取餐区变成一张发烫的网。";
+    setLog(phaseLog);
+    world.cameraShake = 0.2;
+  }
+
+  if (boss.state === "handshake") {
+    boss.stateTimer -= dt;
+    if (boss.stateTimer <= 0) {
+      startBossDash();
+    }
+    return;
+  }
+
+  if (boss.state === "dash") {
+    updateBossDash(dt);
+    return;
+  }
+
+  boss.attackCooldown -= dt;
+  driftBossTowardPlayer(dt);
+
+  if (distance(boss, player) < boss.radius + player.radius) {
+    damagePlayer(boss.damage, "周行被错误协议拖着冲撞过来：订单必须送达。");
+  }
+
+  if (boss.attackCooldown <= 0) {
+    chooseBossAttack();
+  }
+}
+
+function driftBossTowardPlayer(dt) {
+  const angle = Math.atan2(player.y - boss.y, player.x - boss.x);
+  const desiredDistance = 250;
+  const currentDistance = distance(player, boss);
+  const direction = currentDistance > desiredDistance ? 1 : -0.35;
+  const speed = boss.speed * boss.slowFactor;
+  boss.x = clamp(boss.x + Math.cos(angle) * speed * direction * dt, boss.radius, world.width - boss.radius);
+  boss.y = clamp(boss.y + Math.sin(angle) * speed * direction * dt, 86, world.height - boss.radius);
+  resolveDeskCollision(boss);
+}
+
+function chooseBossAttack() {
+  const roll = Math.random();
+
+  if (boss.phase === 3 && roll < 0.34) {
+    startFtpTransfer();
+    return;
+  }
+
+  if (boss.phase >= 2 && roll < 0.62) {
+    startUdpBurst();
+    return;
+  }
+
+  if (boss.phase === 3 && roll < 0.84) {
+    startDnsError();
+    return;
+  }
+
+  startTcpHandshake();
+}
+
+function startTcpHandshake() {
+  const angle = Math.atan2(player.y - boss.y, player.x - boss.x);
+  const routeLength = boss.phase >= 2 ? 680 : 580;
+  const targetX = clamp(boss.x + Math.cos(angle) * routeLength, 52, world.width - 52);
+  const targetY = clamp(boss.y + Math.sin(angle) * routeLength, 92, world.height - 52);
+  boss.lastRoute = { x1: boss.x, y1: boss.y, x2: targetX, y2: targetY };
+  boss.state = "handshake";
+  boss.stateTimer = 1.25;
+  boss.attackCooldown = 1.05;
+  if (boss.logTimer <= 0) {
+    setLog("TCP 三次握手：路线先确认三次，第三次亮起后周行会冲刺。");
+    boss.logTimer = 4;
+  }
+}
+
+function startBossDash() {
+  const route = boss.lastRoute;
+  boss.state = "dash";
+  boss.dash = {
+    ...route,
+    elapsed: 0,
+    duration: boss.phase >= 2 ? 0.36 : 0.44,
+    damaged: false,
+  };
+}
+
+function updateBossDash(dt) {
+  boss.dash.elapsed += dt;
+  const t = clamp(boss.dash.elapsed / boss.dash.duration, 0, 1);
+  boss.x = boss.dash.x1 + (boss.dash.x2 - boss.dash.x1) * t;
+  boss.y = boss.dash.y1 + (boss.dash.y2 - boss.dash.y1) * t;
+
+  if (!boss.dash.damaged && distance(boss, player) < boss.radius + player.radius + 8) {
+    boss.dash.damaged = true;
+    damagePlayer(18 + boss.phase * 4, "TCP ACK 已确认，周行沿着错误路线撞了过来。");
+  }
+
+  if (t >= 1) {
+    if (boss.phase >= 2) {
+      addRetransmitRoute(boss.dash);
+    }
+    boss.state = "idle";
+    boss.dash = null;
+    boss.attackCooldown = boss.phase === 3 ? 0.55 : 0.88;
+  }
+}
+
+function addRetransmitRoute(route) {
+  protocolHazards.push({
+    type: "retransmit",
+    x1: route.x1,
+    y1: route.y1,
+    x2: route.x2,
+    y2: route.y2,
+    timer: 1.35,
+    activeTime: 0.34,
+    damaged: false,
+  });
+}
+
+function startUdpBurst() {
+  const count = boss.phase === 3 ? 16 : 11;
+  for (let index = 0; index < count; index += 1) {
+    const angle = (Math.PI * 2 * index) / count + random(-0.14, 0.14);
+    const speed = random(175, boss.phase === 3 ? 300 : 250);
+    protocolHazards.push({
+      type: "package",
+      x: boss.x,
+      y: boss.y - 10,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      radius: 12,
+      life: 3.1,
+      damage: boss.phase === 3 ? 12 : 10,
+      color: "#f1c15b",
+    });
+  }
+  boss.attackCooldown = boss.phase === 3 ? 0.9 : 1.2;
+  setLog("UDP 乱送模式：外卖包被高速撒出，不确认谁收到了。");
+}
+
+function startFtpTransfer() {
+  const existingFtp = protocolHazards.some((hazard) => hazard.type === "ftp");
+  if (!existingFtp) {
+    protocolHazards.push({
+      type: "ftp",
+      x: 870,
+      y: 348,
+      radius: 44,
+      hp: 230,
+      maxHp: 230,
+      timer: 4.8,
+      destructible: true,
+      hitFlash: 0,
+    });
+    setLog("FTP 大件传输中：打爆中央的大件外卖包，别让它上传完成。");
+  }
+  boss.attackCooldown = 1.2;
+}
+
+function startDnsError() {
+  for (let index = 0; index < 5; index += 1) {
+    const nearPlayer = index < 2;
+    protocolHazards.push({
+      type: "dns",
+      x: clamp((nearPlayer ? player.x : random(160, world.width - 140)) + random(-90, 90), 58, world.width - 58),
+      y: clamp((nearPlayer ? player.y : random(120, world.height - 90)) + random(-70, 70), 98, world.height - 58),
+      radius: 44,
+      timer: 1.35 + index * 0.1,
+      damage: 15,
+      triggered: false,
+    });
+  }
+  boss.attackCooldown = 1.0;
+  setLog("DNS 地址解析错误：取餐点被翻译到了错误位置。");
+}
+
+function updateProtocolHazards(dt) {
+  for (const hazard of protocolHazards) {
+    if (hazard.type === "package") {
+      hazard.x += hazard.vx * dt;
+      hazard.y += hazard.vy * dt;
+      hazard.life -= dt;
+      if (distance(hazard, player) < hazard.radius + player.radius) {
+        hazard.life = 0;
+        damagePlayer(hazard.damage, "UDP 外卖包砸在身上，快是快，就是不讲道理。");
+      }
+    }
+
+    if (hazard.type === "retransmit") {
+      hazard.timer -= dt;
+      if (hazard.timer <= 0) {
+        hazard.activeTime -= dt;
+        if (!hazard.damaged && distancePointToSegment(player, hazard) < player.radius + 18) {
+          hazard.damaged = true;
+          damagePlayer(16, "超时重传影子沿旧路线补送了一次。");
+        }
+      }
+    }
+
+    if (hazard.type === "ftp") {
+      hazard.timer -= dt;
+      hazard.hitFlash = Math.max(0, hazard.hitFlash - dt);
+      if (hazard.timer <= 0) {
+        hazard.exploded = true;
+        hazard.remove = true;
+        world.cameraShake = 0.24;
+        burst(hazard.x, hazard.y, "#f1c15b", 34);
+        spawnEnemyNear(hazard.x - 64, hazard.y + 24, "deadline");
+        spawnEnemyNear(hazard.x + 64, hazard.y + 24, "stress");
+        if (distance(hazard, player) < 190) {
+          damagePlayer(20, "FTP 大件上传完成，整片取餐区被热汤数据炸开。");
+        } else {
+          setLog("FTP 大件上传完成，新的异常从外卖箱里爬了出来。");
+        }
+      }
+    }
+
+    if (hazard.type === "dns") {
+      hazard.timer -= dt;
+      if (hazard.timer <= 0 && !hazard.triggered) {
+        hazard.triggered = true;
+        hazard.remove = true;
+        burst(hazard.x, hazard.y, "#72a5ff", 22);
+        if (distance(hazard, player) < hazard.radius + player.radius) {
+          damagePlayer(hazard.damage, "DNS 解析错位，外卖炸弹落在了你的坐标上。");
+        }
+      }
+    }
+  }
+
+  clearResolvedProtocolHazards();
+}
+
+function clearResolvedProtocolHazards() {
+  protocolHazards = protocolHazards.filter((hazard) => {
+    if (hazard.type === "package") {
+      return hazard.life > 0 && hazard.x > -80 && hazard.x < world.width + 80 && hazard.y > 40 && hazard.y < world.height + 80;
+    }
+
+    if (hazard.type === "retransmit") {
+      return hazard.activeTime > 0;
+    }
+
+    if (hazard.type === "ftp" && hazard.hp <= 0 && !hazard.exploded) {
+      burst(hazard.x, hazard.y, "#5de2d1", 32);
+      spawnBugPickup(hazard.x, hazard.y, 2, 5);
+      setLog("FTP 大件包被提前打断，传输队列少了一大截。");
+      return false;
+    }
+
+    return !hazard.remove;
+  });
+}
+
+function checkBossDefeat() {
+  if (!boss || boss.hp > 0 || boss.defeated) {
+    return;
+  }
+
+  boss.defeated = true;
+  chapterState.bossCleared = true;
+  protocolHazards = [];
+  enemies = [];
+  cleaners = [];
+  burst(boss.x, boss.y, "#5de2d1", 48);
+  boss = null;
+  world.cameraShake = 0.28;
+  openStory(chapterOne.bossVictory);
+}
+
+function damagePlayer(amount, message) {
+  if (player.invulnerable > 0 || world.mode !== "playing") {
+    return false;
+  }
+
+  player.hp -= amount;
+  player.invulnerable = 0.55;
+  world.cameraShake = 0.18;
+  burst(player.x, player.y, "#ef6a70", 10);
+  setLog(message);
+  return true;
+}
+
 function updateEnemies(dt) {
   for (const enemy of [...enemies, ...cleaners]) {
     const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
@@ -721,11 +1238,7 @@ function updateEnemies(dt) {
     resolveDeskCollision(enemy);
 
     if (distance(enemy, player) < enemy.radius + player.radius && player.invulnerable <= 0) {
-      player.hp -= enemy.damage;
-      player.invulnerable = 0.55;
-      world.cameraShake = 0.18;
-      burst(player.x, player.y, "#ef6a70", 10);
-      setLog(enemy.hitLog);
+      damagePlayer(enemy.damage, enemy.hitLog);
     }
   }
 }
@@ -758,6 +1271,10 @@ function updateBugPickups(dt) {
 }
 
 function maybeEscalateBacklash(dt) {
+  if (boss && boss.hp > 0) {
+    return;
+  }
+
   const cleanerCanAppear = chapterState.finished || chapterState.stepIndex >= 3;
   if (cleanerCanAppear && player.backlash >= 75 && cleaners.length === 0) {
     spawnEnemyNear(world.width - 110, 96, "cleaner");
@@ -923,11 +1440,14 @@ function draw(dt) {
   drawOffice();
   drawBugNodes(dt);
   drawBugPickups();
+  drawProtocolHazards();
   drawBullets();
   drawEnemies();
+  drawBoss();
   drawAllies();
   drawPlayer();
   drawParticles();
+  drawBossHud();
   ctx.restore();
 }
 
@@ -971,6 +1491,7 @@ function drawOffice() {
   drawServerRack(750, 424);
   drawServerRack(820, 424);
   drawPrinter(1034, 526);
+  drawDeliveryPickupZone(940, 558);
 
   if ((chapterState?.stepIndex ?? -1) >= 3 || player.fixed >= 3) {
     drawLaoLiangSprite(1080, 118, 0.88);
@@ -984,6 +1505,40 @@ function drawOffice() {
   ctx.fillRect(44, 628, 186, 30);
   ctx.globalAlpha = 1;
   drawLabel("安渡工位", 78, 650, "#224250");
+}
+
+function drawDeliveryPickupZone(x, y) {
+  ctx.save();
+  ctx.fillStyle = "rgba(241, 193, 91, 0.16)";
+  ctx.fillRect(x - 52, y - 42, 244, 104);
+  ctx.strokeStyle = "rgba(201, 132, 22, 0.38)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x - 52, y - 42, 244, 104);
+
+  for (let row = 0; row < 2; row += 1) {
+    for (let col = 0; col < 4; col += 1) {
+      const px = x - 36 + col * 48;
+      const py = y - 28 + row * 36;
+      ctx.fillStyle = col % 2 === row % 2 ? "#fff4dc" : "#f3dcc0";
+      ctx.fillRect(px, py, 38, 28);
+      ctx.strokeStyle = "#d2a053";
+      ctx.strokeRect(px, py, 38, 28);
+      ctx.fillStyle = "#0f9f95";
+      ctx.globalAlpha = 0.22 + Math.sin(performance.now() / 300 + col + row) * 0.08;
+      ctx.fillRect(px + 6, py + 9, 26, 6);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  ctx.strokeStyle = "rgba(15, 159, 149, 0.45)";
+  ctx.setLineDash([10, 8]);
+  ctx.beginPath();
+  ctx.moveTo(x - 52, y + 72);
+  ctx.lineTo(x + 198, y + 72);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  drawLabel("外卖取餐区", x - 8, y + 80, "#9a6615");
+  ctx.restore();
 }
 
 function drawDesk(desk) {
@@ -1177,6 +1732,122 @@ function drawBullets() {
   }
 }
 
+function drawProtocolHazards() {
+  if (boss?.state === "handshake" && boss.lastRoute) {
+    const pulse = 0.44 + Math.sin(performance.now() / 90) * 0.18;
+    drawProtocolRoute(boss.lastRoute, "#5de2d1", pulse, 5, true);
+    drawProtocolRoute(offsetRoute(boss.lastRoute, 11), "#72a5ff", 0.36, 3, true);
+    drawProtocolRoute(offsetRoute(boss.lastRoute, -11), "#f1c15b", 0.3, 3, true);
+  }
+
+  for (const hazard of protocolHazards) {
+    if (hazard.type === "retransmit") {
+      const armed = hazard.timer <= 0;
+      drawProtocolRoute(hazard, armed ? "#ef6a70" : "#f1c15b", armed ? 0.72 : 0.34, armed ? 8 : 4, !armed);
+    }
+
+    if (hazard.type === "package") {
+      drawDeliveryPackage(hazard.x, hazard.y, hazard.radius, hazard.color);
+    }
+
+    if (hazard.type === "ftp") {
+      drawFtpPackage(hazard);
+    }
+
+    if (hazard.type === "dns") {
+      drawDnsMarker(hazard);
+    }
+  }
+}
+
+function drawProtocolRoute(route, color, alpha, width, dashed = false) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  if (dashed) {
+    ctx.setLineDash([18, 12]);
+  }
+  ctx.beginPath();
+  ctx.moveTo(route.x1, route.y1);
+  ctx.lineTo(route.x2, route.y2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.globalAlpha = Math.min(1, alpha + 0.22);
+  fillCircle(route.x2, route.y2, width + 4, color);
+  ctx.restore();
+}
+
+function offsetRoute(route, amount) {
+  const dx = route.x2 - route.x1;
+  const dy = route.y2 - route.y1;
+  const length = Math.hypot(dx, dy) || 1;
+  const ox = (-dy / length) * amount;
+  const oy = (dx / length) * amount;
+  return {
+    x1: route.x1 + ox,
+    y1: route.y1 + oy,
+    x2: route.x2 + ox,
+    y2: route.y2 + oy,
+  };
+}
+
+function drawDeliveryPackage(x, y, radius, color = "#f1c15b") {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(Math.sin(performance.now() / 180 + x) * 0.18);
+  drawPixelShadow(0, radius + 5, radius * 2.2, 8);
+  rect(-radius, -radius * 0.72, radius * 2, radius * 1.44, "#f6d28a");
+  rect(-radius, -radius * 0.72, radius * 2, 5, "#c98416");
+  rect(-3, -radius * 0.72, 6, radius * 1.44, color);
+  rect(-radius + 4, 2, radius * 0.7, 4, "#9a6615");
+  ctx.restore();
+}
+
+function drawFtpPackage(hazard) {
+  ctx.save();
+  ctx.translate(hazard.x, hazard.y);
+  const flash = hazard.hitFlash > 0 ? "#ffffff" : "#f1c15b";
+  drawPixelShadow(0, 40, 86, 16);
+  rect(-42, -34, 84, 68, flash);
+  rect(-42, -34, 84, 12, "#c98416");
+  rect(-6, -34, 12, 68, "#72a5ff");
+  rect(-28, -2, 56, 8, "#9a6615");
+  ctx.strokeStyle = "#0f9f95";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(0, 0, 54, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(hazard.timer / 5.4, 0, 1));
+  ctx.stroke();
+  ctx.fillStyle = "#26364d";
+  ctx.fillRect(-42, -48, 84, 8);
+  ctx.fillStyle = "#5de2d1";
+  ctx.fillRect(-42, -48, 84 * clamp(hazard.hp / hazard.maxHp, 0, 1), 8);
+  ctx.restore();
+}
+
+function drawDnsMarker(hazard) {
+  ctx.save();
+  const progress = clamp(hazard.timer / 1.9, 0, 1);
+  ctx.globalAlpha = 0.18 + (1 - progress) * 0.36;
+  ctx.fillStyle = "#72a5ff";
+  ctx.beginPath();
+  ctx.arc(hazard.x, hazard.y, hazard.radius * (1.14 - progress * 0.2), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 0.82;
+  ctx.strokeStyle = progress < 0.35 ? "#ef6a70" : "#3e72d8";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(hazard.x, hazard.y, hazard.radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(hazard.x - 10, hazard.y);
+  ctx.lineTo(hazard.x + 10, hazard.y);
+  ctx.moveTo(hazard.x, hazard.y - 10);
+  ctx.lineTo(hazard.x, hazard.y + 10);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawEnemies() {
   for (const enemy of enemies) {
     drawEnemy(enemy);
@@ -1191,6 +1862,37 @@ function drawEnemies() {
   }
 }
 
+function drawBoss() {
+  if (!boss || boss.hp <= 0) {
+    return;
+  }
+
+  drawDeliveryRiderBoss(boss.x, boss.y, 1, boss.hitFlash > 0);
+}
+
+function drawBossHud() {
+  if (!boss || boss.hp <= 0) {
+    return;
+  }
+
+  const width = 420;
+  const x = world.width / 2 - width / 2;
+  const y = 82;
+  ctx.save();
+  ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
+  ctx.fillRect(x - 14, y - 30, width + 28, 58);
+  ctx.strokeStyle = "rgba(26, 42, 68, 0.16)";
+  ctx.strokeRect(x - 14, y - 30, width + 28, 58);
+  ctx.fillStyle = "#17202a";
+  ctx.font = "15px Microsoft YaHei, Segoe UI, sans-serif";
+  ctx.fillText(`${boss.name}  阶段 ${boss.phase}`, x, y - 9);
+  ctx.fillStyle = "#26364d";
+  ctx.fillRect(x, y + 4, width, 12);
+  ctx.fillStyle = boss.phase === 3 ? "#ef6a70" : boss.phase === 2 ? "#f1c15b" : "#5de2d1";
+  ctx.fillRect(x, y + 4, width * clamp(boss.hp / boss.maxHp, 0, 1), 12);
+  ctx.restore();
+}
+
 function drawAllies() {
   if (!chapterState.allies.includes("qiao-you")) {
     return;
@@ -1200,9 +1902,24 @@ function drawAllies() {
   const x = clamp(player.x - 42, 24, world.width - 24);
   const y = clamp(player.y + 28 + bob, 88, world.height - 24);
 
-  drawQiaoYouSprite(x, y, 0.74);
+  if (!drawSpriteAsset("qiaoYou", x, y, 76, 76)) {
+    drawQiaoYouSprite(x, y, 0.74);
+  }
 
   drawLabel("乔柚", x - 14, y - 33, "#ffd7ea");
+}
+
+function drawSpriteAsset(key, x, y, width, height) {
+  const asset = assets[key];
+  if (!asset?.ready) {
+    return false;
+  }
+
+  ctx.save();
+  drawPixelShadow(x, y + height * 0.32, width * 0.54, 10);
+  ctx.drawImage(asset.image, x - width / 2, y - height * 0.68, width, height);
+  ctx.restore();
+  return true;
 }
 
 function drawEnemy(enemy) {
@@ -1224,7 +1941,9 @@ function drawPlayer() {
   if (player.invulnerable > 0) {
     ctx.globalAlpha = 0.62 + Math.sin(performance.now() / 45) * 0.25;
   }
-  drawAnduSprite(player.x, player.y, 0.82);
+  if (!drawSpriteAsset("andu", player.x, player.y, 78, 78)) {
+    drawAnduSprite(player.x, player.y, 0.82);
+  }
   ctx.restore();
 
   if (world.pulseCooldown > 0.38) {
@@ -1312,6 +2031,10 @@ function drawQiaoYouSprite(x, y, scale = 1) {
 }
 
 function drawLaoLiangSprite(x, y, scale = 1) {
+  if (drawSpriteAsset("laoLiang", x, y, 78 * scale, 78 * scale)) {
+    return;
+  }
+
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
@@ -1343,7 +2066,58 @@ function drawLaoLiangSprite(x, y, scale = 1) {
   ctx.restore();
 }
 
+function drawDeliveryRiderBoss(x, y, scale = 1, hitFlash = false) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  drawPixelShadow(0, 34, 70, 16);
+
+  const suit = hitFlash ? "#ffffff" : "#f1c15b";
+  const box = hitFlash ? "#ffffff" : "#c98416";
+  rect(-22, 2, 44, 30, suit);
+  rect(-28, -2, 11, 24, "#26364d");
+  rect(17, -2, 11, 24, "#26364d");
+  rect(-17, 28, 12, 18, "#26364d");
+  rect(5, 28, 12, 18, "#26364d");
+  rect(-22, 43, 16, 6, "#101115");
+  rect(6, 43, 16, 6, "#101115");
+
+  rect(26, -2, 28, 38, box);
+  rect(30, 4, 20, 5, "#f6d28a");
+  rect(32, 15, 16, 4, "#5de2d1");
+  ctx.strokeStyle = "#5de2d1";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(35, 2);
+  ctx.quadraticCurveTo(64, -16, 48, -36);
+  ctx.moveTo(42, 6);
+  ctx.quadraticCurveTo(70, 18, 62, 44);
+  ctx.stroke();
+
+  rect(-19, -29, 38, 24, "#f4bd8b");
+  rect(-22, -38, 44, 17, "#f1c15b");
+  rect(-16, -45, 32, 12, "#c98416");
+  rect(-23, -25, 5, 10, "#e29b6d");
+  rect(18, -25, 5, 10, "#e29b6d");
+  rect(-10, -21, 6, 6, "#101115");
+  rect(5, -21, 6, 6, "#101115");
+  rect(-8, -11, 16, 4, "#7f3b12");
+
+  ctx.globalAlpha = 0.7;
+  ctx.strokeStyle = boss?.phase === 3 ? "#ef6a70" : "#72a5ff";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, -8, 48 + Math.sin(performance.now() / 160) * 4, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
 function drawPatrolSprite(x, y, scale = 1, hitFlash = false) {
+  if (!hitFlash && drawSpriteAsset("inspector", x, y, 82 * scale, 82 * scale)) {
+    return;
+  }
+
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
@@ -1512,6 +2286,16 @@ function distance(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+function distancePointToSegment(point, segment) {
+  const dx = segment.x2 - segment.x1;
+  const dy = segment.y2 - segment.y1;
+  const lengthSquared = dx * dx + dy * dy || 1;
+  const t = clamp(((point.x - segment.x1) * dx + (point.y - segment.y1) * dy) / lengthSquared, 0, 1);
+  const x = segment.x1 + dx * t;
+  const y = segment.y1 + dy * t;
+  return Math.hypot(point.x - x, point.y - y);
+}
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -1533,6 +2317,12 @@ window.addEventListener("keyup", (event) => {
 });
 
 ui.restartButton.addEventListener("click", resetGame);
+ui.storyPanel.addEventListener("click", (event) => {
+  if (event.target.closest("button")) {
+    return;
+  }
+  advanceStory();
+});
 
 resetGame();
 requestAnimationFrame(update);

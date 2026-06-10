@@ -32,11 +32,21 @@
           <strong id="objectiveText">调查办公室异常</strong>
         </div>
 
-        <aside id="storyPanel" class="event-panel hidden" aria-modal="true">
-          <p id="storySpeaker" class="event-kicker">安渡</p>
-          <h2 id="storyTitle">凌晨 03:32</h2>
-          <p id="storyText"></p>
-          <div id="storyChoices" class="choice-grid"></div>
+        <aside id="storyPanel" class="story-panel hidden" aria-modal="true">
+          <div id="storyAvatarFrame" class="story-portrait" aria-hidden="true">
+            <img id="storyAvatar" alt="" />
+            <span id="storyAvatarFallback">安</span>
+          </div>
+          <div class="story-dialogue">
+            <div class="story-meta">
+              <p id="storySpeaker" class="event-kicker">安渡</p>
+              <span id="storyProgress"></span>
+            </div>
+            <h2 id="storyTitle">凌晨 03:32</h2>
+            <p id="storyText"></p>
+            <p id="storyContinue" class="story-continue">点击继续</p>
+            <div id="storyChoices" class="choice-grid"></div>
+          </div>
         </aside>
 
         <aside id="eventPanel" class="event-panel hidden" aria-modal="true">

@@ -154,6 +154,122 @@ h1 {
   display: none;
 }
 
+.story-panel {
+  position: absolute;
+  left: clamp(14px, 3vw, 34px);
+  right: clamp(14px, 3vw, 34px);
+  bottom: clamp(12px, 2.4vw, 28px);
+  z-index: 4;
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr);
+  gap: 16px;
+  align-items: end;
+  padding: 16px;
+  border: 1px solid rgba(26, 42, 68, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 24px 70px rgba(31, 45, 71, 0.24);
+  backdrop-filter: blur(12px);
+}
+
+.story-panel.hidden {
+  display: none;
+}
+
+.story-portrait {
+  position: relative;
+  width: 116px;
+  height: 116px;
+  overflow: hidden;
+  border: 1px solid rgba(26, 42, 68, 0.13);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(93, 226, 209, 0.2), rgba(241, 193, 91, 0.12)),
+    rgba(248, 251, 255, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+}
+
+.story-portrait img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.story-portrait.is-empty img {
+  display: none;
+}
+
+.story-portrait span {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-items: center;
+  color: rgba(23, 32, 42, 0.56);
+  font-size: 2.1rem;
+  font-weight: 800;
+}
+
+.story-portrait.is-empty span {
+  display: grid;
+}
+
+.story-dialogue {
+  min-width: 0;
+}
+
+.story-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.story-meta .event-kicker {
+  margin: 0;
+}
+
+.story-meta span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.story-panel h2 {
+  margin-bottom: 8px;
+  font-size: 1.22rem;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.story-panel p {
+  white-space: pre-line;
+}
+
+.story-panel #storyText {
+  min-height: 4.4em;
+  max-height: 11.2em;
+  margin-bottom: 0;
+  overflow: auto;
+  color: var(--text);
+  line-height: 1.75;
+}
+
+.story-continue {
+  margin: 8px 0 0;
+  color: var(--cyan);
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+.story-panel.has-choices .story-continue {
+  display: none;
+}
+
+.story-panel .choice-grid {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
 .event-kicker {
   margin-bottom: 8px;
   color: var(--cyan);
@@ -170,6 +286,7 @@ h1 {
 .event-panel p {
   color: var(--muted);
   line-height: 1.7;
+  white-space: pre-line;
 }
 
 .choice-grid {
@@ -258,5 +375,24 @@ h1 {
 
   #gameCanvas {
     min-height: 520px;
+  }
+
+  .story-panel {
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .story-portrait {
+    width: 76px;
+    height: 76px;
+  }
+
+  .story-panel #storyText {
+    max-height: 10.5em;
+  }
+
+  .story-panel .choice-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

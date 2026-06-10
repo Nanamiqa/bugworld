@@ -255,22 +255,23 @@ window.GameData = {
   ],
 
   chapterOne: {
-    title: "第一章：夜班断点",
+    title: "第一章：订单已超时",
+    totalObjectives: 7,
     opening: {
       speaker: "安渡",
-      title: "加班到凌晨",
-      text: "安渡从键盘上惊醒。屏幕里的报表还停在错误代码那一行，斜对面工位的工牌却飘起了不属于现实的弹幕。",
+      title: "凌晨 03:32",
+      text: "安渡从键盘上惊醒。屏幕里的报表还停在错误代码那一行，手机却同时弹出一串外卖提醒：已超时 999 分钟。斜对面工位的工牌开始冒出不属于现实的弹幕。",
       choices: [{ title: "起身查看异常", effect: "办公室异常开始显形", actions: [{ type: "startChapterStep", step: 0 }] }],
     },
     steps: [
       {
-        objective: "调查斜对面工位的弹幕异常",
+        objective: "调查工位区的弹幕异常",
         node: { eventId: "bullet-comments", x: 540, y: 190 },
         afterEvent: {
           speaker: "安渡",
           title: "第一枚 bug点数",
-          text: "弹幕消散后，安渡掌心多了一点青蓝色碎光。胸前的断点工牌突然发烫，像是有一条旧版系统提示正在等待恢复。",
-          choices: [{ title: "查看断点工牌", effect: "解锁断点工牌节点", actions: [{ type: "startChapterStep", step: 1 }] }],
+          text: "弹幕消散后，安渡掌心多了一点青蓝色碎光。胸前的断点工牌发烫，手机里的外卖地图却突然把办公室标成了取餐终点。",
+          choices: [{ title: "查看断点工牌", effect: "解锁旧版提示", actions: [{ type: "startChapterStep", step: 1 }] }],
         },
       },
       {
@@ -279,12 +280,12 @@ window.GameData = {
         afterEvent: {
           speaker: "断点工牌",
           title: "回滚的提示",
-          text: "工牌投出一行断续文字：不要把所有差异都当成错误。安渡还没回过神，茶水间传来乔柚压低的声音。",
+          text: "工牌投出一行断续文字：不要把所有差异都当成错误。下一秒，茶水间传来乔柚的声音：别直接清掉，它在学一个人的焦虑。",
           choices: [{ title: "去找乔柚", effect: "乔柚第一次登场", actions: [{ type: "startChapterStep", step: 2 }] }],
         },
       },
       {
-        objective: "与乔柚会合，稳定两个数据层泄漏",
+        objective: "与乔柚会合，追踪订单异常源头",
         nodes: [
           { eventId: "emo-fluff", x: 910, y: 560 },
           { eventId: "delivery-meat", x: 742, y: 248 },
@@ -292,70 +293,197 @@ window.GameData = {
         requiredResolved: 2,
         intro: {
           speaker: "乔柚",
-          title: "异常翻译员",
-          text: "乔柚站在茶水间门口，手里捧着一团正在嘀咕的 emo 毛球：别急，我先听听它到底在报什么错。",
+          title: "第一次听见异常",
+          lines: [
+            {
+              speaker: "安渡",
+              title: "茶水间的低语",
+              text: "茶水间的灯一明一暗。饮水机旁蹲着一个女孩，她没有躲开那团黑色压力毛球，反而把手指轻轻放在它头上。",
+            },
+            {
+              speaker: "乔柚",
+              title: "异常翻译员",
+              text: "嘘，别怕。它不是想咬人，它只是太吵了。",
+            },
+            {
+              speaker: "安渡",
+              title: "异常翻译员",
+              text: "你在跟……一团加班情绪说话？",
+            },
+            {
+              speaker: "乔柚",
+              title: "现实只是界面",
+              text: "情绪层漏进现实了。白天这里是办公室，夜里现实只是一层界面，下面还有情绪、承诺、时间、路线这些数据层。",
+            },
+            {
+              speaker: "压力毛球",
+              title: "重复噪声",
+              text: "别超时。别差评。别取消。别超时。别差评。别取消。",
+            },
+            {
+              speaker: "乔柚",
+              title: "订单噪声",
+              text: "听见了吗？它在学某个人的焦虑。源头在外卖取餐区，有人被订单声音盖住了。",
+            },
+          ],
           choices: [
             {
-              title: "一起处理数据层泄漏",
-              effect: "乔柚加入，反噬 -10",
+              title: "一起追踪订单噪声",
+              effect: "乔柚加入，背景解锁，反噬 -10",
               actions: [
                 { type: "addAlly", allyId: "qiao-you" },
-                { type: "gain", backlash: -10, log: "乔柚加入临时值班队伍。" },
+                { type: "gain", backlash: -10, log: "乔柚加入临时值班队伍，异常噪声变得可读。" },
                 { type: "resumeChapter" },
               ],
             },
           ],
         },
-        requiredFixed: 4,
         afterEvent: {
-          speaker: "系统广播",
-          title: "巡检机制上线",
-          text: "天花板上的灯同时熄灭又亮起。冷冰冰的系统广播响起：检测到未授权调试行为，白箱巡检员已派遣。",
-          choices: [{ title: "准备迎接白箱巡检员", effect: "白箱巡检员第一次登场", actions: [{ type: "startChapterStep", step: 3 }] }],
+          speaker: "乔柚",
+          title: "外卖不是外卖",
+          lines: [
+            {
+              speaker: "乔柚",
+              title: "外卖不是外卖",
+              text: "不对劲。那些订单不是在配送食物，它们被规则引擎当成了网络数据包。",
+            },
+            {
+              speaker: "安渡",
+              title: "外卖不是外卖",
+              text: "外卖还能变网线？",
+            },
+            {
+              speaker: "乔柚",
+              title: "配送协议",
+              text: "可以这么理解。下单是请求，地址是坐标，骑手像数据包，确认收货像 ACK。",
+            },
+            {
+              speaker: "乔柚",
+              title: "超时重传",
+              text: "如果一直没有确认，系统就会超时重传。现在所有重传，都压在同一个人身上。",
+            },
+          ],
+          choices: [{ title: "继续往取餐区推进", effect: "追踪错误路线", actions: [{ type: "startChapterStep", step: 3 }] }],
         },
       },
       {
-        objective: "躲过白箱巡检员，继续稳定异常",
+        objective: "清理通往外卖取餐区的错误路线",
         nodes: [
           { eventId: "promise-bloat", x: 1040, y: 190 },
           { eventId: "talking-cat", x: 250, y: 560 },
         ],
         requiredResolved: 2,
         intro: {
-          speaker: "白箱巡检员",
-          title: "第一次巡检",
-          text: "一个白色机体从墙角的扫描线里走出，手里的回收管对准安渡掌心的 bug点数。它没有表情，只重复一句：异常变量，准备归档。",
+          speaker: "老梁",
+          title: "别把他当怪物",
+          text: "办公室广播响起老梁的声音：别往取餐区硬冲。那边不是普通异常，是一个人被订单规则套住了。外卖叫补送，网络叫重传，反正都够烦。",
           choices: [
             {
-              title: "带着 bug点数后撤",
-              effect: "巡检员入场，bug点数 +2",
+              title: "沿错误路线前进",
+              effect: "白箱巡检员短暂锁定，bug点数 +2",
               actions: [
-                { type: "gain", bugPoints: 2, backlash: 12, log: "白箱巡检员锁定了安渡。" },
+                { type: "gain", bugPoints: 2, backlash: 10, log: "老梁把一段旧路线权限塞进了断点工牌。" },
                 { type: "spawnCleaner", x: 1120, y: 96 },
                 { type: "resumeChapter" },
               ],
             },
           ],
         },
-        requiredFixed: 6,
         afterEvent: {
-          speaker: "老梁",
-          title: "0号服务器间的门",
-          text: "老梁的声音从主管室传来：别让它进 0 号服务器间。流程可以慢，别把人当成空值。门你得自己守住。",
-          choices: [{ title: "守住 0 号服务器间", effect: "进入第一章收束", actions: [{ type: "startChapterStep", step: 4 }] }],
+          speaker: "系统广播",
+          title: "订单传输异常",
+          text: "取餐区的灯全部亮起。外卖柜一格接一格弹开，里面没有餐盒，只有发烫的倒计时。地面路线开始像网线一样重算。",
+          choices: [{ title: "进入外卖取餐区", effect: "触发第一章 Boss 战", actions: [{ type: "startChapterStep", step: 4 }] }],
         },
       },
       {
-        objective: "修复 0 号服务器间前的最终异常",
-        node: { eventId: "fish-dimension", x: 940, y: 535 },
-        afterEvent: {
-          speaker: "安渡",
-          title: "第一夜结束",
-          text: "0 号服务器间的门没有打开，白箱巡检员也暂时停下了脚步。安渡攥着发烫的断点工牌，第一次意识到：摸鱼可以，变量不能乱飞。",
-          choices: [{ title: "结束第一章", effect: "完成第一章任务线", actions: [{ type: "finishChapter" }] }],
+        objective: "靠近外卖取餐区，唤醒被附身的骑手",
+        intro: {
+          speaker: "周行",
+          title: "倒计时骑手",
+          lines: [
+            {
+              speaker: "系统广播",
+              title: "外卖取餐区",
+              text: "外卖取餐区的柜门一格接一格弹开。里面没有餐盒，只有一串串发烫的倒计时。",
+            },
+            {
+              speaker: "系统广播",
+              title: "路线重算",
+              text: "地面亮起青蓝色路线，像有人把整座办公室接进了看不见的网络。",
+            },
+            {
+              speaker: "周行",
+              title: "倒计时骑手",
+              text: "周行站在取餐架中央，雨衣还在往下滴水，头盔灯一闪一闪。背后的外卖箱长出数据线，线头扎进每一个取餐柜。",
+            },
+            {
+              speaker: "周行",
+              title: "倒计时骑手",
+              text: "还有三单。不能超时。不能取消。不能停。",
+            },
+            {
+              speaker: "安渡",
+              title: "凌晨 03:32",
+              text: "兄弟，现在是凌晨三点半，没人会因为这单投诉你。",
+            },
+            {
+              speaker: "系统广播",
+              title: "连接建立",
+              text: "连接建立。等待确认。确认超时。准备重传。",
+            },
+            {
+              speaker: "乔柚",
+              title: "传输节点",
+              text: "他听不见我们了。规则引擎把他当成传输节点，不是人。",
+            },
+            {
+              speaker: "老梁",
+              title: "旧广播",
+              text: "打路线，别打人。断开错误配送协议，人才回得来。",
+            },
+          ],
+          choices: [
+            {
+              title: "断开错误配送协议",
+              effect: "开始 Boss 战：协议骑手·周行",
+              actions: [{ type: "startBossFight", bossId: "delivery-rider" }],
+            },
+          ],
         },
       },
     ],
+    bossVictory: {
+      speaker: "乔柚",
+      title: "订单已送达",
+      lines: [
+        {
+          speaker: "周行",
+          title: "醒来",
+          text: "周行倒在外卖架前，第一反应还是去摸手机：我……超时了吗？",
+        },
+        {
+          speaker: "安渡",
+          title: "订单已送达",
+          text: "超了。超得很彻底。但你人没丢。",
+        },
+        {
+          speaker: "乔柚",
+          title: "冷掉的配送单",
+          text: "乔柚从散开的异常里捡起一张冷掉的配送单。单据上没有顾客名，终点却指向 0号服务器间。",
+        },
+      ],
+      choices: [
+        {
+          title: "结束第一夜",
+          effect: "完成第一章，解锁后续线索",
+          actions: [
+            { type: "gain", fixed: 1, bugPoints: 4, backlash: -20, log: "周行被救了下来，冷掉的配送单留下了新的路线。" },
+            { type: "finishChapter" },
+          ],
+        },
+      ],
+    },
   },
 
   eventDeck: [
