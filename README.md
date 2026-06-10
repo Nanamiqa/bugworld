@@ -29,6 +29,7 @@
 - `src/styles.css`：界面样式
 - `src/main.js`：游戏逻辑
 - `src/data/game-data.js`：世界观、角色、章节、事件、武器、敌人、补丁数据
+- `src/assets/characters/`：角色头像与游戏内小人素材
 - `docs/world-bible.md`：世界观圣经与游戏化方向
 - `docs/art/asset-generation-prompts.md`：AI 图像素材生成提示词
 - `docs/design/00-game-pillars.md`：长期项目定位与设计支柱

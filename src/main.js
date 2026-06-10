@@ -104,20 +104,20 @@ const weaponDefinitions = gameData.weapons ?? [];
 const weaponUpgrades = gameData.weaponUpgrades ?? [];
 const enemyTypes = gameData.enemyTypes ?? {};
 const assetSources = {
-  andu: "docs/art/安渡：游戏内小人.png",
-  qiaoYou: "docs/art/乔柚：游戏内小人.png",
-  laoLiang: "docs/art/老梁：游戏内小人.png",
-  inspector: "docs/art/白箱巡检员：游戏内小人.png",
+  andu: "src/assets/characters/andu-sprite.png",
+  qiaoYou: "src/assets/characters/qiao-you-sprite.png",
+  laoLiang: "src/assets/characters/lao-liang-sprite.png",
+  inspector: "src/assets/characters/whitebox-inspector-sprite.png",
 };
 const storyAvatarSources = {
-  安渡: "docs/art/安渡：头像.png",
-  乔柚: "docs/art/乔柚：头像.png",
-  老梁: "docs/art/老梁：头像.png",
-  白箱巡检员: "docs/art/白箱巡检员：头像.png",
-  andu: "docs/art/安渡：头像.png",
-  qiaoYou: "docs/art/乔柚：头像.png",
-  laoLiang: "docs/art/老梁：头像.png",
-  inspector: "docs/art/白箱巡检员：头像.png",
+  安渡: "src/assets/characters/andu-avatar.png",
+  乔柚: "src/assets/characters/qiao-you-avatar.png",
+  老梁: "src/assets/characters/lao-liang-avatar.png",
+  白箱巡检员: "src/assets/characters/whitebox-inspector-avatar.png",
+  andu: "src/assets/characters/andu-avatar.png",
+  qiaoYou: "src/assets/characters/qiao-you-avatar.png",
+  laoLiang: "src/assets/characters/lao-liang-avatar.png",
+  inspector: "src/assets/characters/whitebox-inspector-avatar.png",
 };
 const assets = loadGameAssets(assetSources);
 
