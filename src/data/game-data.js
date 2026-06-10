@@ -78,7 +78,9 @@ window.GameData = {
       hp: 55,
       speedMin: 72,
       speedMax: 98,
-      damage: 10,
+      damage: 6,
+      xpValue: 2,
+      bugValue: 1,
       deathColor: "#ef6a70",
       hitLog: "压力实体撞上来，报表又多了一页。",
     },
@@ -91,7 +93,9 @@ window.GameData = {
       hp: 48,
       speedMin: 92,
       speedMax: 126,
-      damage: 9,
+      damage: 7,
+      xpValue: 3,
+      bugValue: 1,
       deathColor: "#ef6a70",
       hitLog: "工单飞虫贴脸催办，安渡的待办列表多了一行。",
     },
@@ -104,7 +108,9 @@ window.GameData = {
       hp: 130,
       speedMin: 112,
       speedMax: 112,
-      damage: 24,
+      damage: 18,
+      xpValue: 10,
+      bugValue: 4,
       deathColor: "#72a5ff",
       hitLog: "白箱巡检员擦掉了你的一段状态。",
     },
@@ -180,10 +186,10 @@ window.GameData = {
   weaponUpgrades: [
     {
       id: "weapon-damage",
-      title: "错误码磨尖",
-      effect: "当前武器伤害 +7",
+      title: "锐化异常断点",
+      effect: "当前武器伤害 +9",
       actions: [
-        { type: "modifyWeapon", stat: "damage", add: 7 },
+        { type: "modifyWeapon", stat: "damage", add: 9 },
         { type: "log", message: "武器的错误码边缘变锋利了。" },
       ],
     },
@@ -198,7 +204,7 @@ window.GameData = {
     },
     {
       id: "weapon-projectile",
-      title: "弹幕分叉",
+      title: "多线程弹幕",
       effect: "当前武器子弹数 +1，散射略增",
       actions: [
         { type: "modifyWeapon", stat: "projectileCount", add: 1, max: 7 },
@@ -208,7 +214,7 @@ window.GameData = {
     },
     {
       id: "weapon-pierce",
-      title: "穿透注释",
+      title: "穿透注释层",
       effect: "当前武器穿透 +1，射程 +70",
       actions: [
         { type: "modifyWeapon", stat: "pierce", add: 1, max: 3 },
@@ -239,7 +245,7 @@ window.GameData = {
     },
     {
       id: "weapon-trait-boost",
-      title: "专属特性调优",
+      title: "核心特性过载",
       effect: "强化当前武器的专属特性",
       actions: [
         { type: "boostWeaponTrait" },

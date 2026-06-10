@@ -4,7 +4,10 @@ ctx.imageSmoothingEnabled = false;
 
 const ui = {
   hp: document.querySelector("#hpValue"),
+  level: document.querySelector("#levelValue"),
+  xp: document.querySelector("#xpValue"),
   bug: document.querySelector("#bugValue"),
+  weapon: document.querySelector("#weaponValue"),
   backlash: document.querySelector("#backlashValue"),
   fixed: document.querySelector("#fixedValue"),
   log: document.querySelector("#logLine"),
@@ -48,6 +51,10 @@ const playerBase = {
   speed: 230,
   maxHp: 100,
   hp: 100,
+  level: 1,
+  xp: 0,
+  xpToNext: 8,
+  pendingLevelUps: 0,
   bugPoints: 0,
   backlash: 0,
   fixed: 0,
@@ -63,6 +70,7 @@ let bugNodes;
 let enemies;
 let particles;
 let bullets;
+let bugPickups;
 let cleaners;
 let activeEvent = null;
 let nextUpgradeAt = 2;
@@ -94,6 +102,7 @@ function resetGame() {
   enemies = [];
   particles = [];
   bullets = [];
+  bugPickups = [];
   cleaners = [];
   activeEvent = null;
   nextUpgradeAt = 2;
@@ -110,6 +119,7 @@ function resetGame() {
   world.dashCooldown = 0;
   world.cameraShake = 0;
   hidePanels();
+  seedOfficeBugPickups();
   setChapterObjective("调查办公室异常");
   setLog("凌晨 03:32，安渡从键盘上醒来。先从抽屉里摸一件趁手工具。");
   syncHud();
@@ -144,6 +154,8 @@ function spawnEnemyNear(x, y, type = "stress") {
     hp: definition.hp ?? 55,
     speed: random(speedMin, speedMax),
     damage: definition.damage ?? 10,
+    xpValue: definition.xpValue ?? 2,
+    bugValue: definition.bugValue ?? 1,
     render: definition.render ?? "emo",
     deathColor: definition.deathColor ?? "#ef6a70",
     hitLog: definition.hitLog ?? "异常实体撞上来，报表又多了一页。",
@@ -202,7 +214,7 @@ function applyActions(actions = []) {
     }
 
     if (action.type === "boostWeaponTrait") {
-      boostWeaponTrait();
+      boostWeaponTrait(action.rarityMultiplier ?? 1);
     }
 
     if (action.type === "log") {
@@ -291,7 +303,7 @@ function modifyWeapon({ stat, add = 0, multiply = 1, min = -Infinity, max = Infi
   player.weapon.level += stat === "level" ? 0 : 0.25;
 }
 
-function boostWeaponTrait() {
+function boostWeaponTrait(multiplier = 1) {
   if (!player.weapon?.trait) {
     return;
   }
@@ -299,19 +311,61 @@ function boostWeaponTrait() {
   const trait = player.weapon.trait;
   if (trait.type === "chargedShot") {
     trait.every = Math.max(2, trait.every - 1);
-    trait.damageMultiplier += 0.25;
+    trait.damageMultiplier += 0.25 * multiplier;
     return;
   }
 
   if (trait.type === "knockback") {
-    trait.force += 8;
+    trait.force += 8 * multiplier;
     return;
   }
 
   if (trait.type === "slowOnHit") {
-    trait.duration += 0.25;
-    trait.factor = Math.max(0.35, trait.factor - 0.05);
+    trait.duration += 0.25 * multiplier;
+    trait.factor = Math.max(0.35, trait.factor - 0.05 * multiplier);
   }
+}
+
+function addExperience(amount) {
+  player.xp += amount;
+
+  while (player.xp >= player.xpToNext) {
+    player.xp -= player.xpToNext;
+    player.level += 1;
+    player.pendingLevelUps += 1;
+    player.xpToNext = Math.ceil(player.xpToNext * 1.28 + 3);
+  }
+
+  if (player.pendingLevelUps > 0 && world.mode === "playing") {
+    openUpgrade();
+  }
+}
+
+function seedOfficeBugPickups() {
+  const seeds = [
+    { x: 170, y: 510, xp: 2 },
+    { x: 610, y: 126, xp: 2 },
+    { x: 704, y: 360, xp: 3 },
+    { x: 1160, y: 360, xp: 3 },
+    { x: 430, y: 598, xp: 2 },
+  ];
+
+  for (const seed of seeds) {
+    spawnBugPickup(seed.x, seed.y, 1, seed.xp);
+  }
+}
+
+function spawnBugPickup(x, y, bugValue = 1, xpValue = 2) {
+  bugPickups.push({
+    x: x + random(-12, 12),
+    y: y + random(-12, 12),
+    vx: random(-20, 20),
+    vy: random(-20, 20),
+    radius: 8,
+    pulse: random(0, Math.PI * 2),
+    bugValue,
+    xpValue,
+  });
 }
 
 function openStory(story) {
@@ -389,7 +443,10 @@ function hidePanels() {
 
 function syncHud() {
   ui.hp.textContent = `${Math.ceil(player.hp)}/${player.maxHp}`;
+  ui.level.textContent = player.level;
+  ui.xp.textContent = `${player.xp}/${player.xpToNext}`;
   ui.bug.textContent = player.bugPoints;
+  ui.weapon.textContent = player.weapon ? `${player.weapon.name} Lv.${Math.floor(player.weapon.level)}` : "未选择";
   ui.bug.parentElement.title = player.weapon ? `当前武器：${player.weapon.name}` : "";
   ui.backlash.textContent = `${Math.round(player.backlash)}%`;
   ui.fixed.textContent = `${chapterState?.resolvedTotal ?? 0}/7`;
@@ -419,14 +476,20 @@ function updatePlaying(dt) {
   updateWeapon(dt);
   updateBullets(dt);
   updateEnemies(dt);
+  updateBugPickups(dt);
+  if (world.mode !== "playing") {
+    return;
+  }
   updateParticles(dt);
   checkBugCollision();
   handleActions();
   maybeEscalateBacklash(dt);
 
-  if (world.spawnTimer > 6.8 && enemies.length < 6) {
+  const spawnEvery = chapterState.stepIndex >= 2 ? 1.75 : 2.6;
+  const maxEnemies = chapterState.stepIndex >= 3 ? 18 : 13;
+  if (world.spawnTimer > spawnEvery && enemies.length < maxEnemies) {
     world.spawnTimer = 0;
-    spawnEnemyNear(random(80, world.width - 80), random(100, world.height - 80));
+    spawnEnemyWave(chapterState.stepIndex >= 3 ? 3 : 2);
   }
 
   if (player.hp <= 0) {
@@ -527,6 +590,20 @@ function fireWeaponAt(target) {
   }
 }
 
+function spawnEnemyWave(count = 2) {
+  for (let index = 0; index < count; index += 1) {
+    const side = Math.floor(random(0, 4));
+    const type = Math.random() < 0.35 ? "deadline" : "stress";
+    let x = random(80, world.width - 80);
+    let y = random(100, world.height - 80);
+    if (side === 0) y = 92;
+    if (side === 1) x = world.width - 64;
+    if (side === 2) y = world.height - 42;
+    if (side === 3) x = 64;
+    spawnEnemyNear(x, y, type);
+  }
+}
+
 function dash() {
   let dx = 0;
   let dy = 0;
@@ -561,8 +638,7 @@ function repairPulse() {
       enemy.hitFlash = 0.16;
     }
   }
-  enemies = enemies.filter((enemy) => enemy.hp > 0);
-  cleaners = cleaners.filter((enemy) => enemy.hp > 0);
+  clearDefeatedHostiles();
   setLog("安渡把错误码拍成了一圈蓝色涟漪。");
 }
 
@@ -600,23 +676,35 @@ function updateBullets(dt) {
     }
   }
 
+  clearDefeatedHostiles();
+  bullets = bullets.filter((bullet) => {
+    return bullet.life > 0 && bullet.x > -40 && bullet.x < world.width + 40 && bullet.y > 40 && bullet.y < world.height + 40;
+  });
+}
+
+function clearDefeatedHostiles() {
   enemies = enemies.filter((enemy) => {
     if (enemy.hp > 0) {
       return true;
     }
-    burst(enemy.x, enemy.y, enemy.deathColor, 14);
+    defeatEnemy(enemy, 14);
     return false;
   });
   cleaners = cleaners.filter((enemy) => {
     if (enemy.hp > 0) {
       return true;
     }
-    burst(enemy.x, enemy.y, enemy.deathColor, 20);
+    defeatEnemy(enemy, 20);
     return false;
   });
-  bullets = bullets.filter((bullet) => {
-    return bullet.life > 0 && bullet.x > -40 && bullet.x < world.width + 40 && bullet.y > 40 && bullet.y < world.height + 40;
-  });
+}
+
+function defeatEnemy(enemy, particleCount) {
+  burst(enemy.x, enemy.y, enemy.deathColor, particleCount);
+  spawnBugPickup(enemy.x, enemy.y, enemy.bugValue, enemy.xpValue);
+  if (Math.random() < 0.22) {
+    spawnBugPickup(enemy.x + random(-18, 18), enemy.y + random(-18, 18), 1, 1);
+  }
 }
 
 function updateEnemies(dt) {
@@ -640,6 +728,33 @@ function updateEnemies(dt) {
       setLog(enemy.hitLog);
     }
   }
+}
+
+function updateBugPickups(dt) {
+  for (const pickup of bugPickups) {
+    pickup.pulse += dt * 4;
+    const pullDistance = distance(pickup, player);
+    if (pullDistance < 130) {
+      const angle = Math.atan2(player.y - pickup.y, player.x - pickup.x);
+      pickup.vx += Math.cos(angle) * 360 * dt;
+      pickup.vy += Math.sin(angle) * 360 * dt;
+    }
+    pickup.x += pickup.vx * dt;
+    pickup.y += pickup.vy * dt;
+    pickup.vx *= 0.92;
+    pickup.vy *= 0.92;
+  }
+
+  bugPickups = bugPickups.filter((pickup) => {
+    if (distance(pickup, player) > pickup.radius + player.radius + 4) {
+      return true;
+    }
+    player.bugPoints += pickup.bugValue;
+    addExperience(pickup.xpValue);
+    burst(pickup.x, pickup.y, "#0f9f95", 10);
+    setLog(`拾取 bug 点：经验 +${pickup.xpValue}，bug点数 +${pickup.bugValue}。`);
+    return false;
+  });
 }
 
 function maybeEscalateBacklash(dt) {
@@ -697,6 +812,7 @@ function resolveEvent(choice) {
   applyActions(choice.actions);
   const removed = bugNodes.splice(activeEvent.index, 1)[0];
   burst(removed.x, removed.y, removed.event.color, 28);
+  spawnBugPickup(removed.x, removed.y, 1, 3);
   activeEvent = null;
   ui.eventPanel.classList.add("hidden");
 
@@ -705,34 +821,76 @@ function resolveEvent(choice) {
     return;
   }
 
-  if (player.fixed >= nextUpgradeAt) {
-    openUpgrade();
-    nextUpgradeAt += 2;
-  } else {
-    resumeAndSpawnBug();
-  }
+  resumeAndSpawnBug();
 }
 
 function openUpgrade() {
   world.mode = "upgrade";
   ui.upgradeChoices.innerHTML = "";
-  const generalPool = [...upgrades].sort(() => Math.random() - 0.5).slice(0, 2);
-  const weaponPool = [...weaponUpgrades].sort(() => Math.random() - 0.5).slice(0, 1);
-  const pool = [...weaponPool, ...generalPool].sort(() => Math.random() - 0.5);
+  player.pendingLevelUps = Math.max(0, player.pendingLevelUps - 1);
+  const generalPool = [...upgrades].sort(() => Math.random() - 0.5).slice(0, 1);
+  const weaponPool = [...weaponUpgrades].sort(() => Math.random() - 0.5).slice(0, 2);
+  const pool = [...weaponPool, ...generalPool].sort(() => Math.random() - 0.5).map(rollBoon);
 
   for (const upgrade of pool) {
     const button = document.createElement("button");
     button.className = "choice-button";
-    button.innerHTML = `<span class="choice-title">${upgrade.title}</span><span class="choice-effect">${upgrade.effect}</span>`;
+    button.innerHTML = `<span class="choice-title">${upgrade.title}<span class="choice-rarity">${upgrade.rarity.name}</span></span><span class="choice-effect">${upgrade.effect}</span>`;
     button.addEventListener("click", () => {
       applyActions(upgrade.actions);
       ui.upgradePanel.classList.add("hidden");
-      resumeAndSpawnBug();
+      setLog(`选择了${upgrade.rarity.name}强化：${upgrade.title}。`);
+      if (player.pendingLevelUps > 0) {
+        openUpgrade();
+      } else {
+        resumeAndSpawnBug();
+      }
     });
     ui.upgradeChoices.appendChild(button);
   }
 
   ui.upgradePanel.classList.remove("hidden");
+}
+
+function rollBoon(upgrade) {
+  const rarity = rollRarity();
+  const boon = JSON.parse(JSON.stringify(upgrade));
+  boon.rarity = rarity;
+  boon.actions = boon.actions.map((action) => scaleActionByRarity(action, rarity));
+  return boon;
+}
+
+function rollRarity() {
+  const roll = Math.random();
+  if (roll > 0.9) {
+    return { name: "史诗", multiplier: 1.75 };
+  }
+  if (roll > 0.62) {
+    return { name: "稀有", multiplier: 1.35 };
+  }
+  return { name: "普通", multiplier: 1 };
+}
+
+function scaleActionByRarity(action, rarity) {
+  const next = { ...action };
+  if (next.type === "modifyWeapon") {
+    if (typeof next.add === "number" && !["projectileCount", "pierce"].includes(next.stat)) {
+      next.add = Math.ceil(next.add * rarity.multiplier);
+    }
+    if (typeof next.multiply === "number" && next.multiply < 1) {
+      next.multiply = 1 - (1 - next.multiply) * rarity.multiplier;
+      next.multiply = clamp(next.multiply, 0.55, 0.98);
+    }
+  }
+  if (next.type === "gain") {
+    if (next.hp > 0) next.hp = Math.ceil(next.hp * rarity.multiplier);
+    if (next.bugPoints > 0) next.bugPoints = Math.ceil(next.bugPoints * rarity.multiplier);
+    if (next.backlash < 0) next.backlash = Math.floor(next.backlash * rarity.multiplier);
+  }
+  if (next.type === "boostWeaponTrait") {
+    next.rarityMultiplier = rarity.multiplier;
+  }
+  return next;
 }
 
 function resumeAndSpawnBug() {
@@ -764,6 +922,7 @@ function draw(dt) {
   ctx.translate(shakeX, shakeY);
   drawOffice();
   drawBugNodes(dt);
+  drawBugPickups();
   drawBullets();
   drawEnemies();
   drawAllies();
@@ -773,10 +932,10 @@ function draw(dt) {
 }
 
 function drawOffice() {
-  ctx.fillStyle = "#181a20";
+  ctx.fillStyle = "#f8fbff";
   ctx.fillRect(0, 0, world.width, world.height);
 
-  ctx.strokeStyle = "rgba(255,255,255,0.055)";
+  ctx.strokeStyle = "rgba(58, 83, 112, 0.075)";
   ctx.lineWidth = 1;
   for (let x = 0; x < world.width; x += 48) {
     ctx.beginPath();
@@ -791,42 +950,162 @@ function drawOffice() {
     ctx.stroke();
   }
 
-  ctx.fillStyle = "#222934";
+  ctx.fillStyle = "#e8f1fa";
   ctx.fillRect(0, 0, world.width, 68);
-  ctx.fillStyle = "#2f3642";
-  ctx.fillRect(32, 24, 170, 18);
-  ctx.fillRect(240, 24, 110, 18);
-  ctx.fillRect(386, 24, 138, 18);
-  ctx.fillStyle = "#3d434f";
-  ctx.fillRect(1120, 16, 118, 30);
+  ctx.fillStyle = "#c8d8e8";
+  ctx.fillRect(0, 66, world.width, 3);
+  drawWindowRow(32, 14, 4);
+  drawWindowRow(788, 14, 3);
+  drawWhiteboard(386, 14, 170, 38);
+  drawWaterCooler(628, 94);
+  drawCopier(1116, 96);
+  drawPlant(52, 96, 1);
+  drawPlant(1196, 602, 1.1);
+  drawPlant(650, 622, 0.85);
 
   for (const desk of desks) {
     drawDesk(desk);
   }
 
+  drawMeetingTable(750, 262);
+  drawServerRack(750, 424);
+  drawServerRack(820, 424);
+  drawPrinter(1034, 526);
+
   if ((chapterState?.stepIndex ?? -1) >= 3 || player.fixed >= 3) {
     drawLaoLiangSprite(1080, 118, 0.88);
-    drawLabel("老梁", 1062, 84, "#f1c15b");
+    drawLabel("老梁", 1062, 84, "#9a6615");
   }
 
-  ctx.fillStyle = "#26333a";
+  ctx.fillStyle = "#d8e4f0";
   ctx.fillRect(34, 618, 206, 50);
-  ctx.fillStyle = "#5de2d1";
+  ctx.fillStyle = "#0f9f95";
   ctx.globalAlpha = 0.18;
   ctx.fillRect(44, 628, 186, 30);
   ctx.globalAlpha = 1;
-  drawLabel("安渡工位", 78, 650, "#dbe8e6");
+  drawLabel("安渡工位", 78, 650, "#224250");
 }
 
 function drawDesk(desk) {
-  ctx.fillStyle = "#2c3038";
+  ctx.fillStyle = "#d7e1ec";
   ctx.fillRect(desk.x, desk.y, desk.w, desk.h);
-  ctx.fillStyle = "#3a414c";
+  ctx.fillStyle = "#eef4fa";
   ctx.fillRect(desk.x + 8, desk.y + 8, desk.w - 16, 8);
-  ctx.fillStyle = "#20242c";
-  ctx.fillRect(desk.x + 14, desk.y + 24, 34, 16);
-  ctx.fillRect(desk.x + desk.w - 50, desk.y + 24, 34, 16);
-  drawLabel(desk.tag, desk.x + 12, desk.y + desk.h - 10, "#9aa5b1");
+  ctx.fillStyle = "#223044";
+  ctx.fillRect(desk.x + 14, desk.y + 22, 38, 20);
+  ctx.fillStyle = "#78dff1";
+  ctx.fillRect(desk.x + 18, desk.y + 25, 30, 12);
+  ctx.fillStyle = "#44566f";
+  ctx.fillRect(desk.x + 60, desk.y + 32, 44, 6);
+  ctx.fillStyle = "#f1c15b";
+  ctx.fillRect(desk.x + desk.w - 32, desk.y + 25, 12, 13);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(desk.x + desk.w - 56, desk.y + 22, 18, 22);
+  drawChair(desk.x + 30, desk.y + desk.h + 10);
+  drawLabel(desk.tag, desk.x + 12, desk.y + desk.h - 10, "#5c6878");
+}
+
+function drawWindowRow(x, y, count) {
+  for (let index = 0; index < count; index += 1) {
+    const px = x + index * 62;
+    ctx.fillStyle = "#d7ecff";
+    ctx.fillRect(px, y, 48, 34);
+    ctx.strokeStyle = "#9fbed6";
+    ctx.strokeRect(px, y, 48, 34);
+    ctx.beginPath();
+    ctx.moveTo(px + 24, y);
+    ctx.lineTo(px + 24, y + 34);
+    ctx.moveTo(px, y + 17);
+    ctx.lineTo(px + 48, y + 17);
+    ctx.stroke();
+  }
+}
+
+function drawWhiteboard(x, y, w, h) {
+  ctx.fillStyle = "#f8fbff";
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = "#b6c7d7";
+  ctx.strokeRect(x, y, w, h);
+  ctx.fillStyle = "#3e72d8";
+  ctx.fillRect(x + 14, y + 12, 42, 4);
+  ctx.fillStyle = "#d94f5c";
+  ctx.fillRect(x + 14, y + 24, 74, 4);
+  ctx.fillStyle = "#0f9f95";
+  ctx.fillRect(x + 100, y + 16, 46, 4);
+}
+
+function drawChair(x, y) {
+  ctx.fillStyle = "#b7c4d4";
+  ctx.fillRect(x - 14, y - 8, 28, 14);
+  ctx.fillStyle = "#8ea1b8";
+  ctx.fillRect(x - 10, y + 5, 20, 6);
+}
+
+function drawPlant(x, y, scale = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = "#d18b42";
+  ctx.fillRect(-12, 18, 24, 18);
+  ctx.fillStyle = "#b86b32";
+  ctx.fillRect(-15, 14, 30, 6);
+  ctx.fillStyle = "#2f9c67";
+  fillCircle(-9, 4, 12, "#2f9c67");
+  fillCircle(8, 2, 14, "#3bb579");
+  fillCircle(0, -10, 13, "#2f9c67");
+  ctx.restore();
+}
+
+function drawCopier(x, y) {
+  ctx.fillStyle = "#d3dce7";
+  ctx.fillRect(x, y, 78, 50);
+  ctx.fillStyle = "#eef4fa";
+  ctx.fillRect(x + 8, y - 16, 62, 18);
+  ctx.fillStyle = "#8fa2b6";
+  ctx.fillRect(x + 12, y + 12, 44, 8);
+  ctx.fillStyle = "#3e72d8";
+  ctx.fillRect(x + 58, y + 12, 8, 8);
+}
+
+function drawWaterCooler(x, y) {
+  ctx.fillStyle = "#d7ecff";
+  ctx.fillRect(x + 10, y, 28, 30);
+  ctx.fillStyle = "#e8eef5";
+  ctx.fillRect(x, y + 28, 48, 58);
+  ctx.fillStyle = "#3e72d8";
+  ctx.fillRect(x + 12, y + 45, 24, 6);
+}
+
+function drawMeetingTable(x, y) {
+  ctx.fillStyle = "#e1c398";
+  ctx.fillRect(x, y, 210, 56);
+  ctx.fillStyle = "#caa874";
+  ctx.fillRect(x + 8, y + 8, 194, 8);
+  drawChair(x + 28, y - 8);
+  drawChair(x + 88, y - 8);
+  drawChair(x + 148, y - 8);
+  drawChair(x + 54, y + 70);
+  drawChair(x + 122, y + 70);
+}
+
+function drawPrinter(x, y) {
+  ctx.fillStyle = "#cbd6e2";
+  ctx.fillRect(x, y, 72, 38);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(x + 12, y - 14, 46, 18);
+  ctx.fillStyle = "#223044";
+  ctx.fillRect(x + 14, y + 12, 44, 6);
+}
+
+function drawServerRack(x, y) {
+  ctx.fillStyle = "#26364d";
+  ctx.fillRect(x, y, 52, 82);
+  for (let i = 0; i < 5; i += 1) {
+    ctx.fillStyle = i % 2 === 0 ? "#314763" : "#203049";
+    ctx.fillRect(x + 6, y + 8 + i * 14, 40, 8);
+    ctx.fillStyle = i % 2 === 0 ? "#5de2d1" : "#f1c15b";
+    ctx.fillRect(x + 10, y + 10 + i * 14, 5, 4);
+  }
 }
 
 function drawBugNodes(dt) {
@@ -852,6 +1131,31 @@ function drawBugNodes(dt) {
     }
     ctx.closePath();
     ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawBugPickups() {
+  for (const pickup of bugPickups) {
+    const glow = 3 + Math.sin(pickup.pulse) * 2;
+    ctx.save();
+    ctx.translate(pickup.x, pickup.y);
+    ctx.fillStyle = "#0f9f95";
+    ctx.globalAlpha = 0.18;
+    ctx.beginPath();
+    ctx.arc(0, 0, pickup.radius + 10 + glow, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#10b9a8";
+    ctx.beginPath();
+    ctx.moveTo(0, -pickup.radius - glow);
+    ctx.lineTo(pickup.radius + glow, 0);
+    ctx.lineTo(0, pickup.radius + glow);
+    ctx.lineTo(-pickup.radius - glow, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(-2, -2, 4, 4);
     ctx.restore();
   }
 }
