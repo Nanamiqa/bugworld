@@ -85,14 +85,14 @@ let chapterState;
 let storyState = null;
 
 const desks = [
-  { x: 84, y: 104, w: 136, h: 54, tag: "Q3报表" },
-  { x: 278, y: 104, w: 136, h: 54, tag: "需求池" },
-  { x: 472, y: 104, w: 136, h: 54, tag: "灰度" },
-  { x: 84, y: 236, w: 136, h: 54, tag: "咖啡" },
-  { x: 278, y: 236, w: 136, h: 54, tag: "工单" },
-  { x: 472, y: 236, w: 136, h: 54, tag: "弹幕" },
+  { x: 84, y: 104, w: 136, h: 54, tag: "Q3报表", assetKey: "propWorkstationA" },
+  { x: 278, y: 104, w: 136, h: 54, tag: "需求池", assetKey: "propWorkstationB" },
+  { x: 472, y: 104, w: 136, h: 54, tag: "灰度", assetKey: "propWorkstationC" },
+  { x: 84, y: 236, w: 136, h: 54, tag: "咖啡", assetKey: "propWorkstationD" },
+  { x: 278, y: 236, w: 136, h: 54, tag: "工单", assetKey: "propWorkstationE" },
+  { x: 472, y: 236, w: 136, h: 54, tag: "弹幕", assetKey: "propWorkstationF" },
   { x: 742, y: 132, w: 210, h: 74, tag: "会议室" },
-  { x: 1006, y: 132, w: 152, h: 74, tag: "老板室" },
+  { x: 1006, y: 132, w: 152, h: 74, tag: "老板室", assetKey: "propWorkstationB" },
   { x: 742, y: 420, w: 416, h: 78, tag: "0号服务器间" },
 ];
 
@@ -108,7 +108,6 @@ const assetSources = {
   qiaoYou: "src/assets/characters/qiao-you-sprite.png",
   laoLiang: "src/assets/characters/lao-liang-sprite.png",
   inspector: "src/assets/characters/whitebox-inspector-sprite.png",
-  officeScene: "src/assets/scenes/office-night-scene-prop-sheet.png",
   weaponPaperclip: "src/assets/weapons/paperclip-slingshot.png",
   weaponKeyboard: "src/assets/weapons/keyboard-macro-missile.png",
   weaponCorrectionFluid: "src/assets/weapons/correction-fluid-sprayer.png",
@@ -132,6 +131,33 @@ const assetSources = {
   abilityQueueProcessing: "src/assets/abilities/queue-processing.png",
   abilityStackRebound: "src/assets/abilities/stack-rebound.png",
   abilityHashLock: "src/assets/abilities/hash-lock.png",
+  propWorkstationA: "src/assets/props/workstation-a.png",
+  propWorkstationB: "src/assets/props/workstation-b.png",
+  propWorkstationC: "src/assets/props/workstation-c.png",
+  propWorkstationD: "src/assets/props/workstation-d.png",
+  propWorkstationE: "src/assets/props/workstation-e.png",
+  propWorkstationF: "src/assets/props/workstation-f.png",
+  propSingleDesk: "src/assets/props/single-desk.png",
+  propDeskChair: "src/assets/props/desk-chair.png",
+  propOfficeChair: "src/assets/props/office-chair.png",
+  propFileCabinet: "src/assets/props/file-cabinet.png",
+  propPrinter: "src/assets/props/printer.png",
+  propCopier: "src/assets/props/copier.png",
+  propWaterCooler: "src/assets/props/water-cooler.png",
+  propWaterCoolerPortal: "src/assets/props/water-cooler-portal.png",
+  propPlantTall: "src/assets/props/plant-tall.png",
+  propPlantRound: "src/assets/props/plant-round.png",
+  propPlantLeafy: "src/assets/props/plant-leafy.png",
+  propPlantSmall: "src/assets/props/plant-small.png",
+  propServerRoomDoor: "src/assets/props/server-room-door.png",
+  propServerRack: "src/assets/props/server-rack.png",
+  propWhiteboard: "src/assets/props/whiteboard.png",
+  propWindowRow: "src/assets/props/window-row.png",
+  propPlanterBox: "src/assets/props/planter-box.png",
+  propPartitionWide: "src/assets/props/partition-wide.png",
+  propPartitionLeft: "src/assets/props/partition-left.png",
+  propPartitionRight: "src/assets/props/partition-right.png",
+  propMeetingTable: "src/assets/props/meeting-table.png",
 };
 const storyAvatarSources = {
   安渡: "src/assets/characters/andu-avatar.png",
@@ -144,7 +170,6 @@ const storyAvatarSources = {
   inspector: "src/assets/characters/whitebox-inspector-avatar.png",
 };
 const assets = loadGameAssets(assetSources);
-const officeSceneCrop = { x: 0, y: 0, width: 970, height: 590 };
 
 function loadGameAssets(sources) {
   const loaded = {};
@@ -1507,11 +1532,6 @@ function draw(dt) {
 function drawOffice() {
   ctx.fillStyle = "#f8fbff";
   ctx.fillRect(0, 0, world.width, world.height);
-  const sceneDrawn = drawOfficeSceneAsset();
-  if (sceneDrawn) {
-    ctx.fillStyle = "rgba(255, 255, 255, 0.34)";
-    ctx.fillRect(0, 0, world.width, world.height);
-  }
 
   ctx.strokeStyle = "rgba(58, 83, 112, 0.075)";
   ctx.lineWidth = 1;
@@ -1546,8 +1566,7 @@ function drawOffice() {
   }
 
   drawMeetingTable(750, 262);
-  drawServerRack(750, 424);
-  drawServerRack(820, 424);
+  drawServerRoomDoor(738, 388);
   drawPrinter(1034, 526);
   drawDeliveryPickupZone(940, 558);
 
@@ -1556,36 +1575,15 @@ function drawOffice() {
     drawLabel("老梁", 1062, 84, "#9a6615");
   }
 
-  ctx.fillStyle = "#d8e4f0";
-  ctx.fillRect(34, 618, 206, 50);
-  ctx.fillStyle = "#0f9f95";
-  ctx.globalAlpha = 0.18;
-  ctx.fillRect(44, 628, 186, 30);
-  ctx.globalAlpha = 1;
-  drawLabel("安渡工位", 78, 650, "#224250");
-}
-
-function drawOfficeSceneAsset() {
-  const asset = assets.officeScene;
-  if (!asset?.ready) {
-    return false;
+  if (!drawPropAsset("propSingleDesk", 34, 586, 210, 124)) {
+    ctx.fillStyle = "#d8e4f0";
+    ctx.fillRect(34, 618, 206, 50);
+    ctx.fillStyle = "#0f9f95";
+    ctx.globalAlpha = 0.18;
+    ctx.fillRect(44, 628, 186, 30);
+    ctx.globalAlpha = 1;
   }
-
-  ctx.save();
-  ctx.globalAlpha = 0.58;
-  ctx.drawImage(
-    asset.image,
-    officeSceneCrop.x,
-    officeSceneCrop.y,
-    officeSceneCrop.width,
-    officeSceneCrop.height,
-    0,
-    0,
-    world.width,
-    world.height,
-  );
-  ctx.restore();
-  return true;
+  drawLabel("安渡工位", 78, 650, "#224250");
 }
 
 function drawDeliveryPickupZone(x, y) {
@@ -1623,6 +1621,17 @@ function drawDeliveryPickupZone(x, y) {
 }
 
 function drawDesk(desk) {
+  if (desk.assetKey) {
+    const width = desk.w + 42;
+    const height = desk.h + 82;
+    const x = desk.x - 20;
+    const y = desk.y - 22;
+    if (drawPropAsset(desk.assetKey, x, y, width, height)) {
+      drawLabel(desk.tag, desk.x + 12, desk.y + desk.h - 10, "#5c6878");
+      return;
+    }
+  }
+
   ctx.fillStyle = "#d7e1ec";
   ctx.fillRect(desk.x, desk.y, desk.w, desk.h);
   ctx.fillStyle = "#eef4fa";
@@ -1642,6 +1651,10 @@ function drawDesk(desk) {
 }
 
 function drawWindowRow(x, y, count) {
+  if (count >= 3 && drawPropAsset("propWindowRow", x - 4, y - 9, count * 62, 50)) {
+    return;
+  }
+
   for (let index = 0; index < count; index += 1) {
     const px = x + index * 62;
     ctx.fillStyle = "#d7ecff";
@@ -1678,6 +1691,13 @@ function drawChair(x, y) {
 }
 
 function drawPlant(x, y, scale = 1) {
+  const key = scale > 1.05 ? "propPlantLeafy" : scale < 0.9 ? "propPlantSmall" : "propPlantRound";
+  const width = (scale < 0.9 ? 44 : 62) * scale;
+  const height = (scale < 0.9 ? 68 : 92) * scale;
+  if (drawPropAsset(key, x - width / 2, y - height * 0.5, width, height)) {
+    return;
+  }
+
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
@@ -1693,6 +1713,10 @@ function drawPlant(x, y, scale = 1) {
 }
 
 function drawCopier(x, y) {
+  if (drawPropAsset("propCopier", x - 10, y - 24, 94, 108)) {
+    return;
+  }
+
   ctx.fillStyle = "#d3dce7";
   ctx.fillRect(x, y, 78, 50);
   ctx.fillStyle = "#eef4fa";
@@ -1704,6 +1728,10 @@ function drawCopier(x, y) {
 }
 
 function drawWaterCooler(x, y) {
+  if (drawPropAsset("propWaterCooler", x - 4, y - 14, 58, 110)) {
+    return;
+  }
+
   ctx.fillStyle = "#d7ecff";
   ctx.fillRect(x + 10, y, 28, 30);
   ctx.fillStyle = "#e8eef5";
@@ -1713,6 +1741,10 @@ function drawWaterCooler(x, y) {
 }
 
 function drawMeetingTable(x, y) {
+  if (drawPropAsset("propMeetingTable", x - 24, y - 44, 260, 132)) {
+    return;
+  }
+
   ctx.fillStyle = "#e1c398";
   ctx.fillRect(x, y, 210, 56);
   ctx.fillStyle = "#caa874";
@@ -1725,6 +1757,10 @@ function drawMeetingTable(x, y) {
 }
 
 function drawPrinter(x, y) {
+  if (drawPropAsset("propPrinter", x - 12, y - 24, 96, 108)) {
+    return;
+  }
+
   ctx.fillStyle = "#cbd6e2";
   ctx.fillRect(x, y, 72, 38);
   ctx.fillStyle = "#ffffff";
@@ -1734,6 +1770,10 @@ function drawPrinter(x, y) {
 }
 
 function drawServerRack(x, y) {
+  if (drawPropAsset("propServerRack", x - 8, y - 24, 68, 124)) {
+    return;
+  }
+
   ctx.fillStyle = "#26364d";
   ctx.fillRect(x, y, 52, 82);
   for (let i = 0; i < 5; i += 1) {
@@ -1742,6 +1782,17 @@ function drawServerRack(x, y) {
     ctx.fillStyle = i % 2 === 0 ? "#5de2d1" : "#f1c15b";
     ctx.fillRect(x + 10, y + 10 + i * 14, 5, 4);
   }
+}
+
+function drawServerRoomDoor(x, y) {
+  if (drawPropAsset("propServerRoomDoor", x, y, 440, 170)) {
+    drawLabel("0号服务器间", x + 164, y + 143, "#224250");
+    return;
+  }
+
+  drawServerRack(x + 12, y + 36);
+  drawServerRack(x + 82, y + 36);
+  drawServerRack(x + 308, y + 36);
 }
 
 function drawBugNodes(dt) {
@@ -2004,6 +2055,16 @@ function drawAllies() {
   }
 
   drawLabel("乔柚", x - 14, y - 33, "#ffd7ea");
+}
+
+function drawPropAsset(key, x, y, width, height) {
+  const asset = assets[key];
+  if (!asset?.ready) {
+    return false;
+  }
+
+  ctx.drawImage(asset.image, x, y, width, height);
+  return true;
 }
 
 function drawCenteredAsset(key, x, y, width, height, shadow = true) {

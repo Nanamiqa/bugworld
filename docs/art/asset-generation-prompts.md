@@ -387,6 +387,10 @@ no text, no letters, no numbers, no logo, no watermark, no signature, no UI, no 
 
 来源文件：`ChatGPT Image 2026年6月11日 12_52_59.png`
 
+已切分道具目录：`src/assets/props/`
+
+已接入游戏道具：工位、单桌、椅子、复印机、打印机、饮水机、盆栽、会议桌、服务器间门、服务器机柜、白板、窗户、隔断。
+
 ### 办公室夜巡背景
 
 用途：第一章主地图背景或宣传图。

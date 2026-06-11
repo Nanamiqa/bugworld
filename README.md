@@ -33,6 +33,7 @@
 - `src/assets/characters/`：角色头像与游戏内小人素材
 - `src/assets/enemies/`：怪物与敌人素材
 - `src/assets/items/`：掉落物、资源与剧情道具素材
+- `src/assets/props/`：办公室工位、设备、盆栽、服务器等场景道具素材
 - `src/assets/scenes/`：场景背景、场景道具与场景素材表
 - `src/assets/ui/`：卡牌、界面底板与 UI 图标素材
 - `src/assets/weapons/`：武器图标与武器素材
