@@ -108,6 +108,30 @@ const assetSources = {
   qiaoYou: "src/assets/characters/qiao-you-sprite.png",
   laoLiang: "src/assets/characters/lao-liang-sprite.png",
   inspector: "src/assets/characters/whitebox-inspector-sprite.png",
+  officeScene: "src/assets/scenes/office-night-scene-prop-sheet.png",
+  weaponPaperclip: "src/assets/weapons/paperclip-slingshot.png",
+  weaponKeyboard: "src/assets/weapons/keyboard-macro-missile.png",
+  weaponCorrectionFluid: "src/assets/weapons/correction-fluid-sprayer.png",
+  projectilePaperclip: "src/assets/projectiles/paperclip-projectile.png",
+  projectileKeycap: "src/assets/projectiles/keycap-projectile.png",
+  projectileCorrectionMist: "src/assets/projectiles/correction-fluid-mist.png",
+  repairPulse: "src/assets/effects/repair-pulse-ring.png",
+  enemyStressFluff: "src/assets/enemies/stress-fluff.png",
+  enemyWorkOrderBug: "src/assets/enemies/work-order-bug.png",
+  enemyInspectionProbe: "src/assets/enemies/inspection-probe.png",
+  enemyPromiseBall: "src/assets/enemies/promise-ball.png",
+  enemyQueueSnake: "src/assets/enemies/queue-snake.png",
+  enemyStackPile: "src/assets/enemies/stack-pile-monster.png",
+  enemyFloatErrorBubble: "src/assets/enemies/floating-point-error-bubble.png",
+  bugPoint: "src/assets/items/bug-point.png",
+  breakpointBadge: "src/assets/items/breakpoint-badge.png",
+  variableBlessingCard: "src/assets/ui/variable-blessing-card.png",
+  abilityIntegerPrecision: "src/assets/abilities/integer-precision.png",
+  abilityFloatingPointError: "src/assets/abilities/floating-point-error.png",
+  abilityArrayBarrage: "src/assets/abilities/array-barrage.png",
+  abilityQueueProcessing: "src/assets/abilities/queue-processing.png",
+  abilityStackRebound: "src/assets/abilities/stack-rebound.png",
+  abilityHashLock: "src/assets/abilities/hash-lock.png",
 };
 const storyAvatarSources = {
   安渡: "src/assets/characters/andu-avatar.png",
@@ -120,6 +144,7 @@ const storyAvatarSources = {
   inspector: "src/assets/characters/whitebox-inspector-avatar.png",
 };
 const assets = loadGameAssets(assetSources);
+const officeSceneCrop = { x: 0, y: 0, width: 970, height: 590 };
 
 function loadGameAssets(sources) {
   const loaded = {};
@@ -135,6 +160,11 @@ function loadGameAssets(sources) {
     image.src = encodeURI(src);
   }
   return loaded;
+}
+
+function assetUrl(key) {
+  const src = assetSources[key];
+  return src ? encodeURI(src) : "";
 }
 
 function resetGame() {
@@ -202,6 +232,8 @@ function spawnEnemyNear(x, y, type = "stress") {
     xpValue: definition.xpValue ?? 2,
     bugValue: definition.bugValue ?? 1,
     render: definition.render ?? "emo",
+    assetKey: definition.assetKey,
+    spriteSize: definition.spriteSize,
     deathColor: definition.deathColor ?? "#ef6a70",
     hitLog: definition.hitLog ?? "异常实体撞上来，报表又多了一页。",
     type,
@@ -328,8 +360,9 @@ function openWeaponSelect() {
 
   for (const weapon of weaponDefinitions) {
     const button = document.createElement("button");
-    button.className = "choice-button";
-    button.innerHTML = `<span class="choice-title">${weapon.name} · ${weapon.role}</span><span class="choice-effect">${weapon.desc}<br>${weapon.traitText}</span>`;
+    button.className = "choice-button with-media weapon-choice";
+    const icon = weapon.assetKey ? `<img class="choice-icon weapon-icon" src="${assetUrl(weapon.assetKey)}" alt="" />` : "";
+    button.innerHTML = `${icon}<span class="choice-copy"><span class="choice-title">${weapon.name} · ${weapon.role}</span><span class="choice-effect">${weapon.desc}<br>${weapon.traitText}</span></span>`;
     button.addEventListener("click", () => {
       equipWeapon(weapon);
       ui.storyPanel.classList.add("hidden");
@@ -751,9 +784,13 @@ function fireWeaponAt(target) {
       y: player.y - 8,
       vx: Math.cos(angle) * weapon.bulletSpeed,
       vy: Math.sin(angle) * weapon.bulletSpeed,
+      angle,
       radius: weapon.bulletSize + (charged ? trait.bulletSizeAdd : 0),
       damage: weapon.damage * (charged ? trait.damageMultiplier : 1),
       color: charged ? trait.color : weapon.color,
+      assetKey: weapon.projectileAssetKey,
+      assetWidth: (weapon.projectileWidth ?? 28) + (charged ? 8 : 0),
+      assetHeight: (weapon.projectileHeight ?? 28) + (charged ? 5 : 0),
       life: weapon.range / weapon.bulletSpeed,
       pierce: Math.round(weapon.pierce),
       knockback: trait?.type === "knockback" ? trait.force : 0,
@@ -765,9 +802,10 @@ function fireWeaponAt(target) {
 }
 
 function spawnEnemyWave(count = 2) {
+  const pool = getEnemySpawnPool();
   for (let index = 0; index < count; index += 1) {
     const side = Math.floor(random(0, 4));
-    const type = Math.random() < 0.35 ? "deadline" : "stress";
+    const type = pool[Math.floor(random(0, pool.length))] ?? "stress";
     let x = random(80, world.width - 80);
     let y = random(100, world.height - 80);
     if (side === 0) y = 92;
@@ -776,6 +814,20 @@ function spawnEnemyWave(count = 2) {
     if (side === 3) x = 64;
     spawnEnemyNear(x, y, type);
   }
+}
+
+function getEnemySpawnPool() {
+  const step = chapterState?.stepIndex ?? 0;
+  if (step >= 4 || chapterState?.finished) {
+    return ["stress", "deadline", "floatError", "queueSnake", "promise", "stackPile", "inspectionProbe"];
+  }
+  if (step >= 3) {
+    return ["stress", "deadline", "deadline", "floatError", "queueSnake", "promise", "stackPile"];
+  }
+  if (step >= 2) {
+    return ["stress", "stress", "deadline", "floatError", "queueSnake"];
+  }
+  return ["stress", "stress", "deadline"];
 }
 
 function dash() {
@@ -1351,8 +1403,9 @@ function openUpgrade() {
 
   for (const upgrade of pool) {
     const button = document.createElement("button");
-    button.className = "choice-button";
-    button.innerHTML = `<span class="choice-title">${upgrade.title}<span class="choice-rarity">${upgrade.rarity.name}</span></span><span class="choice-effect">${upgrade.effect}</span>`;
+    button.className = "choice-button with-media upgrade-card-choice";
+    const icon = upgrade.iconKey ? `<img class="choice-icon ability-icon" src="${assetUrl(upgrade.iconKey)}" alt="" />` : "";
+    button.innerHTML = `${icon}<span class="choice-copy"><span class="choice-title">${upgrade.title}<span class="choice-rarity">${upgrade.rarity.name}</span></span><span class="choice-effect">${upgrade.effect}</span></span>`;
     button.addEventListener("click", () => {
       applyActions(upgrade.actions);
       ui.upgradePanel.classList.add("hidden");
@@ -1454,6 +1507,11 @@ function draw(dt) {
 function drawOffice() {
   ctx.fillStyle = "#f8fbff";
   ctx.fillRect(0, 0, world.width, world.height);
+  const sceneDrawn = drawOfficeSceneAsset();
+  if (sceneDrawn) {
+    ctx.fillStyle = "rgba(255, 255, 255, 0.34)";
+    ctx.fillRect(0, 0, world.width, world.height);
+  }
 
   ctx.strokeStyle = "rgba(58, 83, 112, 0.075)";
   ctx.lineWidth = 1;
@@ -1505,6 +1563,29 @@ function drawOffice() {
   ctx.fillRect(44, 628, 186, 30);
   ctx.globalAlpha = 1;
   drawLabel("安渡工位", 78, 650, "#224250");
+}
+
+function drawOfficeSceneAsset() {
+  const asset = assets.officeScene;
+  if (!asset?.ready) {
+    return false;
+  }
+
+  ctx.save();
+  ctx.globalAlpha = 0.58;
+  ctx.drawImage(
+    asset.image,
+    officeSceneCrop.x,
+    officeSceneCrop.y,
+    officeSceneCrop.width,
+    officeSceneCrop.height,
+    0,
+    0,
+    world.width,
+    world.height,
+  );
+  ctx.restore();
+  return true;
 }
 
 function drawDeliveryPickupZone(x, y) {
@@ -1667,6 +1748,7 @@ function drawBugNodes(dt) {
   for (const node of bugNodes) {
     node.pulse += dt * 3;
     const glow = 5 + Math.sin(node.pulse) * 3;
+    const assetKey = getBugNodeAssetKey(node);
     ctx.save();
     ctx.translate(node.x, node.y);
     ctx.fillStyle = node.event.color;
@@ -1686,8 +1768,18 @@ function drawBugNodes(dt) {
     }
     ctx.closePath();
     ctx.fill();
+    if (assetKey) {
+      drawCenteredAsset(assetKey, 0, 0, 42 + glow, 42 + glow);
+    }
     ctx.restore();
   }
+}
+
+function getBugNodeAssetKey(node) {
+  if (node.event?.id === "debug-badge") {
+    return "breakpointBadge";
+  }
+  return "bugPoint";
 }
 
 function drawBugPickups() {
@@ -1711,6 +1803,7 @@ function drawBugPickups() {
     ctx.fill();
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(-2, -2, 4, 4);
+    drawCenteredAsset("bugPoint", 0, 0, 26 + glow * 1.4, 26 + glow * 1.4);
     ctx.restore();
   }
 }
@@ -1719,6 +1812,10 @@ function drawBullets() {
   for (const bullet of bullets) {
     ctx.save();
     ctx.translate(bullet.x, bullet.y);
+    if (drawRotatedAsset(bullet.assetKey, 0, 0, bullet.assetWidth, bullet.assetHeight, bullet.angle)) {
+      ctx.restore();
+      continue;
+    }
     ctx.fillStyle = bullet.color;
     ctx.globalAlpha = 0.24;
     ctx.beginPath();
@@ -1909,6 +2006,34 @@ function drawAllies() {
   drawLabel("乔柚", x - 14, y - 33, "#ffd7ea");
 }
 
+function drawCenteredAsset(key, x, y, width, height, shadow = true) {
+  const asset = assets[key];
+  if (!asset?.ready) {
+    return false;
+  }
+
+  ctx.save();
+  if (shadow) {
+    drawPixelShadow(x, y + height * 0.28, width * 0.48, 8);
+  }
+  ctx.drawImage(asset.image, x - width / 2, y - height / 2, width, height);
+  ctx.restore();
+  return true;
+}
+
+function drawRotatedAsset(key, x, y, width, height, angle = 0) {
+  const asset = assets[key];
+  if (!asset?.ready) {
+    return false;
+  }
+
+  ctx.save();
+  ctx.rotate(angle);
+  ctx.drawImage(asset.image, x - width / 2, y - height / 2, width, height);
+  ctx.restore();
+  return true;
+}
+
 function drawSpriteAsset(key, x, y, width, height) {
   const asset = assets[key];
   if (!asset?.ready) {
@@ -1923,6 +2048,10 @@ function drawSpriteAsset(key, x, y, width, height) {
 }
 
 function drawEnemy(enemy) {
+  if (drawEnemyAsset(enemy)) {
+    return;
+  }
+
   if (enemy.render === "deadline") {
     drawDeadlineBug(enemy.x, enemy.y, 0.76, enemy.hitFlash > 0);
     return;
@@ -1936,6 +2065,30 @@ function drawEnemy(enemy) {
   drawEmoFluff(enemy.x, enemy.y, 0.78, enemy.hitFlash > 0);
 }
 
+function drawEnemyAsset(enemy) {
+  if (!enemy.assetKey) {
+    return false;
+  }
+
+  const size = enemy.spriteSize ?? Math.max(46, enemy.radius * 3.8);
+  const drawn = drawSpriteAsset(enemy.assetKey, enemy.x, enemy.y, size, size);
+  if (!drawn) {
+    return false;
+  }
+
+  if (enemy.hitFlash > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(enemy.x, enemy.y - size * 0.24, size * 0.36, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  return true;
+}
+
 function drawPlayer() {
   ctx.save();
   if (player.invulnerable > 0) {
@@ -1947,10 +2100,15 @@ function drawPlayer() {
   ctx.restore();
 
   if (world.pulseCooldown > 0.38) {
+    const progress = 1 - world.pulseCooldown / 0.55;
+    ctx.save();
+    ctx.globalAlpha = 0.58;
+    drawCenteredAsset("repairPulse", player.x, player.y, player.pulseRadius * 2.15 * progress, player.pulseRadius * 2.15 * progress, false);
+    ctx.restore();
     ctx.strokeStyle = "rgba(114, 165, 255, 0.8)";
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(player.x, player.y, player.pulseRadius * (1 - world.pulseCooldown / 0.55), 0, Math.PI * 2);
+    ctx.arc(player.x, player.y, player.pulseRadius * progress, 0, Math.PI * 2);
     ctx.stroke();
   }
 }

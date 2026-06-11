@@ -149,6 +149,8 @@ no text, no letters, no logo, no watermark, no signature, no UI, no frame, no bo
 
 用途：开局武器选择图标、HUD 武器图标、弹道强化图标。
 
+已入库素材：`src/assets/weapons/paperclip-slingshot.png`
+
 ```text
 Original 2D game weapon icon, pixel-art inspired, crisp outline, soft cel shading, transparent background, centered single object, readable at small size.
 
@@ -161,6 +163,8 @@ no text, no letters, no logo, no watermark, no signature, no UI, no frame, no bo
 
 用途：开局武器选择图标、武器图标。
 
+已入库素材：`src/assets/weapons/keyboard-macro-missile.png`
+
 ```text
 Original 2D game weapon icon, pixel-art inspired, crisp outline, soft cel shading, transparent background, centered single object, readable at small size.
 
@@ -172,6 +176,8 @@ no text, no letters, no logo, no watermark, no signature, no UI, no frame, no bo
 ### 修正液喷枪
 
 用途：开局武器选择图标、武器图标。
+
+已入库素材：`src/assets/weapons/correction-fluid-sprayer.png`
 
 ```text
 Original 2D game weapon icon, pixel-art inspired, crisp outline, soft cel shading, transparent background, centered single object, readable at small size.
@@ -187,6 +193,8 @@ no text, no letters, no logo, no watermark, no signature, no UI, no frame, no bo
 
 用途：回形针弹弓子弹。
 
+已入库素材：`src/assets/projectiles/paperclip-projectile.png`
+
 ```text
 Original 2D game projectile sprite, pixel-art inspired, crisp outline, transparent background, centered single object.
 
@@ -194,6 +202,30 @@ A tiny glowing silver paperclip projectile wrapped in teal data light, fast prec
 
 no text, no letters, no logo, no watermark, no signature, no UI, no frame, no border, no realistic photo, no complex background
 ```
+
+### 键盘按键弹
+
+用途：键盘宏飞弹子弹。
+
+已入库素材：`src/assets/projectiles/keycap-projectile.png`
+
+### 修正液雾弹
+
+用途：修正液喷枪子弹。
+
+已入库素材：`src/assets/projectiles/correction-fluid-mist.png`
+
+### 修复脉冲
+
+用途：修复脉冲范围特效。
+
+已入库素材：`src/assets/effects/repair-pulse-ring.png`
+
+### 办公武器/子弹/特效素材表
+
+用途：归档原始 3x2 素材表。
+
+已入库素材：`src/assets/sheets/office-weapon-projectile-effect-sheet.png`
 
 ### 键盘按键弹
 
@@ -237,6 +269,10 @@ no letters, no logo, no watermark, no signature, no UI, no frame, no border, no 
 
 用途：普通追击怪，情绪层。
 
+已入库素材：`src/assets/enemies/stress-fluff.png`
+
+来源文件：`压力毛球.png`
+
 ```text
 Original 2D top-down chibi enemy sprite, pixel-art inspired, blocky simplified shapes, clean readable silhouette, soft shadow, transparent background, centered single creature, game-ready PNG sprite.
 
@@ -248,6 +284,10 @@ no text, no letters, no logo, no watermark, no signature, no UI, no frame, no bo
 ### 工单飞虫
 
 用途：快速追击怪，结构层。
+
+已入库素材：`src/assets/enemies/work-order-bug.png`
+
+来源文件：`工单飞虫.png`
 
 ```text
 Original 2D top-down chibi enemy sprite, pixel-art inspired, blocky simplified shapes, clean readable silhouette, soft shadow, transparent background, centered single creature, game-ready PNG sprite.
@@ -261,6 +301,10 @@ no text, no letters, no logo, no watermark, no signature, no UI, no frame, no bo
 
 用途：未来护盾怪，承诺层。
 
+已入库素材：`src/assets/enemies/promise-ball.png`
+
+来源文件：`承诺球.png`
+
 ```text
 Original 2D top-down chibi enemy sprite, pixel-art inspired, clean readable silhouette, soft shadow, transparent background, centered single creature, game-ready PNG sprite.
 
@@ -272,6 +316,10 @@ no text, no letters, no logo, no watermark, no signature, no UI, no frame, no bo
 ### 巡检探针
 
 用途：未来快速巡逻怪，规则引擎。
+
+已入库素材：`src/assets/enemies/inspection-probe.png`
+
+来源文件：`巡检探针.png`
 
 ```text
 Original 2D top-down chibi enemy sprite, pixel-art inspired, clean readable silhouette, soft shadow, transparent background, centered single robot, game-ready PNG sprite.
@@ -285,6 +333,10 @@ no text, no letters, no logo, no watermark, no signature, no UI, no frame, no bo
 
 用途：未来浮点数概念怪。
 
+已入库素材：`src/assets/enemies/floating-point-error-bubble.png`
+
+来源文件：`浮点误差泡.png`
+
 ```text
 Original 2D top-down chibi enemy sprite, pixel-art inspired, clean readable silhouette, soft shadow, transparent background, centered single creature, game-ready PNG sprite.
 
@@ -296,6 +348,10 @@ no text, no letters, no numbers, no logo, no watermark, no signature, no UI, no 
 ### 队列长蛇
 
 用途：未来队列概念怪。
+
+已入库素材：`src/assets/enemies/queue-snake.png`
+
+来源文件：`队列长蛇.png`
 
 ```text
 Original 2D top-down chibi enemy sprite, pixel-art inspired, clean readable silhouette, soft shadow, transparent background, centered single creature, game-ready PNG sprite.
@@ -309,6 +365,10 @@ no text, no letters, no numbers, no logo, no watermark, no signature, no UI, no 
 
 用途：未来栈概念怪。
 
+已入库素材：`src/assets/enemies/stack-pile-monster.png`
+
+来源文件：`栈叠叠怪.png`
+
 ```text
 Original 2D top-down chibi enemy sprite, pixel-art inspired, clean readable silhouette, soft shadow, transparent background, centered single creature, game-ready PNG sprite.
 
@@ -318,6 +378,14 @@ no text, no letters, no numbers, no logo, no watermark, no signature, no UI, no 
 ```
 
 ## 场景素材
+
+### 办公室场景/道具素材表
+
+用途：第一章办公室主地图、工位、电脑、盆栽、打印机、饮水机、服务器、隔断、会议桌等场景素材拆分来源。
+
+已入库素材：`src/assets/scenes/office-night-scene-prop-sheet.png`
+
+来源文件：`ChatGPT Image 2026年6月11日 12_52_59.png`
 
 ### 办公室夜巡背景
 
@@ -385,6 +453,10 @@ no text, no letters, no numbers, no logo, no watermark, no signature, no UI, no 
 
 用途：掉落物、资源图标。
 
+已入库素材：`src/assets/items/bug-point.png`
+
+来源文件：`bug点.png`
+
 ```text
 Original 2D game resource icon, pixel-art inspired, crisp outline, transparent background, centered single object.
 
@@ -396,6 +468,10 @@ no text, no letters, no numbers, no logo, no watermark, no signature, no UI fram
 ### 断点工牌
 
 用途：信物、剧情道具。
+
+已入库素材：`src/assets/items/breakpoint-badge.png`
+
+来源文件：`断点工牌.png`
 
 ```text
 Original 2D game item icon, pixel-art inspired, crisp outline, transparent background, centered single object.
@@ -409,6 +485,10 @@ no text, no letters, no numbers, no logo, no watermark, no signature, no UI fram
 
 用途：升级三选一卡面背景。
 
+已入库素材：`src/assets/ui/variable-blessing-card.png`
+
+来源文件：`变量祝福卡.png`
+
 ```text
 Original 2D game card background asset, clean stylized illustration, modern office anomaly roguelite theme, no text, no logo, no watermark.
 
@@ -419,7 +499,21 @@ no text, no letters, no numbers, no logo, no watermark, no signature, no charact
 
 ## 概念能力图标
 
+### 概念能力图标素材表
+
+用途：归档原始 3x2 能力图标素材表。
+
+已入库素材：`src/assets/sheets/concept-ability-icon-sheet.png`
+
+来源文件：`ChatGPT Image 2026年6月11日 13_04_02.png`
+
 ### 整数精准
+
+用途：升级祝福、能力图标。
+
+已入库素材：`src/assets/abilities/integer-precision.png`
+
+来源文件：`ChatGPT Image 2026年6月11日 13_04_02.png` 上左切片。
 
 ```text
 Original 2D game ability icon, pixel-art inspired, transparent background, centered symbol, readable at small size.
@@ -431,6 +525,12 @@ no text, no letters, no numbers, no logo, no watermark, no signature, no UI fram
 
 ### 浮点误差
 
+用途：升级祝福、能力图标。
+
+已入库素材：`src/assets/abilities/floating-point-error.png`
+
+来源文件：`ChatGPT Image 2026年6月11日 13_04_02.png` 上中切片。
+
 ```text
 Original 2D game ability icon, pixel-art inspired, transparent background, centered symbol, readable at small size.
 
@@ -440,6 +540,12 @@ no text, no letters, no numbers, no logo, no watermark, no signature, no UI fram
 ```
 
 ### 数组连发
+
+用途：升级祝福、能力图标。
+
+已入库素材：`src/assets/abilities/array-barrage.png`
+
+来源文件：`ChatGPT Image 2026年6月11日 13_04_02.png` 上右切片。
 
 ```text
 Original 2D game ability icon, pixel-art inspired, transparent background, centered symbol, readable at small size.
@@ -451,6 +557,12 @@ no text, no letters, no numbers, no logo, no watermark, no signature, no UI fram
 
 ### 队列处理
 
+用途：升级祝福、能力图标。
+
+已入库素材：`src/assets/abilities/queue-processing.png`
+
+来源文件：`ChatGPT Image 2026年6月11日 13_04_02.png` 下左切片。
+
 ```text
 Original 2D game ability icon, pixel-art inspired, transparent background, centered symbol, readable at small size.
 
@@ -461,6 +573,12 @@ no text, no letters, no numbers, no logo, no watermark, no signature, no UI fram
 
 ### 栈回弹
 
+用途：升级祝福、能力图标。
+
+已入库素材：`src/assets/abilities/stack-rebound.png`
+
+来源文件：`ChatGPT Image 2026年6月11日 13_04_02.png` 下中切片。
+
 ```text
 Original 2D game ability icon, pixel-art inspired, transparent background, centered symbol, readable at small size.
 
@@ -470,6 +588,12 @@ no text, no letters, no numbers, no logo, no watermark, no signature, no UI fram
 ```
 
 ### 哈希锁定
+
+用途：升级祝福、能力图标。
+
+已入库素材：`src/assets/abilities/hash-lock.png`
+
+来源文件：`ChatGPT Image 2026年6月11日 13_04_02.png` 下右切片。
 
 ```text
 Original 2D game ability icon, pixel-art inspired, transparent background, centered symbol, readable at small size.

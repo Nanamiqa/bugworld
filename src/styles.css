@@ -344,6 +344,55 @@ h1 {
   border-color: rgba(15, 159, 149, 0.45);
 }
 
+.choice-button.with-media {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.choice-button.weapon-choice {
+  min-height: 86px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(229, 247, 247, 0.74)),
+    rgba(247, 250, 255, 0.9);
+}
+
+.choice-button.upgrade-card-choice {
+  min-height: 92px;
+  border-color: rgba(15, 159, 149, 0.28);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.7)),
+    url("./assets/ui/variable-blessing-card.png") center / cover;
+}
+
+.choice-icon {
+  width: 58px;
+  height: 58px;
+  display: block;
+  object-fit: contain;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(93, 226, 209, 0.22), transparent 62%),
+    rgba(8, 29, 37, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.58);
+}
+
+.weapon-icon {
+  width: 64px;
+  height: 64px;
+}
+
+.ability-icon {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(93, 226, 209, 0.26), transparent 64%),
+    rgba(8, 29, 37, 0.14);
+}
+
+.choice-copy {
+  min-width: 0;
+}
+
 .choice-rarity {
   display: inline-block;
   margin-left: 8px;
@@ -419,6 +468,17 @@ h1 {
 
   .story-panel .choice-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .choice-button.with-media {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .choice-icon,
+  .weapon-icon {
+    width: 48px;
+    height: 48px;
   }
 }
 
