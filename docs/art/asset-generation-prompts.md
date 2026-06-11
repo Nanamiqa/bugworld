@@ -451,6 +451,28 @@ A prop sheet containing separated objects: office desk, office chair, printer, c
 no text, no letters, no numbers, no logo, no watermark, no signature, no UI, no frame, no border, no realistic photo, no complex background
 ```
 
+## Boss 素材
+
+### 协议骑手·周行：Phase 1 本体
+
+用途：第一章 Boss 本体素材、后续 Boss 战绘制素材。
+
+已入库素材：`src/assets/bosses/delivery-rider-boss-phase1.png`
+
+来源文件：`ChatGPT Image 2026年6月11日 16_58_17.png`
+
+处理记录：已将棋盘格假透明背景处理为真实透明背景。
+
+### 协议骑手·周行：剧情头像
+
+用途：第一章 Boss 剧情对话头像、Boss 介绍面板素材。
+
+已入库素材：`src/assets/bosses/delivery-rider-boss-portrait.png`
+
+来源文件：`ChatGPT Image 2026年6月11日 17_03_00.png`
+
+处理记录：已将棋盘格假透明背景处理为真实透明背景。
+
 ## UI 与图标素材
 
 ### bug点

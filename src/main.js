@@ -164,10 +164,12 @@ const storyAvatarSources = {
   乔柚: "src/assets/characters/qiao-you-avatar.png",
   老梁: "src/assets/characters/lao-liang-avatar.png",
   白箱巡检员: "src/assets/characters/whitebox-inspector-avatar.png",
+  周行: "src/assets/bosses/delivery-rider-boss-portrait.png",
   andu: "src/assets/characters/andu-avatar.png",
   qiaoYou: "src/assets/characters/qiao-you-avatar.png",
   laoLiang: "src/assets/characters/lao-liang-avatar.png",
   inspector: "src/assets/characters/whitebox-inspector-avatar.png",
+  deliveryRider: "src/assets/bosses/delivery-rider-boss-portrait.png",
 };
 const assets = loadGameAssets(assetSources);
 

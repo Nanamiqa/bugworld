@@ -30,6 +30,7 @@
 - `src/main.js`：游戏逻辑
 - `src/data/game-data.js`：世界观、角色、章节、事件、武器、敌人、补丁数据
 - `src/assets/abilities/`：升级祝福与概念能力图标素材
+- `src/assets/bosses/`：Boss 本体、阶段变体与 Boss 专属素材
 - `src/assets/characters/`：角色头像与游戏内小人素材
 - `src/assets/enemies/`：怪物与敌人素材
 - `src/assets/items/`：掉落物、资源与剧情道具素材
@@ -46,3 +47,4 @@
 - `docs/design/01-long-term-roadmap.md`：长期制作路线与双周节奏
 - `docs/design/02-content-templates.md`：地图、武器、能力、敌人与羁绊模板
 - `docs/design/03-chapter-one-steam-demo-template.md`：第一章 Steam Demo 质量补充模板
+- `docs/design/04-current-tasks-and-enemies.md`：当前第一章任务、怪物和 Boss 信息整理
