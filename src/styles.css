@@ -17,9 +17,18 @@
   box-sizing: border-box;
 }
 
+html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
+  width: 100%;
+  height: 100%;
   min-height: 100vh;
+  overflow: hidden;
   background: var(--bg);
   color: var(--text);
   font-family:
@@ -31,7 +40,10 @@ button {
 }
 
 .game-shell {
-  min-height: 100vh;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   display: grid;
   grid-template-rows: auto 1fr auto;
   background:
@@ -45,14 +57,15 @@ button {
   justify-content: space-between;
   gap: 18px;
   align-items: end;
-  padding: 18px clamp(16px, 3vw, 32px) 12px;
+  min-height: 0;
+  padding: clamp(10px, 1.8vh, 18px) clamp(12px, 2.4vw, 32px) clamp(8px, 1.4vh, 12px);
   border-bottom: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(12px);
 }
 
 .eyebrow {
-  margin: 0 0 4px;
+  margin: 0 0 3px;
   color: var(--cyan);
   font-size: 0.76rem;
   letter-spacing: 0;
@@ -66,27 +79,27 @@ p {
 
 h1 {
   margin-bottom: 0;
-  font-size: clamp(1.35rem, 3vw, 2.2rem);
+  font-size: clamp(1.2rem, 2.4vw, 2rem);
   line-height: 1.05;
   letter-spacing: 0;
 }
 
 .hud {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(7, max-content);
   justify-content: flex-end;
-  gap: 8px;
-  max-width: min(860px, 100%);
+  gap: 6px;
+  max-width: min(920px, 100%);
 }
 
 .hud span {
-  min-width: 92px;
-  padding: 8px 10px;
+  min-width: 0;
+  padding: 7px 9px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.72);
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: clamp(0.72rem, 1.1vw, 0.85rem);
   white-space: nowrap;
 }
 
@@ -98,6 +111,7 @@ h1 {
 .stage {
   position: relative;
   min-height: 0;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -133,7 +147,8 @@ h1 {
   width: 100%;
   height: 100%;
   display: block;
-  min-height: 470px;
+  min-width: 0;
+  min-height: 0;
 }
 
 .event-panel {
@@ -143,6 +158,8 @@ h1 {
   width: min(520px, calc(100% - 32px));
   transform: translate(-50%, -50%);
   z-index: 3;
+  max-height: min(82vh, 680px);
+  overflow: auto;
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -164,6 +181,8 @@ h1 {
   grid-template-columns: 116px minmax(0, 1fr);
   gap: 16px;
   align-items: end;
+  max-height: min(46vh, 360px);
+  overflow: auto;
   padding: 16px;
   border: 1px solid rgba(26, 42, 68, 0.16);
   border-radius: 8px;
@@ -248,7 +267,7 @@ h1 {
 
 .story-panel #storyText {
   min-height: 4.4em;
-  max-height: 11.2em;
+  max-height: min(11.2em, 19vh);
   margin-bottom: 0;
   overflow: auto;
   color: var(--text);
@@ -347,14 +366,22 @@ h1 {
 }
 
 .ticker {
-  min-height: 42px;
+  min-height: 0;
   display: flex;
   align-items: center;
-  padding: 9px clamp(16px, 3vw, 32px);
+  padding: clamp(6px, 1.1vh, 9px) clamp(12px, 2.4vw, 32px);
   border-top: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.78);
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: clamp(0.76rem, 1.2vw, 0.9rem);
+  line-height: 1.35;
+}
+
+.ticker span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 760px) {
@@ -366,21 +393,19 @@ h1 {
   .hud {
     justify-content: stretch;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .hud span {
     min-width: 0;
-  }
-
-  #gameCanvas {
-    min-height: 520px;
+    padding: 6px 7px;
   }
 
   .story-panel {
     grid-template-columns: 76px minmax(0, 1fr);
     gap: 10px;
     padding: 12px;
+    max-height: 52vh;
   }
 
   .story-portrait {
@@ -389,10 +414,44 @@ h1 {
   }
 
   .story-panel #storyText {
-    max-height: 10.5em;
+    max-height: 18vh;
   }
 
   .story-panel .choice-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-height: 680px) {
+  .eyebrow {
+    display: none;
+  }
+
+  .topbar {
+    align-items: center;
+  }
+
+  h1 {
+    font-size: 1.1rem;
+  }
+
+  .chapter-status {
+    top: 10px;
+    width: min(300px, calc(100% - 20px));
+    padding: 9px 10px;
+  }
+
+  .chapter-status strong {
+    font-size: 0.84rem;
+  }
+
+  .story-panel {
+    max-height: 50vh;
+  }
+}
+
+@media (max-width: 1080px) {
+  .hud {
+    grid-template-columns: repeat(4, minmax(0, max-content));
   }
 }
