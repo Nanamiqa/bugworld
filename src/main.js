@@ -115,6 +115,15 @@ const assetSources = {
   projectileKeycap: "src/assets/projectiles/keycap-projectile.png",
   projectileCorrectionMist: "src/assets/projectiles/correction-fluid-mist.png",
   repairPulse: "src/assets/effects/repair-pulse-ring.png",
+  bossDeliveryPhase1: "src/assets/bosses/delivery-rider-boss-phase1.png",
+  bossDeliveryPhase2: "src/assets/bosses/delivery-rider-boss-phase2.png",
+  bossDeliveryPhase3: "src/assets/bosses/delivery-rider-boss-phase3.png",
+  bossTcpRoute: "src/assets/effects/boss-tcp-handshake-route.png",
+  bossUdpPackage: "src/assets/effects/boss-udp-delivery-package.png",
+  bossFtpPackage: "src/assets/effects/boss-ftp-transfer-package.png",
+  bossDnsMarker: "src/assets/effects/boss-dns-error-marker.png",
+  bossTimeoutRoute: "src/assets/effects/boss-timeout-retransmit-route.png",
+  bossOrderAura: "src/assets/effects/boss-order-overload-aura.png",
   enemyStressFluff: "src/assets/enemies/stress-fluff.png",
   enemyWorkOrderBug: "src/assets/enemies/work-order-bug.png",
   enemyInspectionProbe: "src/assets/enemies/inspection-probe.png",
@@ -1885,19 +1894,25 @@ function drawBullets() {
 function drawProtocolHazards() {
   if (boss?.state === "handshake" && boss.lastRoute) {
     const pulse = 0.44 + Math.sin(performance.now() / 90) * 0.18;
-    drawProtocolRoute(boss.lastRoute, "#5de2d1", pulse, 5, true);
-    drawProtocolRoute(offsetRoute(boss.lastRoute, 11), "#72a5ff", 0.36, 3, true);
-    drawProtocolRoute(offsetRoute(boss.lastRoute, -11), "#f1c15b", 0.3, 3, true);
+    const drawn = drawRouteEffectAsset("bossTcpRoute", boss.lastRoute, 120, pulse + 0.2);
+    if (!drawn) {
+      drawProtocolRoute(boss.lastRoute, "#5de2d1", pulse, 5, true);
+      drawProtocolRoute(offsetRoute(boss.lastRoute, 11), "#72a5ff", 0.36, 3, true);
+      drawProtocolRoute(offsetRoute(boss.lastRoute, -11), "#f1c15b", 0.3, 3, true);
+    }
   }
 
   for (const hazard of protocolHazards) {
     if (hazard.type === "retransmit") {
       const armed = hazard.timer <= 0;
-      drawProtocolRoute(hazard, armed ? "#ef6a70" : "#f1c15b", armed ? 0.72 : 0.34, armed ? 8 : 4, !armed);
+      const drawn = drawRouteEffectAsset("bossTimeoutRoute", hazard, armed ? 116 : 96, armed ? 0.74 : 0.42);
+      if (!drawn) {
+        drawProtocolRoute(hazard, armed ? "#ef6a70" : "#f1c15b", armed ? 0.72 : 0.34, armed ? 8 : 4, !armed);
+      }
     }
 
     if (hazard.type === "package") {
-      drawDeliveryPackage(hazard.x, hazard.y, hazard.radius, hazard.color);
+      drawDeliveryPackage(hazard.x, hazard.y, hazard.radius, hazard.color, Math.atan2(hazard.vy, hazard.vx));
     }
 
     if (hazard.type === "ftp") {
@@ -1942,7 +1957,11 @@ function offsetRoute(route, amount) {
   };
 }
 
-function drawDeliveryPackage(x, y, radius, color = "#f1c15b") {
+function drawDeliveryPackage(x, y, radius, color = "#f1c15b", angle = 0) {
+  if (drawWorldRotatedAsset("bossUdpPackage", x, y, radius * 8.2, radius * 5.4, angle, 0.95, true)) {
+    return;
+  }
+
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(Math.sin(performance.now() / 180 + x) * 0.18);
@@ -1955,14 +1974,22 @@ function drawDeliveryPackage(x, y, radius, color = "#f1c15b") {
 }
 
 function drawFtpPackage(hazard) {
+  const flash = hazard.hitFlash > 0 ? "#ffffff" : "#f1c15b";
+  const drawn = drawCenteredAsset("bossFtpPackage", hazard.x, hazard.y, 142, 142, true);
+
   ctx.save();
   ctx.translate(hazard.x, hazard.y);
-  const flash = hazard.hitFlash > 0 ? "#ffffff" : "#f1c15b";
-  drawPixelShadow(0, 40, 86, 16);
-  rect(-42, -34, 84, 68, flash);
-  rect(-42, -34, 84, 12, "#c98416");
-  rect(-6, -34, 12, 68, "#72a5ff");
-  rect(-28, -2, 56, 8, "#9a6615");
+  if (!drawn) {
+    drawPixelShadow(0, 40, 86, 16);
+    rect(-42, -34, 84, 68, flash);
+    rect(-42, -34, 84, 12, "#c98416");
+    rect(-6, -34, 12, 68, "#72a5ff");
+    rect(-28, -2, 56, 8, "#9a6615");
+  } else if (hazard.hitFlash > 0) {
+    ctx.globalAlpha = 0.3;
+    fillCircle(0, -2, 58, "#ffffff");
+    ctx.globalAlpha = 1;
+  }
   ctx.strokeStyle = "#0f9f95";
   ctx.lineWidth = 4;
   ctx.beginPath();
@@ -1976,8 +2003,21 @@ function drawFtpPackage(hazard) {
 }
 
 function drawDnsMarker(hazard) {
-  ctx.save();
   const progress = clamp(hazard.timer / 1.9, 0, 1);
+  const size = hazard.radius * 3.05;
+  const drawn = drawCenteredAsset("bossDnsMarker", hazard.x, hazard.y, size, size, false, 0.58 + (1 - progress) * 0.32);
+  ctx.save();
+  if (drawn) {
+    ctx.globalAlpha = 0.72;
+    ctx.strokeStyle = progress < 0.35 ? "#ef6a70" : "#f1c15b";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(hazard.x, hazard.y, hazard.radius * (0.76 + (1 - progress) * 0.18), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
   ctx.globalAlpha = 0.18 + (1 - progress) * 0.36;
   ctx.fillStyle = "#72a5ff";
   ctx.beginPath();
@@ -2017,7 +2057,35 @@ function drawBoss() {
     return;
   }
 
-  drawDeliveryRiderBoss(boss.x, boss.y, 1, boss.hitFlash > 0);
+  if (boss.phase === 3) {
+    const auraAlpha = 0.34 + Math.sin(performance.now() / 180) * 0.08;
+    drawCenteredAsset("bossOrderAura", boss.x, boss.y + 6, 216, 216, false, auraAlpha);
+  }
+
+  const assetKey = getBossPhaseAssetKey(boss.phase);
+  const spriteSize = boss.phase === 3 ? 188 : boss.phase === 2 ? 170 : 152;
+  const drawn = drawSpriteAsset(assetKey, boss.x, boss.y, spriteSize, spriteSize);
+  if (!drawn) {
+    drawDeliveryRiderBoss(boss.x, boss.y, 1, boss.hitFlash > 0);
+    return;
+  }
+
+  if (boss.hitFlash > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.32;
+    fillCircle(boss.x, boss.y - spriteSize * 0.24, spriteSize * 0.36, "#ffffff");
+    ctx.restore();
+  }
+}
+
+function getBossPhaseAssetKey(phase) {
+  if (phase === 3) {
+    return "bossDeliveryPhase3";
+  }
+  if (phase === 2) {
+    return "bossDeliveryPhase2";
+  }
+  return "bossDeliveryPhase1";
 }
 
 function drawBossHud() {
@@ -2069,7 +2137,23 @@ function drawPropAsset(key, x, y, width, height) {
   return true;
 }
 
-function drawCenteredAsset(key, x, y, width, height, shadow = true) {
+function drawCenteredAsset(key, x, y, width, height, shadow = true, alpha = 1) {
+  const asset = assets[key];
+  if (!asset?.ready) {
+    return false;
+  }
+
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  if (shadow) {
+    drawPixelShadow(x, y + height * 0.28, width * 0.48, 8);
+  }
+  ctx.drawImage(asset.image, x - width / 2, y - height / 2, width, height);
+  ctx.restore();
+  return true;
+}
+
+function drawWorldRotatedAsset(key, x, y, width, height, angle = 0, alpha = 1, shadow = false) {
   const asset = assets[key];
   if (!asset?.ready) {
     return false;
@@ -2077,9 +2161,34 @@ function drawCenteredAsset(key, x, y, width, height, shadow = true) {
 
   ctx.save();
   if (shadow) {
-    drawPixelShadow(x, y + height * 0.28, width * 0.48, 8);
+    drawPixelShadow(x, y + height * 0.24, width * 0.42, 8);
   }
-  ctx.drawImage(asset.image, x - width / 2, y - height / 2, width, height);
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.globalAlpha *= alpha;
+  ctx.drawImage(asset.image, -width / 2, -height / 2, width, height);
+  ctx.restore();
+  return true;
+}
+
+function drawRouteEffectAsset(key, route, height, alpha = 1) {
+  const asset = assets[key];
+  if (!asset?.ready) {
+    return false;
+  }
+
+  const dx = route.x2 - route.x1;
+  const dy = route.y2 - route.y1;
+  const length = Math.hypot(dx, dy);
+  if (length <= 1) {
+    return false;
+  }
+
+  ctx.save();
+  ctx.translate((route.x1 + route.x2) / 2, (route.y1 + route.y2) / 2);
+  ctx.rotate(Math.atan2(dy, dx));
+  ctx.globalAlpha *= alpha;
+  ctx.drawImage(asset.image, -length / 2, -height / 2, length, height);
   ctx.restore();
   return true;
 }

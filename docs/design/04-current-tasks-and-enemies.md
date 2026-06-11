@@ -184,7 +184,7 @@ Boss ID：`delivery-rider`
 
 已入库素材：`src/assets/bosses/delivery-rider-boss-phase1.png`
 
-来源文件：`ChatGPT Image 2026年6月11日 16_58_17.png`
+来源文件：`ChatGPT Image 2026年6月11日 22_14_30.png` 左侧阶段 1。
 
 ```text
 Original 2D top-down chibi boss sprite for an urban anomaly roguelite game, pixel-art inspired, crisp outline, soft cel shading, transparent background, centered full body, readable at small size, game-ready PNG.
@@ -210,6 +210,17 @@ no text, no readable letters, no numbers, no logo, no brand mark, no watermark, 
 
 ### Boss 技能与特效素材表
 
+已入库素材表：`src/assets/sheets/boss-delivery-protocol-effect-sheet.png`
+
+已切分素材：
+
+- `src/assets/effects/boss-tcp-handshake-route.png`：TCP 三次握手冲刺路线预警。
+- `src/assets/effects/boss-udp-delivery-package.png`：UDP 外卖包裹投射物。
+- `src/assets/effects/boss-ftp-transfer-package.png`：FTP 大文件传输重箱危险物。
+- `src/assets/effects/boss-dns-error-marker.png`：DNS 错误定位地面标记。
+- `src/assets/effects/boss-timeout-retransmit-route.png`：超时重传残影路线。
+- `src/assets/effects/boss-order-overload-aura.png`：订单过载环形力场。
+
 ```text
 Original 2D game VFX and projectile sprite sheet, pixel-art inspired, transparent background, separated assets with enough spacing for cropping, modern office anomaly roguelite theme, teal data glow and warm yellow delivery color, no text.
 
@@ -225,6 +236,14 @@ Each asset must be isolated, readable at small size, no built-in words, no numbe
 ```
 
 ### Boss 三阶段外观变体
+
+已入库素材表：`src/assets/sheets/delivery-rider-boss-phase-sheet.png`
+
+已切分素材：
+
+- `src/assets/bosses/delivery-rider-boss-phase1.png`：阶段 1，轻度协议异常。
+- `src/assets/bosses/delivery-rider-boss-phase2.png`：阶段 2，订单线缆和路线环增强。
+- `src/assets/bosses/delivery-rider-boss-phase3.png`：阶段 3，配送箱展开为协议核心。
 
 ```text
 Original 2D top-down chibi boss character variant sheet, pixel-art inspired, transparent background, three separated full-body sprites in one horizontal row, game-ready PNG.

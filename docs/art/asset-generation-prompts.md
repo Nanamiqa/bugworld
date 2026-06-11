@@ -459,9 +459,25 @@ no text, no letters, no numbers, no logo, no watermark, no signature, no UI, no 
 
 已入库素材：`src/assets/bosses/delivery-rider-boss-phase1.png`
 
-来源文件：`ChatGPT Image 2026年6月11日 16_58_17.png`
+来源文件：`ChatGPT Image 2026年6月11日 22_14_30.png` 左侧阶段 1。
 
-处理记录：已将棋盘格假透明背景处理为真实透明背景。
+处理记录：已从三阶段素材表切分，并将棋盘格假透明背景处理为真实透明背景。
+
+### 协议骑手·周行：三阶段形态素材表
+
+用途：第一章 Boss 血量阶段切换、阶段演出与后续 Boss 状态表现。
+
+已入库素材表：`src/assets/sheets/delivery-rider-boss-phase-sheet.png`
+
+已切分素材：
+
+- `src/assets/bosses/delivery-rider-boss-phase1.png`
+- `src/assets/bosses/delivery-rider-boss-phase2.png`
+- `src/assets/bosses/delivery-rider-boss-phase3.png`
+
+来源文件：`ChatGPT Image 2026年6月11日 22_14_30.png`
+
+处理记录：已按左中右三阶段切分，并将棋盘格假透明背景处理为真实透明背景。
 
 ### 协议骑手·周行：剧情头像
 
@@ -472,6 +488,25 @@ no text, no letters, no numbers, no logo, no watermark, no signature, no UI, no 
 来源文件：`ChatGPT Image 2026年6月11日 17_03_00.png`
 
 处理记录：已将棋盘格假透明背景处理为真实透明背景。
+
+### 协议骑手·周行：技能特效素材表
+
+用途：第一章外卖协议 Boss 的 TCP/UDP/FTP/DNS/超时重传/订单过载技能特效。
+
+已入库素材表：`src/assets/sheets/boss-delivery-protocol-effect-sheet.png`
+
+已切分素材：
+
+- `src/assets/effects/boss-tcp-handshake-route.png`
+- `src/assets/effects/boss-udp-delivery-package.png`
+- `src/assets/effects/boss-ftp-transfer-package.png`
+- `src/assets/effects/boss-dns-error-marker.png`
+- `src/assets/effects/boss-timeout-retransmit-route.png`
+- `src/assets/effects/boss-order-overload-aura.png`
+
+来源文件：`ChatGPT Image 2026年6月11日 21_23_33.png`
+
+处理记录：已按 3x2 素材表切分，并将棋盘格假透明背景处理为真实透明背景。
 
 ## UI 与图标素材
 
