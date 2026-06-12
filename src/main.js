@@ -43,6 +43,7 @@ const world = {
   height: 720,
   mode: "playing",
   lastTime: 0,
+  animTime: 0,
   spawnTimer: 0,
   pulseCooldown: 0,
   dashCooldown: 0,
@@ -103,6 +104,80 @@ const chapterOne = gameData.chapterOne;
 const weaponDefinitions = gameData.weapons ?? [];
 const weaponUpgrades = gameData.weaponUpgrades ?? [];
 const enemyTypes = gameData.enemyTypes ?? {};
+const bossPhaseTuning = {
+  1: {
+    desiredDistance: 235,
+    speedMultiplier: 1,
+    routeLength: 620,
+    handshakeTime: 1.05,
+    dashDuration: 0.38,
+    dashDamage: 28,
+    postDashCooldown: 0.72,
+    retransmitTimer: 1.22,
+    retransmitActiveTime: 0.36,
+    retransmitDamage: 16,
+    udpCount: 8,
+    udpMinSpeed: 170,
+    udpMaxSpeed: 235,
+    udpDamage: 9,
+    udpCooldown: 1.14,
+    ftpHp: 260,
+    ftpTimer: 4.8,
+    ftpBlastDamage: 22,
+    dnsCount: 0,
+    dnsRadius: 44,
+    dnsTimer: 1.35,
+    dnsDamage: 15,
+  },
+  2: {
+    desiredDistance: 220,
+    speedMultiplier: 1.14,
+    routeLength: 700,
+    handshakeTime: 0.92,
+    dashDuration: 0.3,
+    dashDamage: 34,
+    postDashCooldown: 0.58,
+    retransmitTimer: 1.04,
+    retransmitActiveTime: 0.44,
+    retransmitDamage: 18,
+    udpCount: 14,
+    udpMinSpeed: 210,
+    udpMaxSpeed: 290,
+    udpDamage: 12,
+    udpCooldown: 0.95,
+    ftpHp: 290,
+    ftpTimer: 4.45,
+    ftpBlastDamage: 26,
+    dnsCount: 0,
+    dnsRadius: 44,
+    dnsTimer: 1.25,
+    dnsDamage: 17,
+  },
+  3: {
+    desiredDistance: 190,
+    speedMultiplier: 1.28,
+    routeLength: 760,
+    handshakeTime: 0.76,
+    dashDuration: 0.24,
+    dashDamage: 42,
+    postDashCooldown: 0.38,
+    retransmitTimer: 0.86,
+    retransmitActiveTime: 0.52,
+    retransmitDamage: 22,
+    udpCount: 22,
+    udpMinSpeed: 230,
+    udpMaxSpeed: 345,
+    udpDamage: 15,
+    udpCooldown: 0.72,
+    ftpHp: 340,
+    ftpTimer: 4.05,
+    ftpBlastDamage: 30,
+    dnsCount: 7,
+    dnsRadius: 48,
+    dnsTimer: 1.05,
+    dnsDamage: 22,
+  },
+};
 const assetSources = {
   andu: "src/assets/characters/andu-sprite.png",
   qiaoYou: "src/assets/characters/qiao-you-sprite.png",
@@ -224,6 +299,7 @@ function resetGame() {
     finished: false,
   };
   world.mode = "playing";
+  world.animTime = 0;
   world.spawnTimer = 0;
   world.pulseCooldown = 0;
   world.dashCooldown = 0;
@@ -245,6 +321,7 @@ function createBugNode(x = random(90, world.width - 90), y = random(96, world.he
     y,
     radius: 17,
     pulse: random(0, Math.PI * 2),
+    animPhase: random(0, Math.PI * 2),
     event,
     chapterStep: chapterState?.stepIndex ?? -1,
   };
@@ -273,6 +350,7 @@ function spawnEnemyNear(x, y, type = "stress") {
     deathColor: definition.deathColor ?? "#ef6a70",
     hitLog: definition.hitLog ?? "异常实体撞上来，报表又多了一页。",
     type,
+    animPhase: random(0, Math.PI * 2),
     hitFlash: 0,
     slowTimer: 0,
     slowFactor: 1,
@@ -486,6 +564,7 @@ function spawnBugPickup(x, y, bugValue = 1, xpValue = 2) {
     vy: random(-20, 20),
     radius: 8,
     pulse: random(0, Math.PI * 2),
+    animPhase: random(0, Math.PI * 2),
     bugValue,
     xpValue,
   });
@@ -627,20 +706,21 @@ function startBossFight() {
     x: 1034,
     y: 548,
     radius: 34,
-    hp: 1250,
-    maxHp: 1250,
-    speed: 98,
-    damage: 18,
+    hp: 1750,
+    maxHp: 1750,
+    speed: 112,
+    damage: 22,
     phase: 1,
     state: "idle",
     stateTimer: 0.85,
-    attackCooldown: 0.8,
+    attackCooldown: 0.55,
     hitFlash: 0,
     slowTimer: 0,
     slowFactor: 1,
     dash: null,
     lastRoute: null,
     logTimer: 0,
+    animPhase: random(0, Math.PI * 2),
   };
   chapterState.stepIndex = 4;
   setChapterObjective("打断错误配送协议，救回外卖小哥周行");
@@ -691,6 +771,7 @@ function syncHud() {
 function update(time) {
   const dt = Math.min((time - world.lastTime) / 1000 || 0, 0.033);
   world.lastTime = time;
+  world.animTime += dt;
 
   if (world.mode === "playing") {
     updatePlaying(dt);
@@ -827,6 +908,8 @@ function fireWeaponAt(target) {
       assetKey: weapon.projectileAssetKey,
       assetWidth: (weapon.projectileWidth ?? 28) + (charged ? 8 : 0),
       assetHeight: (weapon.projectileHeight ?? 28) + (charged ? 5 : 0),
+      animPhase: random(0, Math.PI * 2),
+      spin: weapon.projectileAssetKey === "projectileKeycap" ? random(-7, 7) : random(-1.2, 1.2),
       life: weapon.range / weapon.bulletSpeed,
       pierce: Math.round(weapon.pierce),
       knockback: trait?.type === "knockback" ? trait.force : 0,
@@ -1017,9 +1100,9 @@ function updateBoss(dt) {
   }
 
   const previousPhase = boss.phase;
-  if (boss.hp <= boss.maxHp * 0.35) {
+  if (boss.hp <= boss.maxHp * 0.4) {
     boss.phase = 3;
-  } else if (boss.hp <= boss.maxHp * 0.65) {
+  } else if (boss.hp <= boss.maxHp * 0.7) {
     boss.phase = 2;
   } else {
     boss.phase = 1;
@@ -1029,6 +1112,7 @@ function updateBoss(dt) {
     const phaseLog = boss.phase === 2 ? "周行的外卖箱开始触发超时重传。" : "错误路线开始 DNS 解析，取餐区变成一张发烫的网。";
     setLog(phaseLog);
     world.cameraShake = 0.2;
+    boss.attackCooldown = Math.min(boss.attackCooldown, boss.phase === 3 ? 0.22 : 0.36);
   }
 
   if (boss.state === "handshake") {
@@ -1057,31 +1141,56 @@ function updateBoss(dt) {
 }
 
 function driftBossTowardPlayer(dt) {
+  const tuning = getBossTuning();
   const angle = Math.atan2(player.y - boss.y, player.x - boss.x);
-  const desiredDistance = 250;
+  const desiredDistance = tuning.desiredDistance;
   const currentDistance = distance(player, boss);
   const direction = currentDistance > desiredDistance ? 1 : -0.35;
-  const speed = boss.speed * boss.slowFactor;
+  const speed = boss.speed * tuning.speedMultiplier * boss.slowFactor;
   boss.x = clamp(boss.x + Math.cos(angle) * speed * direction * dt, boss.radius, world.width - boss.radius);
   boss.y = clamp(boss.y + Math.sin(angle) * speed * direction * dt, 86, world.height - boss.radius);
   resolveDeskCollision(boss);
 }
 
+function getBossTuning() {
+  return bossPhaseTuning[boss?.phase ?? 1] ?? bossPhaseTuning[1];
+}
+
 function chooseBossAttack() {
   const roll = Math.random();
 
-  if (boss.phase === 3 && roll < 0.34) {
-    startFtpTransfer();
+  if (boss.phase === 3) {
+    if (roll < 0.26) {
+      startFtpTransfer();
+      return;
+    }
+    if (roll < 0.6) {
+      startUdpBurst();
+      return;
+    }
+    if (roll < 0.84) {
+      startDnsError();
+      return;
+    }
+    startTcpHandshake();
     return;
   }
 
-  if (boss.phase >= 2 && roll < 0.62) {
+  if (boss.phase === 2) {
+    if (roll < 0.18) {
+      startFtpTransfer();
+      return;
+    }
+    if (roll < 0.66) {
+      startUdpBurst();
+      return;
+    }
+    startTcpHandshake();
+    return;
+  }
+
+  if (roll < 0.26) {
     startUdpBurst();
-    return;
-  }
-
-  if (boss.phase === 3 && roll < 0.84) {
-    startDnsError();
     return;
   }
 
@@ -1089,14 +1198,15 @@ function chooseBossAttack() {
 }
 
 function startTcpHandshake() {
+  const tuning = getBossTuning();
   const angle = Math.atan2(player.y - boss.y, player.x - boss.x);
-  const routeLength = boss.phase >= 2 ? 680 : 580;
+  const routeLength = tuning.routeLength;
   const targetX = clamp(boss.x + Math.cos(angle) * routeLength, 52, world.width - 52);
   const targetY = clamp(boss.y + Math.sin(angle) * routeLength, 92, world.height - 52);
   boss.lastRoute = { x1: boss.x, y1: boss.y, x2: targetX, y2: targetY };
   boss.state = "handshake";
-  boss.stateTimer = 1.25;
-  boss.attackCooldown = 1.05;
+  boss.stateTimer = tuning.handshakeTime;
+  boss.attackCooldown = 0.82;
   if (boss.logTimer <= 0) {
     setLog("TCP 三次握手：路线先确认三次，第三次亮起后周行会冲刺。");
     boss.logTimer = 4;
@@ -1105,11 +1215,13 @@ function startTcpHandshake() {
 
 function startBossDash() {
   const route = boss.lastRoute;
+  const tuning = getBossTuning();
   boss.state = "dash";
   boss.dash = {
     ...route,
     elapsed: 0,
-    duration: boss.phase >= 2 ? 0.36 : 0.44,
+    duration: tuning.dashDuration,
+    damage: tuning.dashDamage,
     damaged: false,
   };
 }
@@ -1122,7 +1234,7 @@ function updateBossDash(dt) {
 
   if (!boss.dash.damaged && distance(boss, player) < boss.radius + player.radius + 8) {
     boss.dash.damaged = true;
-    damagePlayer(18 + boss.phase * 4, "TCP ACK 已确认，周行沿着错误路线撞了过来。");
+    damagePlayer(boss.dash.damage, "TCP ACK 已确认，周行沿着错误路线撞了过来。");
   }
 
   if (t >= 1) {
@@ -1131,45 +1243,49 @@ function updateBossDash(dt) {
     }
     boss.state = "idle";
     boss.dash = null;
-    boss.attackCooldown = boss.phase === 3 ? 0.55 : 0.88;
+    boss.attackCooldown = getBossTuning().postDashCooldown;
   }
 }
 
 function addRetransmitRoute(route) {
+  const tuning = getBossTuning();
   protocolHazards.push({
     type: "retransmit",
     x1: route.x1,
     y1: route.y1,
     x2: route.x2,
     y2: route.y2,
-    timer: 1.35,
-    activeTime: 0.34,
+    timer: tuning.retransmitTimer,
+    activeTime: tuning.retransmitActiveTime,
+    damage: tuning.retransmitDamage,
     damaged: false,
   });
 }
 
 function startUdpBurst() {
-  const count = boss.phase === 3 ? 16 : 11;
+  const tuning = getBossTuning();
+  const count = tuning.udpCount;
   for (let index = 0; index < count; index += 1) {
     const angle = (Math.PI * 2 * index) / count + random(-0.14, 0.14);
-    const speed = random(175, boss.phase === 3 ? 300 : 250);
+    const speed = random(tuning.udpMinSpeed, tuning.udpMaxSpeed);
     protocolHazards.push({
       type: "package",
       x: boss.x,
       y: boss.y - 10,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      radius: 12,
+      radius: boss.phase === 3 ? 13 : 12,
       life: 3.1,
-      damage: boss.phase === 3 ? 12 : 10,
+      damage: tuning.udpDamage,
       color: "#f1c15b",
     });
   }
-  boss.attackCooldown = boss.phase === 3 ? 0.9 : 1.2;
+  boss.attackCooldown = tuning.udpCooldown;
   setLog("UDP 乱送模式：外卖包被高速撒出，不确认谁收到了。");
 }
 
 function startFtpTransfer() {
+  const tuning = getBossTuning();
   const existingFtp = protocolHazards.some((hazard) => hazard.type === "ftp");
   if (!existingFtp) {
     protocolHazards.push({
@@ -1177,31 +1293,34 @@ function startFtpTransfer() {
       x: 870,
       y: 348,
       radius: 44,
-      hp: 230,
-      maxHp: 230,
-      timer: 4.8,
+      hp: tuning.ftpHp,
+      maxHp: tuning.ftpHp,
+      timer: tuning.ftpTimer,
+      phase: boss.phase,
+      blastDamage: tuning.ftpBlastDamage,
       destructible: true,
       hitFlash: 0,
     });
     setLog("FTP 大件传输中：打爆中央的大件外卖包，别让它上传完成。");
   }
-  boss.attackCooldown = 1.2;
+  boss.attackCooldown = boss.phase === 3 ? 0.82 : 1;
 }
 
 function startDnsError() {
-  for (let index = 0; index < 5; index += 1) {
-    const nearPlayer = index < 2;
+  const tuning = getBossTuning();
+  for (let index = 0; index < tuning.dnsCount; index += 1) {
+    const nearPlayer = index < (boss.phase === 3 ? 3 : 2);
     protocolHazards.push({
       type: "dns",
       x: clamp((nearPlayer ? player.x : random(160, world.width - 140)) + random(-90, 90), 58, world.width - 58),
       y: clamp((nearPlayer ? player.y : random(120, world.height - 90)) + random(-70, 70), 98, world.height - 58),
-      radius: 44,
-      timer: 1.35 + index * 0.1,
-      damage: 15,
+      radius: tuning.dnsRadius,
+      timer: tuning.dnsTimer + index * 0.08,
+      damage: tuning.dnsDamage,
       triggered: false,
     });
   }
-  boss.attackCooldown = 1.0;
+  boss.attackCooldown = boss.phase === 3 ? 0.66 : 0.9;
   setLog("DNS 地址解析错误：取餐点被翻译到了错误位置。");
 }
 
@@ -1223,7 +1342,7 @@ function updateProtocolHazards(dt) {
         hazard.activeTime -= dt;
         if (!hazard.damaged && distancePointToSegment(player, hazard) < player.radius + 18) {
           hazard.damaged = true;
-          damagePlayer(16, "超时重传影子沿旧路线补送了一次。");
+          damagePlayer(hazard.damage ?? 16, "超时重传影子沿旧路线补送了一次。");
         }
       }
     }
@@ -1238,8 +1357,11 @@ function updateProtocolHazards(dt) {
         burst(hazard.x, hazard.y, "#f1c15b", 34);
         spawnEnemyNear(hazard.x - 64, hazard.y + 24, "deadline");
         spawnEnemyNear(hazard.x + 64, hazard.y + 24, "stress");
+        if ((hazard.phase ?? 1) >= 3) {
+          spawnEnemyNear(hazard.x, hazard.y - 56, "queueSnake");
+        }
         if (distance(hazard, player) < 190) {
-          damagePlayer(20, "FTP 大件上传完成，整片取餐区被热汤数据炸开。");
+          damagePlayer(hazard.blastDamage ?? 20, "FTP 大件上传完成，整片取餐区被热汤数据炸开。");
         } else {
           setLog("FTP 大件上传完成，新的异常从外卖箱里爬了出来。");
         }
@@ -1810,9 +1932,11 @@ function drawBugNodes(dt) {
   for (const node of bugNodes) {
     node.pulse += dt * 3;
     const glow = 5 + Math.sin(node.pulse) * 3;
+    const bob = Math.sin(world.animTime * 2.4 + node.animPhase) * 3;
+    const spin = node.pulse * 0.22;
     const assetKey = getBugNodeAssetKey(node);
     ctx.save();
-    ctx.translate(node.x, node.y);
+    ctx.translate(node.x, node.y + bob);
     ctx.fillStyle = node.event.color;
     ctx.globalAlpha = 0.16;
     ctx.beginPath();
@@ -1831,7 +1955,8 @@ function drawBugNodes(dt) {
     ctx.closePath();
     ctx.fill();
     if (assetKey) {
-      drawCenteredAsset(assetKey, 0, 0, 42 + glow, 42 + glow);
+      ctx.rotate(spin);
+      drawCenteredAsset(assetKey, 0, 0, 42 + glow, 42 + glow, false);
     }
     ctx.restore();
   }
@@ -1847,8 +1972,9 @@ function getBugNodeAssetKey(node) {
 function drawBugPickups() {
   for (const pickup of bugPickups) {
     const glow = 3 + Math.sin(pickup.pulse) * 2;
+    const bob = Math.sin(world.animTime * 4.2 + pickup.animPhase) * 2.4;
     ctx.save();
-    ctx.translate(pickup.x, pickup.y);
+    ctx.translate(pickup.x, pickup.y + bob);
     ctx.fillStyle = "#0f9f95";
     ctx.globalAlpha = 0.18;
     ctx.beginPath();
@@ -1865,6 +1991,7 @@ function drawBugPickups() {
     ctx.fill();
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(-2, -2, 4, 4);
+    ctx.rotate(pickup.pulse * 0.55);
     drawCenteredAsset("bugPoint", 0, 0, 26 + glow * 1.4, 26 + glow * 1.4);
     ctx.restore();
   }
@@ -1872,9 +1999,22 @@ function drawBugPickups() {
 
 function drawBullets() {
   for (const bullet of bullets) {
+    const speed = Math.hypot(bullet.vx, bullet.vy) || 1;
+    const ux = bullet.vx / speed;
+    const uy = bullet.vy / speed;
+    const drawAngle = bullet.angle + Math.sin(world.animTime * 16 + bullet.animPhase) * 0.05 + world.animTime * bullet.spin * 0.08;
     ctx.save();
     ctx.translate(bullet.x, bullet.y);
-    if (drawRotatedAsset(bullet.assetKey, 0, 0, bullet.assetWidth, bullet.assetHeight, bullet.angle)) {
+    for (let index = 3; index >= 1; index -= 1) {
+      const alpha = 0.12 / index;
+      const offset = index * Math.max(10, bullet.radius * 1.8);
+      if (!drawRotatedAsset(bullet.assetKey, -ux * offset, -uy * offset, bullet.assetWidth, bullet.assetHeight, drawAngle, alpha, 0.86)) {
+        ctx.globalAlpha = alpha;
+        fillCircle(-ux * offset, -uy * offset, bullet.radius + 3, bullet.color);
+        ctx.globalAlpha = 1;
+      }
+    }
+    if (drawRotatedAsset(bullet.assetKey, 0, 0, bullet.assetWidth, bullet.assetHeight, drawAngle)) {
       ctx.restore();
       continue;
     }
@@ -1900,6 +2040,8 @@ function drawProtocolHazards() {
       drawProtocolRoute(offsetRoute(boss.lastRoute, 11), "#72a5ff", 0.36, 3, true);
       drawProtocolRoute(offsetRoute(boss.lastRoute, -11), "#f1c15b", 0.3, 3, true);
     }
+    drawRouteSignal(boss.lastRoute, "#ffffff", 0.8);
+    drawRouteSignal(boss.lastRoute, "#5de2d1", 0.46, 0.42);
   }
 
   for (const hazard of protocolHazards) {
@@ -1909,6 +2051,7 @@ function drawProtocolHazards() {
       if (!drawn) {
         drawProtocolRoute(hazard, armed ? "#ef6a70" : "#f1c15b", armed ? 0.72 : 0.34, armed ? 8 : 4, !armed);
       }
+      drawRouteSignal(hazard, armed ? "#ef6a70" : "#f1c15b", armed ? 0.78 : 0.38, hazard.x1 * 0.013);
     }
 
     if (hazard.type === "package") {
@@ -1943,6 +2086,25 @@ function drawProtocolRoute(route, color, alpha, width, dashed = false) {
   ctx.restore();
 }
 
+function drawRouteSignal(route, color, alpha, offset = 0) {
+  const dx = route.x2 - route.x1;
+  const dy = route.y2 - route.y1;
+  const length = Math.hypot(dx, dy);
+  if (length <= 1) {
+    return;
+  }
+
+  const t = (world.animTime * 0.82 + offset) % 1;
+  const x = route.x1 + dx * t;
+  const y = route.y1 + dy * t;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  fillCircle(x, y, 5 + Math.sin(world.animTime * 12 + offset) * 1.6, color);
+  ctx.globalAlpha = alpha * 0.22;
+  fillCircle(x, y, 15, color);
+  ctx.restore();
+}
+
 function offsetRoute(route, amount) {
   const dx = route.x2 - route.x1;
   const dy = route.y2 - route.y1;
@@ -1958,12 +2120,14 @@ function offsetRoute(route, amount) {
 }
 
 function drawDeliveryPackage(x, y, radius, color = "#f1c15b", angle = 0) {
-  if (drawWorldRotatedAsset("bossUdpPackage", x, y, radius * 8.2, radius * 5.4, angle, 0.95, true)) {
+  const bob = Math.sin(world.animTime * 5 + x * 0.01) * 2.2;
+  const scale = 1 + Math.sin(world.animTime * 7 + y * 0.01) * 0.035;
+  if (drawWorldRotatedAsset("bossUdpPackage", x, y + bob, radius * 8.2 * scale, radius * 5.4 * scale, angle + Math.sin(world.animTime * 6) * 0.08, 0.95, true)) {
     return;
   }
 
   ctx.save();
-  ctx.translate(x, y);
+  ctx.translate(x, y + bob);
   ctx.rotate(Math.sin(performance.now() / 180 + x) * 0.18);
   drawPixelShadow(0, radius + 5, radius * 2.2, 8);
   rect(-radius, -radius * 0.72, radius * 2, radius * 1.44, "#f6d28a");
@@ -1975,10 +2139,13 @@ function drawDeliveryPackage(x, y, radius, color = "#f1c15b", angle = 0) {
 
 function drawFtpPackage(hazard) {
   const flash = hazard.hitFlash > 0 ? "#ffffff" : "#f1c15b";
-  const drawn = drawCenteredAsset("bossFtpPackage", hazard.x, hazard.y, 142, 142, true);
+  const bob = Math.sin(world.animTime * 3.8 + hazard.x * 0.01) * 3;
+  const pulse = 1 + Math.sin(world.animTime * 5.2 + hazard.y * 0.01) * 0.025;
+  const drawY = hazard.y + bob;
+  const drawn = drawCenteredAsset("bossFtpPackage", hazard.x, drawY, 142 * pulse, 142 * pulse, true);
 
   ctx.save();
-  ctx.translate(hazard.x, hazard.y);
+  ctx.translate(hazard.x, drawY);
   if (!drawn) {
     drawPixelShadow(0, 40, 86, 16);
     rect(-42, -34, 84, 68, flash);
@@ -2004,8 +2171,8 @@ function drawFtpPackage(hazard) {
 
 function drawDnsMarker(hazard) {
   const progress = clamp(hazard.timer / 1.9, 0, 1);
-  const size = hazard.radius * 3.05;
-  const drawn = drawCenteredAsset("bossDnsMarker", hazard.x, hazard.y, size, size, false, 0.58 + (1 - progress) * 0.32);
+  const size = hazard.radius * (3.05 + Math.sin(world.animTime * 8 + hazard.x * 0.01) * 0.12);
+  const drawn = drawWorldRotatedAsset("bossDnsMarker", hazard.x, hazard.y, size, size, Math.sin(world.animTime * 2.8) * 0.06, 0.58 + (1 - progress) * 0.32, false);
   ctx.save();
   if (drawn) {
     ctx.globalAlpha = 0.72;
@@ -2046,9 +2213,12 @@ function drawEnemies() {
     drawEnemy(cleaner);
     ctx.strokeStyle = "#72a5ff";
     ctx.lineWidth = 3;
+    const ringPulse = Math.sin(world.animTime * 5 + cleaner.animPhase) * 4;
+    ctx.globalAlpha = 0.72;
     ctx.beginPath();
-    ctx.arc(cleaner.x, cleaner.y, cleaner.radius + 7, 0, Math.PI * 2);
+    ctx.arc(cleaner.x, cleaner.y, cleaner.radius + 7 + ringPulse, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 }
 
@@ -2064,7 +2234,33 @@ function drawBoss() {
 
   const assetKey = getBossPhaseAssetKey(boss.phase);
   const spriteSize = boss.phase === 3 ? 188 : boss.phase === 2 ? 170 : 152;
-  const drawn = drawSpriteAsset(assetKey, boss.x, boss.y, spriteSize, spriteSize);
+  const bossPulse = Math.sin(world.animTime * (boss.state === "dash" ? 12 : 3.2) + boss.animPhase);
+  const bossBob = boss.state === "handshake" ? bossPulse * 5 : bossPulse * 2.5;
+  const bossScale = 1 + Math.sin(world.animTime * 2.6 + boss.animPhase) * 0.025 + (boss.state === "handshake" ? 0.035 : 0);
+  const bossTilt = Math.sin(world.animTime * (boss.phase + 1.8) + boss.animPhase) * (boss.phase === 3 ? 0.045 : 0.025);
+
+  if (boss.state === "dash" && boss.dash) {
+    const dx = boss.dash.x2 - boss.dash.x1;
+    const dy = boss.dash.y2 - boss.dash.y1;
+    const len = Math.hypot(dx, dy) || 1;
+    for (let index = 3; index >= 1; index -= 1) {
+      drawSpriteAsset(assetKey, boss.x - (dx / len) * index * 18, boss.y - (dy / len) * index * 18, spriteSize, spriteSize, {
+        alpha: 0.09 * index,
+        bob: bossBob,
+        rotate: bossTilt,
+        scale: bossScale - index * 0.025,
+        shadow: false,
+      });
+    }
+  }
+
+  const drawn = drawSpriteAsset(assetKey, boss.x, boss.y, spriteSize, spriteSize, {
+    bob: bossBob,
+    glowAlpha: boss.phase === 3 ? 0.12 : boss.state === "handshake" ? 0.08 : 0,
+    glowColor: boss.phase === 3 ? "#ef6a70" : "#5de2d1",
+    rotate: bossTilt,
+    scale: bossScale,
+  });
   if (!drawn) {
     drawDeliveryRiderBoss(boss.x, boss.y, 1, boss.hitFlash > 0);
     return;
@@ -2193,28 +2389,55 @@ function drawRouteEffectAsset(key, route, height, alpha = 1) {
   return true;
 }
 
-function drawRotatedAsset(key, x, y, width, height, angle = 0) {
+function drawRotatedAsset(key, x, y, width, height, angle = 0, alpha = 1, scale = 1) {
   const asset = assets[key];
   if (!asset?.ready) {
     return false;
   }
 
   ctx.save();
+  ctx.translate(x, y);
   ctx.rotate(angle);
-  ctx.drawImage(asset.image, x - width / 2, y - height / 2, width, height);
+  ctx.globalAlpha *= alpha;
+  ctx.drawImage(asset.image, (-width * scale) / 2, (-height * scale) / 2, width * scale, height * scale);
   ctx.restore();
   return true;
 }
 
-function drawSpriteAsset(key, x, y, width, height) {
+function drawSpriteAsset(key, x, y, width, height, options = {}) {
   const asset = assets[key];
   if (!asset?.ready) {
     return false;
   }
 
+  const {
+    alpha = 1,
+    bob = 0,
+    glowAlpha = 0,
+    glowColor = "#5de2d1",
+    rotate = 0,
+    scale = 1,
+    shadow = true,
+  } = options;
+  const drawWidth = width * scale;
+  const drawHeight = height * scale;
+  const drawX = x;
+  const drawY = y + bob;
+
   ctx.save();
-  drawPixelShadow(x, y + height * 0.32, width * 0.54, 10);
-  ctx.drawImage(asset.image, x - width / 2, y - height * 0.68, width, height);
+  if (shadow) {
+    drawPixelShadow(drawX, drawY + drawHeight * 0.32, drawWidth * 0.54, 10);
+  }
+  ctx.translate(drawX, drawY);
+  if (glowAlpha > 0) {
+    const previousAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = previousAlpha * glowAlpha;
+    fillCircle(0, -drawHeight * 0.24, drawWidth * 0.4, glowColor);
+    ctx.globalAlpha = previousAlpha;
+  }
+  ctx.rotate(rotate);
+  ctx.globalAlpha *= alpha;
+  ctx.drawImage(asset.image, -drawWidth / 2, -drawHeight * 0.68, drawWidth, drawHeight);
   ctx.restore();
   return true;
 }
@@ -2243,7 +2466,18 @@ function drawEnemyAsset(enemy) {
   }
 
   const size = enemy.spriteSize ?? Math.max(46, enemy.radius * 3.8);
-  const drawn = drawSpriteAsset(enemy.assetKey, enemy.x, enemy.y, size, size);
+  const phase = enemy.animPhase ?? 0;
+  const hurt = enemy.hitFlash > 0 ? Math.sin(world.animTime * 46) * 0.035 : 0;
+  const bob = Math.sin(world.animTime * 3.4 + phase) * (enemy.type === "queueSnake" ? 1.3 : 2.4);
+  const scale = 1 + Math.sin(world.animTime * 4 + phase) * 0.035 + Math.abs(hurt);
+  const rotate = Math.sin(world.animTime * 2.2 + phase) * (enemy.type === "inspectionProbe" ? 0.08 : 0.04);
+  const drawn = drawSpriteAsset(enemy.assetKey, enemy.x, enemy.y, size, size, {
+    bob,
+    glowAlpha: enemy.slowTimer > 0 ? 0.07 : 0,
+    glowColor: "#72a5ff",
+    rotate,
+    scale,
+  });
   if (!drawn) {
     return false;
   }
@@ -2266,7 +2500,10 @@ function drawPlayer() {
   if (player.invulnerable > 0) {
     ctx.globalAlpha = 0.62 + Math.sin(performance.now() / 45) * 0.25;
   }
-  if (!drawSpriteAsset("andu", player.x, player.y, 78, 78)) {
+  const isMoving = keys.has("arrowleft") || keys.has("a") || keys.has("arrowright") || keys.has("d") || keys.has("arrowup") || keys.has("w") || keys.has("arrowdown") || keys.has("s");
+  const stepBob = isMoving ? Math.sin(world.animTime * 14) * 2.2 : Math.sin(world.animTime * 2.4) * 0.8;
+  const stepTilt = isMoving ? Math.sin(world.animTime * 10) * 0.035 : 0;
+  if (!drawSpriteAsset("andu", player.x, player.y, 78, 78, { bob: stepBob, rotate: stepTilt, scale: 1 + Math.abs(stepBob) * 0.003 })) {
     drawAnduSprite(player.x, player.y, 0.82);
   }
   ctx.restore();
@@ -2567,9 +2804,15 @@ function strokeCircle(x, y, radius, color, width) {
 
 function drawParticles() {
   for (const particle of particles) {
-    ctx.globalAlpha = Math.max(0, particle.life / particle.maxLife);
+    const alpha = Math.max(0, particle.life / particle.maxLife);
+    const size = particle.size * (0.45 + alpha * 0.85);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(particle.x, particle.y);
+    ctx.rotate((1 - alpha) * Math.PI * 0.65);
     ctx.fillStyle = particle.color;
-    ctx.fillRect(particle.x, particle.y, particle.size, particle.size);
+    ctx.fillRect(-size / 2, -size / 2, size, size);
+    ctx.restore();
   }
   ctx.globalAlpha = 1;
 }
