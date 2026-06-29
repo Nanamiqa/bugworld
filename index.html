@@ -32,6 +32,16 @@
           <strong id="objectiveText">调查办公室异常</strong>
         </div>
 
+        <aside class="run-panel" aria-live="polite">
+          <div id="chapterPips" class="chapter-pips"></div>
+          <div class="run-grid">
+            <span>档案 <strong id="archiveValue">0/5</strong></span>
+            <span>构筑 <strong id="buildValue">初始</strong></span>
+            <span>共鸣 <strong id="resonanceValue">无</strong></span>
+            <span>击破 <strong id="defeatValue">0</strong></span>
+          </div>
+        </aside>
+
         <aside id="storyPanel" class="story-panel hidden" aria-modal="true">
           <div id="storyAvatarFrame" class="story-portrait" aria-hidden="true">
             <img id="storyAvatar" alt="" />
@@ -57,8 +67,8 @@
         </aside>
 
         <aside id="upgradePanel" class="event-panel hidden" aria-modal="true">
-          <p class="event-kicker">变量祝福</p>
-          <h2>选择一个升级方向</h2>
+          <p id="upgradeKicker" class="event-kicker">变量祝福</p>
+          <h2 id="upgradeTitle">选择一个升级方向</h2>
           <div id="upgradeChoices" class="choice-grid"></div>
         </aside>
 
@@ -66,7 +76,8 @@
           <p id="resultKicker" class="event-kicker">今日结算</p>
           <h2 id="resultTitle"></h2>
           <p id="resultText"></p>
-          <button id="restartButton" class="choice-button primary">再来一天</button>
+          <div id="resultStats" class="result-stats"></div>
+          <button id="restartButton" class="choice-button primary">重开夜巡</button>
         </aside>
       </section>
 

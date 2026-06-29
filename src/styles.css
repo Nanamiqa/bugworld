@@ -113,6 +113,9 @@ h1 {
   min-height: 0;
   height: 100%;
   overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(246, 248, 251, 0.18), rgba(246, 248, 251, 0.72)),
+    url("./assets/scenes/variable-city-key-art.png") center / cover;
 }
 
 .chapter-status {
@@ -141,6 +144,91 @@ h1 {
   font-size: 0.96rem;
   line-height: 1.35;
   font-weight: 700;
+}
+
+.run-panel {
+  position: absolute;
+  right: clamp(14px, 2.4vw, 28px);
+  top: clamp(14px, 2.4vw, 28px);
+  z-index: 2;
+  display: grid;
+  gap: 10px;
+  width: min(390px, calc(100% - 28px));
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 16px 34px rgba(31, 45, 71, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.chapter-pips {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.chapter-pip {
+  min-width: 0;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(26, 42, 68, 0.12);
+  overflow: hidden;
+}
+
+.chapter-pip::before {
+  content: "";
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--cyan), var(--blue));
+  transition: width 180ms ease;
+}
+
+.chapter-pip.is-cleared::before {
+  width: 100%;
+}
+
+.chapter-pip.is-current::before {
+  width: 52%;
+  background: linear-gradient(90deg, var(--amber), var(--cyan));
+}
+
+.run-grid,
+.result-stats {
+  display: grid;
+  gap: 6px;
+}
+
+.run-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.run-grid span,
+.result-stat {
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid rgba(26, 42, 68, 0.1);
+  border-radius: 8px;
+  background: rgba(247, 250, 255, 0.72);
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.run-grid strong,
+.result-stat strong {
+  display: block;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.84rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 14px 0;
 }
 
 #gameCanvas {
@@ -362,8 +450,11 @@ h1 {
   min-height: 92px;
   border-color: rgba(15, 159, 149, 0.28);
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.7)),
-    url("./assets/ui/variable-blessing-card.png") center / cover;
+    linear-gradient(90deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.9) 58%, rgba(255, 255, 255, 0.72) 100%),
+    url("./assets/ui/roguelike-reward-card-v2.png") center / cover;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.72),
+    0 12px 28px rgba(31, 45, 71, 0.08);
 }
 
 .choice-icon {
@@ -501,6 +592,14 @@ h1 {
     padding: 9px 10px;
   }
 
+  .run-panel {
+    top: auto;
+    right: 10px;
+    bottom: 56px;
+    width: min(330px, calc(100% - 20px));
+    padding: 9px 10px;
+  }
+
   .chapter-status strong {
     font-size: 0.84rem;
   }
@@ -513,5 +612,23 @@ h1 {
 @media (max-width: 1080px) {
   .hud {
     grid-template-columns: repeat(4, minmax(0, max-content));
+  }
+
+  .run-panel {
+    top: auto;
+    bottom: 54px;
+  }
+}
+
+@media (max-width: 760px) {
+  .run-panel {
+    right: 12px;
+    bottom: 52px;
+    width: min(340px, calc(100% - 24px));
+  }
+
+  .run-grid,
+  .result-stats {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

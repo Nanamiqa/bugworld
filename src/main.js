@@ -18,6 +18,11 @@ const ui = {
   eventChoices: document.querySelector("#eventChoices"),
   chapterTitle: document.querySelector("#chapterTitle"),
   objectiveText: document.querySelector("#objectiveText"),
+  chapterPips: document.querySelector("#chapterPips"),
+  archive: document.querySelector("#archiveValue"),
+  build: document.querySelector("#buildValue"),
+  resonance: document.querySelector("#resonanceValue"),
+  defeat: document.querySelector("#defeatValue"),
   storyPanel: document.querySelector("#storyPanel"),
   storySpeaker: document.querySelector("#storySpeaker"),
   storyTitle: document.querySelector("#storyTitle"),
@@ -29,11 +34,14 @@ const ui = {
   storyContinue: document.querySelector("#storyContinue"),
   storyChoices: document.querySelector("#storyChoices"),
   upgradePanel: document.querySelector("#upgradePanel"),
+  upgradeKicker: document.querySelector("#upgradeKicker"),
+  upgradeTitle: document.querySelector("#upgradeTitle"),
   upgradeChoices: document.querySelector("#upgradeChoices"),
   resultPanel: document.querySelector("#resultPanel"),
   resultKicker: document.querySelector("#resultKicker"),
   resultTitle: document.querySelector("#resultTitle"),
   resultText: document.querySelector("#resultText"),
+  resultStats: document.querySelector("#resultStats"),
   restartButton: document.querySelector("#restartButton"),
 };
 
@@ -47,6 +55,7 @@ const world = {
   spawnTimer: 0,
   pulseCooldown: 0,
   dashCooldown: 0,
+  allyAssistCooldown: 0,
   cameraShake: 0,
 };
 
@@ -84,6 +93,10 @@ let activeEvent = null;
 let nextUpgradeAt = 2;
 let chapterState;
 let storyState = null;
+let currentChapterIndex = 0;
+let runStats;
+let archiveState;
+let runPanelSignature = "";
 
 const desks = [
   { x: 84, y: 104, w: 136, h: 54, tag: "Q3报表", assetKey: "propWorkstationA" },
@@ -100,9 +113,10 @@ const desks = [
 const gameData = window.GameData ?? { eventDeck: [], upgrades: [] };
 const bugEvents = gameData.eventDeck;
 const upgrades = gameData.upgrades;
-const chapterOne = gameData.chapterOne;
+const chapters = gameData.chapters?.length ? gameData.chapters : [gameData.chapterOne].filter(Boolean);
 const weaponDefinitions = gameData.weapons ?? [];
 const weaponUpgrades = gameData.weaponUpgrades ?? [];
+const chapterRelics = gameData.chapterRelics ?? [];
 const enemyTypes = gameData.enemyTypes ?? {};
 const bossPhaseTuning = {
   1: {
@@ -183,38 +197,40 @@ const assetSources = {
   qiaoYou: "src/assets/characters/qiao-you-sprite.png",
   laoLiang: "src/assets/characters/lao-liang-sprite.png",
   inspector: "src/assets/characters/whitebox-inspector-sprite.png",
-  weaponPaperclip: "src/assets/weapons/paperclip-slingshot.png",
-  weaponKeyboard: "src/assets/weapons/keyboard-macro-missile.png",
-  weaponCorrectionFluid: "src/assets/weapons/correction-fluid-sprayer.png",
-  projectilePaperclip: "src/assets/projectiles/paperclip-projectile.png",
-  projectileKeycap: "src/assets/projectiles/keycap-projectile.png",
-  projectileCorrectionMist: "src/assets/projectiles/correction-fluid-mist.png",
-  repairPulse: "src/assets/effects/repair-pulse-ring.png",
-  bossDeliveryPhase1: "src/assets/bosses/delivery-rider-boss-phase1.png",
-  bossDeliveryPhase2: "src/assets/bosses/delivery-rider-boss-phase2.png",
-  bossDeliveryPhase3: "src/assets/bosses/delivery-rider-boss-phase3.png",
-  bossTcpRoute: "src/assets/effects/boss-tcp-handshake-route.png",
-  bossUdpPackage: "src/assets/effects/boss-udp-delivery-package.png",
-  bossFtpPackage: "src/assets/effects/boss-ftp-transfer-package.png",
-  bossDnsMarker: "src/assets/effects/boss-dns-error-marker.png",
-  bossTimeoutRoute: "src/assets/effects/boss-timeout-retransmit-route.png",
-  bossOrderAura: "src/assets/effects/boss-order-overload-aura.png",
-  enemyStressFluff: "src/assets/enemies/stress-fluff.png",
-  enemyWorkOrderBug: "src/assets/enemies/work-order-bug.png",
-  enemyInspectionProbe: "src/assets/enemies/inspection-probe.png",
-  enemyPromiseBall: "src/assets/enemies/promise-ball.png",
-  enemyQueueSnake: "src/assets/enemies/queue-snake.png",
-  enemyStackPile: "src/assets/enemies/stack-pile-monster.png",
-  enemyFloatErrorBubble: "src/assets/enemies/floating-point-error-bubble.png",
-  bugPoint: "src/assets/items/bug-point.png",
-  breakpointBadge: "src/assets/items/breakpoint-badge.png",
+  weaponPaperclip: "src/assets/weapons/paperclip-slingshot-v2.png",
+  weaponKeyboard: "src/assets/weapons/keyboard-macro-missile-v2.png",
+  weaponCorrectionFluid: "src/assets/weapons/correction-fluid-sprayer-v2.png",
+  projectilePaperclip: "src/assets/projectiles/paperclip-projectile-v2.png",
+  projectileKeycap: "src/assets/projectiles/keycap-projectile-v2.png",
+  projectileCorrectionMist: "src/assets/projectiles/correction-fluid-mist-v2.png",
+  repairPulse: "src/assets/effects/repair-pulse-ring-v2.png",
+  bossDeliveryPhase1: "src/assets/bosses/delivery-rider-boss-phase1-v2.png",
+  bossDeliveryPhase2: "src/assets/bosses/delivery-rider-boss-phase2-v2.png",
+  bossDeliveryPhase3: "src/assets/bosses/delivery-rider-boss-phase3-v2.png",
+  bossTcpRoute: "src/assets/effects/boss-tcp-handshake-route-v2.png",
+  bossUdpPackage: "src/assets/effects/boss-udp-delivery-package-v2.png",
+  bossFtpPackage: "src/assets/effects/boss-ftp-transfer-package-v2.png",
+  bossDnsMarker: "src/assets/effects/boss-dns-error-marker-v2.png",
+  bossTimeoutRoute: "src/assets/effects/boss-timeout-retransmit-route-v2.png",
+  bossOrderAura: "src/assets/effects/boss-order-overload-aura-v2.png",
+  enemyStressFluff: "src/assets/enemies/stress-fluff-v2.png",
+  enemyWorkOrderBug: "src/assets/enemies/work-order-bug-v2.png",
+  enemyInspectionProbe: "src/assets/enemies/inspection-probe-v2.png",
+  enemyCleanerSentinel: "src/assets/enemies/cleaner-sentinel-v2.png",
+  enemyPromiseBall: "src/assets/enemies/promise-ball-v2.png",
+  enemyQueueSnake: "src/assets/enemies/queue-snake-v2.png",
+  enemyStackPile: "src/assets/enemies/stack-pile-monster-v2.png",
+  enemyFloatErrorBubble: "src/assets/enemies/floating-point-error-bubble-v2.png",
+  bugPoint: "src/assets/items/bug-point-v2.png",
+  breakpointBadge: "src/assets/items/breakpoint-badge-v2.png",
+  sceneKeyArt: "src/assets/scenes/variable-city-key-art.png",
   variableBlessingCard: "src/assets/ui/variable-blessing-card.png",
-  abilityIntegerPrecision: "src/assets/abilities/integer-precision.png",
-  abilityFloatingPointError: "src/assets/abilities/floating-point-error.png",
-  abilityArrayBarrage: "src/assets/abilities/array-barrage.png",
-  abilityQueueProcessing: "src/assets/abilities/queue-processing.png",
-  abilityStackRebound: "src/assets/abilities/stack-rebound.png",
-  abilityHashLock: "src/assets/abilities/hash-lock.png",
+  abilityIntegerPrecision: "src/assets/abilities/integer-precision-v2.png",
+  abilityFloatingPointError: "src/assets/abilities/floating-point-error-v2.png",
+  abilityArrayBarrage: "src/assets/abilities/array-barrage-v2.png",
+  abilityQueueProcessing: "src/assets/abilities/queue-processing-v2.png",
+  abilityStackRebound: "src/assets/abilities/stack-rebound-v2.png",
+  abilityHashLock: "src/assets/abilities/hash-lock-v2.png",
   propWorkstationA: "src/assets/props/workstation-a.png",
   propWorkstationB: "src/assets/props/workstation-b.png",
   propWorkstationC: "src/assets/props/workstation-c.png",
@@ -248,12 +264,12 @@ const storyAvatarSources = {
   乔柚: "src/assets/characters/qiao-you-avatar.png",
   老梁: "src/assets/characters/lao-liang-avatar.png",
   白箱巡检员: "src/assets/characters/whitebox-inspector-avatar.png",
-  周行: "src/assets/bosses/delivery-rider-boss-portrait.png",
+  周行: "src/assets/bosses/delivery-rider-boss-portrait-v2.png",
   andu: "src/assets/characters/andu-avatar.png",
   qiaoYou: "src/assets/characters/qiao-you-avatar.png",
   laoLiang: "src/assets/characters/lao-liang-avatar.png",
   inspector: "src/assets/characters/whitebox-inspector-avatar.png",
-  deliveryRider: "src/assets/bosses/delivery-rider-boss-portrait.png",
+  deliveryRider: "src/assets/bosses/delivery-rider-boss-portrait-v2.png",
 };
 const assets = loadGameAssets(assetSources);
 
@@ -278,8 +294,106 @@ function assetUrl(key) {
   return src ? encodeURI(src) : "";
 }
 
+function currentChapter() {
+  return chapters[currentChapterIndex] ?? chapters[0] ?? { title: "变量城夜巡", steps: [], totalObjectives: 1 };
+}
+
+function createRunStats() {
+  return {
+    startedAt: Date.now(),
+    chaptersCleared: 0,
+    eventsResolved: 0,
+    enemiesDefeated: 0,
+    bossesDefeated: 0,
+    upgradesChosen: [],
+    relicsChosen: [],
+    conceptsChosen: [],
+    synergiesUnlocked: [],
+    damageTaken: 0,
+    highestLevel: 1,
+    bestChapterReached: 0,
+  };
+}
+
+function loadArchive() {
+  const fallback = {
+    bestChapter: 1,
+    wins: 0,
+    runs: 0,
+    totalEnemiesDefeated: 0,
+    totalEventsResolved: 0,
+    unlockedChapters: [0],
+    lastBuild: "未记录",
+  };
+
+  try {
+    const saved = JSON.parse(localStorage.getItem("variableCityArchive") ?? "null");
+    if (!saved || typeof saved !== "object") {
+      return fallback;
+    }
+    const normalized = {
+      ...fallback,
+      ...saved,
+      unlockedChapters: Array.isArray(saved.unlockedChapters) ? saved.unlockedChapters : fallback.unlockedChapters,
+    };
+    normalized.bestChapter = clamp(Number(normalized.bestChapter) || 1, 1, chapters.length);
+    if (!normalized.unlockedChapters.includes(0)) {
+      normalized.unlockedChapters.unshift(0);
+    }
+    return normalized;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveArchive() {
+  try {
+    localStorage.setItem("variableCityArchive", JSON.stringify(archiveState));
+  } catch {
+    // Local storage can be unavailable in some embedded previews.
+  }
+}
+
+function recordChapterProgress(clearedChapterIndex) {
+  const nextChapterIndex = Math.min(clearedChapterIndex + 1, chapters.length - 1);
+  archiveState.bestChapter = Math.max(archiveState.bestChapter ?? 1, Math.min(clearedChapterIndex + 2, chapters.length));
+  if (!archiveState.unlockedChapters.includes(nextChapterIndex)) {
+    archiveState.unlockedChapters.push(nextChapterIndex);
+  }
+  archiveState.lastBuild = getBuildSummary();
+  saveArchive();
+}
+
+function recordRunEnd(victory) {
+  archiveState.runs = (archiveState.runs ?? 0) + 1;
+  archiveState.wins = (archiveState.wins ?? 0) + (victory ? 1 : 0);
+  archiveState.bestChapter = Math.max(archiveState.bestChapter ?? 1, currentChapterIndex + 1);
+  archiveState.totalEnemiesDefeated = (archiveState.totalEnemiesDefeated ?? 0) + (runStats?.enemiesDefeated ?? 0);
+  archiveState.totalEventsResolved = (archiveState.totalEventsResolved ?? 0) + (runStats?.eventsResolved ?? 0);
+  archiveState.lastBuild = getBuildSummary();
+  saveArchive();
+}
+
+function createChapterState(allies = []) {
+  return {
+    chapterIndex: currentChapterIndex,
+    stepIndex: -1,
+    resolvedInStep: 0,
+    resolvedTotal: 0,
+    allies: [...new Set(allies)],
+    bossCleared: false,
+    finished: false,
+  };
+}
+
 function resetGame() {
+  archiveState = loadArchive();
+  runStats = createRunStats();
   player = { ...playerBase };
+  player.relics = [];
+  player.concepts = {};
+  player.unlockedSynergies = [];
+  currentChapterIndex = 0;
   bugNodes = [];
   enemies = [];
   particles = [];
@@ -290,25 +404,20 @@ function resetGame() {
   protocolHazards = [];
   activeEvent = null;
   nextUpgradeAt = 2;
-  chapterState = {
-    stepIndex: -1,
-    resolvedInStep: 0,
-    resolvedTotal: 0,
-    allies: [],
-    bossCleared: false,
-    finished: false,
-  };
+  runPanelSignature = "";
+  chapterState = createChapterState();
   world.mode = "playing";
   world.animTime = 0;
   world.spawnTimer = 0;
   world.pulseCooldown = 0;
   world.dashCooldown = 0;
+  world.allyAssistCooldown = 0;
   world.cameraShake = 0;
   hidePanels();
   storyState = null;
   seedOfficeBugPickups();
-  setChapterObjective("调查办公室异常");
-  setLog("凌晨 03:32，安渡从键盘上醒来。手机显示：外卖订单已超时 999 分钟。");
+  setChapterObjective(currentChapter().initialObjective ?? "调查办公室异常");
+  setLog(currentChapter().startLog ?? "凌晨 03:32，安渡从键盘上醒来。手机显示：外卖订单已超时 999 分钟。");
   syncHud();
   openWeaponSelect();
 }
@@ -433,8 +542,7 @@ function applyActions(actions = []) {
     }
 
     if (action.type === "finishChapter") {
-      chapterState.finished = true;
-      endGame(true);
+      finishCurrentChapter();
     }
   }
 }
@@ -456,7 +564,7 @@ function setLog(message) {
 }
 
 function setChapterObjective(objective) {
-  ui.chapterTitle.textContent = chapterOne.title;
+  ui.chapterTitle.textContent = currentChapter().title;
   ui.objectiveText.textContent = objective;
 }
 
@@ -480,7 +588,7 @@ function openWeaponSelect() {
     button.addEventListener("click", () => {
       equipWeapon(weapon);
       ui.storyPanel.classList.add("hidden");
-      openStory(chapterOne.opening);
+      openStory(currentChapter().opening);
     });
     ui.storyChoices.appendChild(button);
   }
@@ -670,7 +778,11 @@ function renderStoryAvatar(speaker, avatarKey = null) {
 }
 
 function startChapterStep(stepIndex) {
-  const step = chapterOne.steps[stepIndex];
+  const step = currentChapter().steps[stepIndex];
+  if (!step) {
+    finishCurrentChapter();
+    return;
+  }
   chapterState.stepIndex = stepIndex;
   chapterState.resolvedInStep = 0;
   bugNodes = [];
@@ -685,7 +797,7 @@ function startChapterStep(stepIndex) {
 }
 
 function resumeChapterStep() {
-  const step = chapterOne.steps[chapterState.stepIndex];
+  const step = currentChapter().steps[chapterState.stepIndex];
   spawnChapterNodes(step);
 }
 
@@ -695,21 +807,29 @@ function spawnChapterNodes(step) {
   world.mode = "playing";
 }
 
-function startBossFight() {
+function startBossFight(bossId = null) {
+  const chapter = currentChapter();
+  const bossConfig = chapter.boss ?? {};
   bugNodes = [];
   enemies = enemies.slice(0, 4);
   cleaners = [];
   protocolHazards = [];
   boss = {
-    id: "delivery-rider",
-    name: "协议骑手·周行",
-    x: 1034,
-    y: 548,
-    radius: 34,
-    hp: 1750,
-    maxHp: 1750,
-    speed: 112,
-    damage: 22,
+    id: bossId ?? bossConfig.id ?? "delivery-rider",
+    name: bossConfig.name ?? "协议骑手·周行",
+    x: bossConfig.x ?? 1034,
+    y: bossConfig.y ?? 548,
+    radius: bossConfig.radius ?? 34,
+    hp: bossConfig.hp ?? 1750,
+    maxHp: bossConfig.hp ?? 1750,
+    speed: bossConfig.speed ?? 112,
+    damage: bossConfig.damage ?? 22,
+    difficulty: bossConfig.difficulty ?? 1,
+    phaseLogs: bossConfig.phaseLogs ?? null,
+    attackLogs: bossConfig.attackLogs ?? null,
+    collisionLog: bossConfig.collisionLog ?? null,
+    themeColor: bossConfig.themeColor ?? "#5de2d1",
+    packageColor: bossConfig.packageColor ?? "#f1c15b",
     phase: 1,
     state: "idle",
     stateTimer: 0.85,
@@ -722,10 +842,94 @@ function startBossFight() {
     logTimer: 0,
     animPhase: random(0, Math.PI * 2),
   };
-  chapterState.stepIndex = 4;
-  setChapterObjective("打断错误配送协议，救回外卖小哥周行");
-  setLog("Boss 战开始：订单被误识别成网络数据包。躲开路线，打掉大件包。");
+  chapterState.stepIndex = bossConfig.stepIndex ?? chapterState.stepIndex;
+  setChapterObjective(bossConfig.objective ?? "打断错误配送协议，救回外卖小哥周行");
+  setLog(bossConfig.startLog ?? "Boss 战开始：订单被误识别成网络数据包。躲开路线，打掉大件包。");
   world.mode = "playing";
+}
+
+function finishCurrentChapter() {
+  chapterState.finished = true;
+  runStats.chaptersCleared += 1;
+  recordChapterProgress(currentChapterIndex);
+  if (currentChapterIndex >= chapters.length - 1) {
+    endGame(true);
+    return;
+  }
+
+  const allies = chapterState.allies;
+  openChapterRelicReward(allies);
+}
+
+function beginNextChapter(allies) {
+  currentChapterIndex += 1;
+  bugNodes = [];
+  enemies = [];
+  bullets = [];
+  bugPickups = [];
+  cleaners = [];
+  boss = null;
+  protocolHazards = [];
+  activeEvent = null;
+  chapterState = createChapterState(allies);
+  world.mode = "story";
+  world.spawnTimer = 0;
+  world.pulseCooldown = 0;
+  world.dashCooldown = 0;
+  world.allyAssistCooldown = 0.6;
+  world.cameraShake = 0.12;
+  player.x = 170;
+  player.y = 560;
+  player.hp = clamp(player.hp + Math.ceil(player.maxHp * 0.35), 1, player.maxHp);
+  player.backlash = clamp(player.backlash - 18, 0, 100);
+  seedOfficeBugPickups();
+  setChapterObjective(currentChapter().initialObjective ?? "继续夜巡");
+  setLog(currentChapter().startLog ?? `${currentChapter().title}开始。`);
+  openStory(currentChapter().opening);
+}
+
+function openChapterRelicReward(allies) {
+  const choices = getChapterRelicChoices();
+  if (choices.length === 0) {
+    beginNextChapter(allies);
+    return;
+  }
+
+  world.mode = "reward";
+  ui.upgradeKicker.textContent = "章节信物";
+  ui.upgradeTitle.textContent = `${currentChapter().title} 已稳定`;
+  ui.upgradeChoices.innerHTML = "";
+
+  for (const relic of choices) {
+    const button = document.createElement("button");
+    button.className = "choice-button with-media upgrade-card-choice";
+    const icon = relic.iconKey ? `<img class="choice-icon ability-icon" src="${assetUrl(relic.iconKey)}" alt="" />` : "";
+    button.innerHTML = `${icon}<span class="choice-copy"><span class="choice-title">${relic.title}<span class="choice-rarity">信物</span></span><span class="choice-effect">${relic.effect}</span></span>`;
+    button.addEventListener("click", () => {
+      applyChapterRelic(relic);
+      ui.upgradePanel.classList.add("hidden");
+      beginNextChapter(allies);
+    });
+    ui.upgradeChoices.appendChild(button);
+  }
+
+  hidePanels();
+  ui.upgradePanel.classList.remove("hidden");
+}
+
+function getChapterRelicChoices() {
+  const owned = new Set(player.relics ?? []);
+  const available = chapterRelics.filter((relic) => !owned.has(relic.id) && (relic.minChapter ?? 0) <= currentChapterIndex);
+  return available.sort(() => Math.random() - 0.5).slice(0, 3);
+}
+
+function applyChapterRelic(relic) {
+  player.relics.push(relic.id);
+  runStats.relicsChosen.push(relic.title);
+  runStats.upgradesChosen.push(relic.title);
+  registerConcepts(relic);
+  applyActions(relic.actions ?? []);
+  setLog(`获得章节信物：${relic.title}。`);
 }
 
 function handleChapterEventResolved(removedNode) {
@@ -733,7 +937,7 @@ function handleChapterEventResolved(removedNode) {
     return false;
   }
 
-  const step = chapterOne.steps[chapterState.stepIndex];
+  const step = currentChapter().steps[chapterState.stepIndex];
   const requiredResolved = step.requiredResolved ?? 1;
   chapterState.resolvedInStep += 1;
   chapterState.resolvedTotal += 1;
@@ -755,6 +959,146 @@ function hidePanels() {
   ui.resultPanel.classList.add("hidden");
 }
 
+function getBuildSummary() {
+  const weaponName = player?.weapon?.name ?? "未选择武器";
+  const picked = runStats?.upgradesChosen ?? [];
+  const relics = runStats?.relicsChosen ?? [];
+  if (picked.length === 0 && relics.length === 0) {
+    return weaponName;
+  }
+
+  const latestRelic = relics.length > 0 ? relics[relics.length - 1] : null;
+  const latest = latestRelic ?? picked.slice(-2).join(" + ");
+  return `${weaponName} / ${latest}`;
+}
+
+const conceptNames = {
+  integer: "整数",
+  float: "浮点",
+  array: "数组",
+  stack: "栈",
+  queue: "队列",
+  hash: "哈希",
+  tree: "树",
+  graph: "图",
+  time: "时间",
+  promise: "承诺",
+};
+
+const conceptSynergyRewards = {
+  integer: {
+    2: [{ type: "modifyWeapon", stat: "damage", add: 6 }],
+    4: [{ type: "modifyWeapon", stat: "bulletSize", add: 2, max: 12 }],
+  },
+  float: {
+    2: [{ type: "modifyPlayer", stat: "speed", add: 14 }],
+    4: [{ type: "modifyWeapon", stat: "projectileCount", add: 1, max: 8 }],
+  },
+  array: {
+    2: [{ type: "modifyWeapon", stat: "projectileCount", add: 1, max: 8 }],
+    4: [{ type: "modifyWeapon", stat: "spread", add: 0.04, max: 0.5 }],
+  },
+  stack: {
+    2: [{ type: "modifyPlayer", stat: "pulseDamage", add: 16 }],
+    4: [{ type: "modifyPlayer", stat: "maxHp", add: 18 }, { type: "gain", hp: 18 }],
+  },
+  queue: {
+    2: [{ type: "modifyWeapon", stat: "cooldown", multiply: 0.92, min: 0.08 }],
+    4: [{ type: "modifyPlayer", stat: "pulseCost", add: -1, min: 1 }],
+  },
+  hash: {
+    2: [{ type: "modifyWeapon", stat: "range", add: 75 }],
+    4: [{ type: "modifyWeapon", stat: "pierce", add: 1, max: 4 }],
+  },
+  tree: {
+    2: [{ type: "modifyPlayer", stat: "maxHp", add: 12 }, { type: "gain", hp: 12 }],
+    4: [{ type: "modifyWeapon", stat: "projectileCount", add: 1, max: 8 }],
+  },
+  graph: {
+    2: [{ type: "modifyPlayer", stat: "pulseRadius", add: 22 }],
+    4: [{ type: "modifyWeapon", stat: "range", add: 90 }],
+  },
+  time: {
+    2: [{ type: "modifyPlayer", stat: "dashPower", add: 18 }],
+    4: [{ type: "gain", backlash: -18 }],
+  },
+  promise: {
+    2: [{ type: "gain", backlash: -14 }],
+    4: [{ type: "modifyPlayer", stat: "maxHp", add: 20 }, { type: "gain", hp: 20 }],
+  },
+};
+
+function registerConcepts(source) {
+  const concepts = source?.concepts ?? [];
+  if (!concepts.length) {
+    return;
+  }
+
+  for (const concept of concepts) {
+    player.concepts[concept] = (player.concepts[concept] ?? 0) + 1;
+    runStats.conceptsChosen.push(concept);
+    unlockConceptSynergies(concept);
+  }
+}
+
+function unlockConceptSynergies(concept) {
+  const count = player.concepts[concept] ?? 0;
+  for (const threshold of [2, 4]) {
+    const key = `${concept}:${threshold}`;
+    if (count < threshold || player.unlockedSynergies.includes(key)) {
+      continue;
+    }
+
+    player.unlockedSynergies.push(key);
+    runStats.synergiesUnlocked.push(`${conceptNames[concept] ?? concept}${threshold}`);
+    applyActions(conceptSynergyRewards[concept]?.[threshold] ?? []);
+    setLog(`${conceptNames[concept] ?? concept}共鸣 ${threshold} 层触发，构筑产生额外校准。`);
+  }
+}
+
+function getResonanceSummary() {
+  const entries = Object.entries(player?.concepts ?? {}).filter(([, count]) => count > 0);
+  if (!entries.length) {
+    return "无";
+  }
+
+  entries.sort((a, b) => b[1] - a[1]);
+  return entries
+    .slice(0, 2)
+    .map(([concept, count]) => `${conceptNames[concept] ?? concept}${count}`)
+    .join(" / ");
+}
+
+function renderRunPanel() {
+  if (!ui.chapterPips) {
+    return;
+  }
+
+  const signature = `${currentChapterIndex}:${(archiveState?.unlockedChapters ?? []).join(",")}:${chapters.length}`;
+  if (signature !== runPanelSignature) {
+    runPanelSignature = signature;
+    ui.chapterPips.innerHTML = "";
+    for (let index = 0; index < chapters.length; index += 1) {
+      const pip = document.createElement("span");
+      pip.className = "chapter-pip";
+      if (index < currentChapterIndex || archiveState?.unlockedChapters?.includes(index + 1)) {
+        pip.classList.add("is-cleared");
+      }
+      if (index === currentChapterIndex) {
+        pip.classList.add("is-current");
+      }
+      pip.title = chapters[index]?.title ?? `第 ${index + 1} 章`;
+      ui.chapterPips.appendChild(pip);
+    }
+  }
+
+  const bestChapter = Math.min(archiveState?.bestChapter ?? 1, chapters.length);
+  ui.archive.textContent = `${bestChapter}/${chapters.length}`;
+  ui.build.textContent = getBuildSummary();
+  ui.resonance.textContent = getResonanceSummary();
+  ui.defeat.textContent = runStats?.enemiesDefeated ?? 0;
+}
+
 function syncHud() {
   ui.hp.textContent = `${Math.ceil(player.hp)}/${player.maxHp}`;
   ui.level.textContent = player.level;
@@ -763,9 +1107,14 @@ function syncHud() {
   ui.weapon.textContent = player.weapon ? `${player.weapon.name} Lv.${Math.floor(player.weapon.level)}` : "未选择";
   ui.bug.parentElement.title = player.weapon ? `当前武器：${player.weapon.name}` : "";
   ui.backlash.textContent = `${Math.round(player.backlash)}%`;
-  const totalObjectives = chapterOne.totalObjectives ?? 7;
+  const totalObjectives = currentChapter().totalObjectives ?? 7;
   const bossProgress = chapterState?.bossCleared ? 1 : 0;
   ui.fixed.textContent = `${(chapterState?.resolvedTotal ?? 0) + bossProgress}/${totalObjectives}`;
+  if (runStats) {
+    runStats.highestLevel = Math.max(runStats.highestLevel, player.level);
+    runStats.bestChapterReached = Math.max(runStats.bestChapterReached, currentChapterIndex);
+  }
+  renderRunPanel();
 }
 
 function update(time) {
@@ -786,6 +1135,7 @@ function updatePlaying(dt) {
   world.spawnTimer += dt;
   world.pulseCooldown = Math.max(0, world.pulseCooldown - dt);
   world.dashCooldown = Math.max(0, world.dashCooldown - dt);
+  world.allyAssistCooldown = Math.max(0, world.allyAssistCooldown - dt);
   player.invulnerable = Math.max(0, player.invulnerable - dt);
   world.cameraShake = Math.max(0, world.cameraShake - dt);
 
@@ -795,6 +1145,7 @@ function updatePlaying(dt) {
   updateBoss(dt);
   updateProtocolHazards(dt);
   updateEnemies(dt);
+  updateAllyAssist(dt);
   updateBugPickups(dt);
   if (world.mode !== "playing") {
     return;
@@ -805,11 +1156,12 @@ function updatePlaying(dt) {
   maybeEscalateBacklash(dt);
 
   const bossActive = Boolean(boss && boss.hp > 0);
-  const spawnEvery = chapterState.stepIndex >= 2 ? 1.75 : 2.6;
-  const maxEnemies = chapterState.stepIndex >= 3 ? 18 : 13;
+  const danger = currentChapter().danger ?? 1;
+  const spawnEvery = (chapterState.stepIndex >= 2 ? 1.75 : 2.6) / danger;
+  const maxEnemies = (chapterState.stepIndex >= 3 ? 18 : 13) + currentChapterIndex * 2;
   if (!bossActive && world.spawnTimer > spawnEvery && enemies.length < maxEnemies) {
     world.spawnTimer = 0;
-    spawnEnemyWave(chapterState.stepIndex >= 3 ? 3 : 2);
+    spawnEnemyWave(Math.ceil((chapterState.stepIndex >= 3 ? 3 : 2) * danger));
   }
 
   if (player.hp <= 0) {
@@ -937,6 +1289,19 @@ function spawnEnemyWave(count = 2) {
 
 function getEnemySpawnPool() {
   const step = chapterState?.stepIndex ?? 0;
+  const pools = currentChapter().enemyPools;
+  if (pools) {
+    if (step >= 4 || chapterState?.finished) {
+      return pools.boss ?? pools.late ?? pools.mid ?? pools.early;
+    }
+    if (step >= 3) {
+      return pools.late ?? pools.mid ?? pools.early;
+    }
+    if (step >= 2) {
+      return pools.mid ?? pools.early;
+    }
+    return pools.early ?? ["stress", "deadline"];
+  }
   if (step >= 4 || chapterState?.finished) {
     return ["stress", "deadline", "floatError", "queueSnake", "promise", "stackPile", "inspectionProbe"];
   }
@@ -1080,6 +1445,7 @@ function clearDefeatedHostiles() {
 }
 
 function defeatEnemy(enemy, particleCount) {
+  runStats.enemiesDefeated += 1;
   burst(enemy.x, enemy.y, enemy.deathColor, particleCount);
   spawnBugPickup(enemy.x, enemy.y, enemy.bugValue, enemy.xpValue);
   if (Math.random() < 0.22) {
@@ -1109,7 +1475,8 @@ function updateBoss(dt) {
   }
 
   if (boss.phase !== previousPhase) {
-    const phaseLog = boss.phase === 2 ? "周行的外卖箱开始触发超时重传。" : "错误路线开始 DNS 解析，取餐区变成一张发烫的网。";
+    const defaultPhaseLog = boss.phase === 2 ? "周行的外卖箱开始触发超时重传。" : "错误路线开始 DNS 解析，取餐区变成一张发烫的网。";
+    const phaseLog = boss.phaseLogs?.[boss.phase] ?? defaultPhaseLog;
     setLog(phaseLog);
     world.cameraShake = 0.2;
     boss.attackCooldown = Math.min(boss.attackCooldown, boss.phase === 3 ? 0.22 : 0.36);
@@ -1132,7 +1499,7 @@ function updateBoss(dt) {
   driftBossTowardPlayer(dt);
 
   if (distance(boss, player) < boss.radius + player.radius) {
-    damagePlayer(boss.damage, "周行被错误协议拖着冲撞过来：订单必须送达。");
+    damagePlayer(boss.damage, boss.collisionLog ?? "周行被错误协议拖着冲撞过来：订单必须送达。");
   }
 
   if (boss.attackCooldown <= 0) {
@@ -1153,7 +1520,20 @@ function driftBossTowardPlayer(dt) {
 }
 
 function getBossTuning() {
-  return bossPhaseTuning[boss?.phase ?? 1] ?? bossPhaseTuning[1];
+  const base = bossPhaseTuning[boss?.phase ?? 1] ?? bossPhaseTuning[1];
+  const difficulty = boss?.difficulty ?? 1;
+  return {
+    ...base,
+    speedMultiplier: base.speedMultiplier * (0.92 + difficulty * 0.08),
+    dashDamage: Math.ceil(base.dashDamage * difficulty),
+    retransmitDamage: Math.ceil(base.retransmitDamage * difficulty),
+    udpCount: Math.ceil(base.udpCount * difficulty),
+    udpDamage: Math.ceil(base.udpDamage * difficulty),
+    ftpHp: Math.ceil(base.ftpHp * difficulty),
+    ftpBlastDamage: Math.ceil(base.ftpBlastDamage * difficulty),
+    dnsCount: Math.ceil(base.dnsCount * difficulty),
+    dnsDamage: Math.ceil(base.dnsDamage * difficulty),
+  };
 }
 
 function chooseBossAttack() {
@@ -1208,7 +1588,7 @@ function startTcpHandshake() {
   boss.stateTimer = tuning.handshakeTime;
   boss.attackCooldown = 0.82;
   if (boss.logTimer <= 0) {
-    setLog("TCP 三次握手：路线先确认三次，第三次亮起后周行会冲刺。");
+    setLog(boss.attackLogs?.handshake ?? "TCP 三次握手：路线先确认三次，第三次亮起后周行会冲刺。");
     boss.logTimer = 4;
   }
 }
@@ -1234,7 +1614,7 @@ function updateBossDash(dt) {
 
   if (!boss.dash.damaged && distance(boss, player) < boss.radius + player.radius + 8) {
     boss.dash.damaged = true;
-    damagePlayer(boss.dash.damage, "TCP ACK 已确认，周行沿着错误路线撞了过来。");
+    damagePlayer(boss.dash.damage, boss.attackLogs?.dashHit ?? "TCP ACK 已确认，周行沿着错误路线撞了过来。");
   }
 
   if (t >= 1) {
@@ -1277,11 +1657,11 @@ function startUdpBurst() {
       radius: boss.phase === 3 ? 13 : 12,
       life: 3.1,
       damage: tuning.udpDamage,
-      color: "#f1c15b",
+      color: boss.packageColor ?? "#f1c15b",
     });
   }
   boss.attackCooldown = tuning.udpCooldown;
-  setLog("UDP 乱送模式：外卖包被高速撒出，不确认谁收到了。");
+  setLog(boss.attackLogs?.burst ?? "UDP 乱送模式：外卖包被高速撒出，不确认谁收到了。");
 }
 
 function startFtpTransfer() {
@@ -1301,7 +1681,7 @@ function startFtpTransfer() {
       destructible: true,
       hitFlash: 0,
     });
-    setLog("FTP 大件传输中：打爆中央的大件外卖包，别让它上传完成。");
+    setLog(boss.attackLogs?.payload ?? "FTP 大件传输中：打爆中央的大件外卖包，别让它上传完成。");
   }
   boss.attackCooldown = boss.phase === 3 ? 0.82 : 1;
 }
@@ -1321,7 +1701,7 @@ function startDnsError() {
     });
   }
   boss.attackCooldown = boss.phase === 3 ? 0.66 : 0.9;
-  setLog("DNS 地址解析错误：取餐点被翻译到了错误位置。");
+  setLog(boss.attackLogs?.marker ?? "DNS 地址解析错误：取餐点被翻译到了错误位置。");
 }
 
 function updateProtocolHazards(dt) {
@@ -1332,7 +1712,7 @@ function updateProtocolHazards(dt) {
       hazard.life -= dt;
       if (distance(hazard, player) < hazard.radius + player.radius) {
         hazard.life = 0;
-        damagePlayer(hazard.damage, "UDP 外卖包砸在身上，快是快，就是不讲道理。");
+        damagePlayer(hazard.damage, boss?.attackLogs?.packageHit ?? "UDP 外卖包砸在身上，快是快，就是不讲道理。");
       }
     }
 
@@ -1342,7 +1722,7 @@ function updateProtocolHazards(dt) {
         hazard.activeTime -= dt;
         if (!hazard.damaged && distancePointToSegment(player, hazard) < player.radius + 18) {
           hazard.damaged = true;
-          damagePlayer(hazard.damage ?? 16, "超时重传影子沿旧路线补送了一次。");
+          damagePlayer(hazard.damage ?? 16, boss?.attackLogs?.retransmitHit ?? "超时重传影子沿旧路线补送了一次。");
         }
       }
     }
@@ -1361,9 +1741,9 @@ function updateProtocolHazards(dt) {
           spawnEnemyNear(hazard.x, hazard.y - 56, "queueSnake");
         }
         if (distance(hazard, player) < 190) {
-          damagePlayer(hazard.blastDamage ?? 20, "FTP 大件上传完成，整片取餐区被热汤数据炸开。");
+          damagePlayer(hazard.blastDamage ?? 20, boss?.attackLogs?.payloadBlast ?? "FTP 大件上传完成，整片取餐区被热汤数据炸开。");
         } else {
-          setLog("FTP 大件上传完成，新的异常从外卖箱里爬了出来。");
+          setLog(boss?.attackLogs?.payloadSpawn ?? "FTP 大件上传完成，新的异常从外卖箱里爬了出来。");
         }
       }
     }
@@ -1375,7 +1755,7 @@ function updateProtocolHazards(dt) {
         hazard.remove = true;
         burst(hazard.x, hazard.y, "#72a5ff", 22);
         if (distance(hazard, player) < hazard.radius + player.radius) {
-          damagePlayer(hazard.damage, "DNS 解析错位，外卖炸弹落在了你的坐标上。");
+          damagePlayer(hazard.damage, boss?.attackLogs?.markerHit ?? "DNS 解析错位，外卖炸弹落在了你的坐标上。");
         }
       }
     }
@@ -1397,7 +1777,7 @@ function clearResolvedProtocolHazards() {
     if (hazard.type === "ftp" && hazard.hp <= 0 && !hazard.exploded) {
       burst(hazard.x, hazard.y, "#5de2d1", 32);
       spawnBugPickup(hazard.x, hazard.y, 2, 5);
-      setLog("FTP 大件包被提前打断，传输队列少了一大截。");
+      setLog(boss?.attackLogs?.payloadBreak ?? "FTP 大件包被提前打断，传输队列少了一大截。");
       return false;
     }
 
@@ -1412,13 +1792,15 @@ function checkBossDefeat() {
 
   boss.defeated = true;
   chapterState.bossCleared = true;
+  runStats.bossesDefeated += 1;
   protocolHazards = [];
   enemies = [];
   cleaners = [];
-  burst(boss.x, boss.y, "#5de2d1", 48);
+  const victoryStory = currentChapter().bossVictory;
+  burst(boss.x, boss.y, boss.themeColor ?? "#5de2d1", 48);
   boss = null;
   world.cameraShake = 0.28;
-  openStory(chapterOne.bossVictory);
+  openStory(victoryStory);
 }
 
 function damagePlayer(amount, message) {
@@ -1427,6 +1809,7 @@ function damagePlayer(amount, message) {
   }
 
   player.hp -= amount;
+  runStats.damageTaken += amount;
   player.invulnerable = 0.55;
   world.cameraShake = 0.18;
   burst(player.x, player.y, "#ef6a70", 10);
@@ -1451,6 +1834,35 @@ function updateEnemies(dt) {
       damagePlayer(enemy.damage, enemy.hitLog);
     }
   }
+}
+
+function updateAllyAssist(dt) {
+  if (chapterState.allies.includes("qiao-you") && player.backlash > 0) {
+    player.backlash = clamp(player.backlash - dt * 0.45, 0, 100);
+  }
+
+  if (!chapterState.allies.includes("whitebox") || world.allyAssistCooldown > 0) {
+    return;
+  }
+
+  const target = findNearestHostile(560);
+  if (!target) {
+    world.allyAssistCooldown = 1.2;
+    return;
+  }
+
+  const damage = 34 + player.level * 2;
+  target.hp -= damage;
+  target.hitFlash = 0.2;
+  target.slowTimer = Math.max(target.slowTimer ?? 0, 0.8);
+  target.slowFactor = Math.min(target.slowFactor ?? 1, 0.62);
+  burst(target.x, target.y, "#72a5ff", 12);
+  if (!boss || target !== boss || boss.logTimer <= 0) {
+    setLog("白箱协助单元提交反例扫描，最近异常被短暂降速。");
+  }
+  world.allyAssistCooldown = 2.8;
+  clearDefeatedHostiles();
+  checkBossDefeat();
 }
 
 function updateBugPickups(dt) {
@@ -1537,6 +1949,7 @@ function openEvent(event) {
 
 function resolveEvent(choice) {
   applyActions(choice.actions);
+  runStats.eventsResolved += 1;
   const removed = bugNodes.splice(activeEvent.index, 1)[0];
   burst(removed.x, removed.y, removed.event.color, 28);
   spawnBugPickup(removed.x, removed.y, 1, 3);
@@ -1553,6 +1966,8 @@ function resolveEvent(choice) {
 
 function openUpgrade() {
   world.mode = "upgrade";
+  ui.upgradeKicker.textContent = "变量祝福";
+  ui.upgradeTitle.textContent = "选择一个升级方向";
   ui.upgradeChoices.innerHTML = "";
   player.pendingLevelUps = Math.max(0, player.pendingLevelUps - 1);
   const generalPool = [...upgrades].sort(() => Math.random() - 0.5).slice(0, 1);
@@ -1566,6 +1981,8 @@ function openUpgrade() {
     button.innerHTML = `${icon}<span class="choice-copy"><span class="choice-title">${upgrade.title}<span class="choice-rarity">${upgrade.rarity.name}</span></span><span class="choice-effect">${upgrade.effect}</span></span>`;
     button.addEventListener("click", () => {
       applyActions(upgrade.actions);
+      registerConcepts(upgrade);
+      runStats.upgradesChosen.push(upgrade.title);
       ui.upgradePanel.classList.add("hidden");
       setLog(`选择了${upgrade.rarity.name}强化：${upgrade.title}。`);
       if (player.pendingLevelUps > 0) {
@@ -1632,13 +2049,47 @@ function resumeAndSpawnBug() {
   }
 }
 
+function renderResultStats(victory) {
+  if (!ui.resultStats) {
+    return;
+  }
+
+  const durationSeconds = Math.max(1, Math.round((Date.now() - (runStats?.startedAt ?? Date.now())) / 1000));
+  const minutes = Math.floor(durationSeconds / 60);
+  const seconds = durationSeconds % 60;
+  const stats = [
+    ["章节", `${runStats?.chaptersCleared ?? 0}/${chapters.length}`],
+    ["等级", `Lv.${runStats?.highestLevel ?? player.level}`],
+    ["击破", `${runStats?.enemiesDefeated ?? 0}`],
+    ["异常", `${runStats?.eventsResolved ?? 0}`],
+    ["升级", `${runStats?.upgradesChosen?.length ?? 0} / 信物 ${runStats?.relicsChosen?.length ?? 0}`],
+    ["共鸣", `${runStats?.synergiesUnlocked?.length ?? 0} 次`],
+    ["耗时", `${minutes}:${String(seconds).padStart(2, "0")}`],
+    ["构筑", getBuildSummary()],
+    ["档案", victory ? `通关 ${archiveState.wins} 次` : `最远 ${archiveState.bestChapter}/${chapters.length}`],
+  ];
+
+  ui.resultStats.innerHTML = "";
+  for (const [label, value] of stats) {
+    const item = document.createElement("div");
+    item.className = "result-stat";
+    item.innerHTML = `${label}<strong>${value}</strong>`;
+    ui.resultStats.appendChild(item);
+  }
+}
+
 function endGame(victory) {
+  if (world.mode === "result") {
+    return;
+  }
+  recordRunEnd(victory);
   world.mode = "result";
-  ui.resultKicker.textContent = victory ? "今日存活" : "今日重置";
-  ui.resultTitle.textContent = victory ? "第一个异常夜班被你扛过去了" : "安渡被移出当前巡检版本";
+  ui.resultKicker.textContent = victory ? "五章通关" : "今日重置";
+  ui.resultTitle.textContent = victory ? "公共规则引擎完成校准" : `${currentChapter().title} 中断`;
   ui.resultText.textContent = victory
-    ? "公共规则引擎没有恢复正常，但它承认你暂时有资格继续上班。"
+    ? "变量城没有变得完美，但它第一次把“差异不等于错误”写进了主规则。"
     : "bug点数散落在工位缝里，白箱巡检员把凌晨重新归档为凌晨。";
+  renderResultStats(victory);
   ui.resultPanel.classList.remove("hidden");
 }
 
@@ -1663,10 +2114,18 @@ function draw(dt) {
 }
 
 function drawOffice() {
-  ctx.fillStyle = "#f8fbff";
-  ctx.fillRect(0, 0, world.width, world.height);
+  const visual = getChapterVisual();
+  const hasKeyArt = assets.sceneKeyArt?.ready;
 
-  ctx.strokeStyle = "rgba(58, 83, 112, 0.075)";
+  drawKeyArtBackdrop(visual);
+
+  ctx.save();
+  ctx.globalAlpha = hasKeyArt ? visual.floorVeil : 1;
+  ctx.fillStyle = visual.floor;
+  ctx.fillRect(0, 0, world.width, world.height);
+  ctx.restore();
+
+  ctx.strokeStyle = visual.grid;
   ctx.lineWidth = 1;
   for (let x = 0; x < world.width; x += 48) {
     ctx.beginPath();
@@ -1681,9 +2140,11 @@ function drawOffice() {
     ctx.stroke();
   }
 
-  ctx.fillStyle = "#e8f1fa";
+  drawChapterBackdrop(visual);
+
+  ctx.fillStyle = visual.wall;
   ctx.fillRect(0, 0, world.width, 68);
-  ctx.fillStyle = "#c8d8e8";
+  ctx.fillStyle = visual.trim;
   ctx.fillRect(0, 66, world.width, 3);
   drawWindowRow(32, 14, 4);
   drawWindowRow(788, 14, 3);
@@ -1719,6 +2180,221 @@ function drawOffice() {
   drawLabel("安渡工位", 78, 650, "#224250");
 }
 
+function getChapterVisual() {
+  const palette = [
+    {
+      floor: "#f8fbff",
+      grid: "rgba(58, 83, 112, 0.075)",
+      wall: "#e8f1fa",
+      trim: "#c8d8e8",
+      accent: "#5de2d1",
+      keyArtAlpha: 0.36,
+      floorVeil: 0.74,
+      tintA: "rgba(93, 226, 209, 0.08)",
+      tintB: "rgba(241, 193, 91, 0.1)",
+      label: "外卖取餐区",
+    },
+    {
+      floor: "#f7fbff",
+      grid: "rgba(62, 114, 216, 0.1)",
+      wall: "#e4eefb",
+      trim: "#72a5ff",
+      accent: "#72a5ff",
+      keyArtAlpha: 0.41,
+      floorVeil: 0.72,
+      tintA: "rgba(62, 114, 216, 0.12)",
+      tintB: "rgba(93, 226, 209, 0.08)",
+      label: "环线站台",
+    },
+    {
+      floor: "#fbfaf4",
+      grid: "rgba(120, 96, 42, 0.09)",
+      wall: "#f2eadc",
+      trim: "#d8b26e",
+      accent: "#96e072",
+      keyArtAlpha: 0.34,
+      floorVeil: 0.78,
+      tintA: "rgba(216, 178, 110, 0.12)",
+      tintB: "rgba(150, 224, 114, 0.08)",
+      label: "哈希夜市",
+    },
+    {
+      floor: "#f8fbf6",
+      grid: "rgba(65, 124, 72, 0.1)",
+      wall: "#e7f2e6",
+      trim: "#96e072",
+      accent: "#96e072",
+      keyArtAlpha: 0.33,
+      floorVeil: 0.8,
+      tintA: "rgba(150, 224, 114, 0.12)",
+      tintB: "rgba(114, 165, 255, 0.08)",
+      label: "承诺塔根层",
+    },
+    {
+      floor: "#f9fbfd",
+      grid: "rgba(36, 45, 62, 0.11)",
+      wall: "#edf1f5",
+      trim: "#a9b5c3",
+      accent: "#ef6a70",
+      keyArtAlpha: 0.45,
+      floorVeil: 0.7,
+      tintA: "rgba(239, 106, 112, 0.1)",
+      tintB: "rgba(114, 165, 255, 0.12)",
+      label: "零号核心",
+    },
+  ];
+  return palette[currentChapterIndex] ?? palette[0];
+}
+
+function drawKeyArtBackdrop(visual) {
+  const asset = assets.sceneKeyArt;
+  if (!asset?.ready) {
+    return;
+  }
+
+  const image = asset.image;
+  const imageWidth = image.naturalWidth || image.width || world.width;
+  const imageHeight = image.naturalHeight || image.height || world.height;
+  const scale = Math.max(world.width / imageWidth, world.height / imageHeight);
+  const drawWidth = imageWidth * scale;
+  const drawHeight = imageHeight * scale;
+  const drawX = (world.width - drawWidth) / 2;
+  const drawY = (world.height - drawHeight) / 2;
+  const scanlineOffset = (world.animTime * 18) % 48;
+  const pulse = Math.sin(world.animTime * 0.85 + currentChapterIndex) * 0.035;
+  const veil = ctx.createLinearGradient(0, 0, world.width, world.height);
+  veil.addColorStop(0, visual.tintA);
+  veil.addColorStop(0.5, "rgba(255, 255, 255, 0.1)");
+  veil.addColorStop(1, visual.tintB);
+
+  ctx.save();
+  ctx.globalAlpha = clamp((visual.keyArtAlpha ?? 0.36) + pulse, 0.22, 0.52);
+  ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = veil;
+  ctx.fillRect(0, 0, world.width, world.height);
+  ctx.globalAlpha = 0.08;
+  ctx.strokeStyle = visual.accent;
+  ctx.lineWidth = 1;
+  for (let y = -48 + scanlineOffset; y < world.height + 48; y += 48) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(world.width, y - 18);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawChapterBackdrop(visual) {
+  ctx.save();
+  ctx.globalAlpha = 0.72;
+
+  if (currentChapterIndex === 1) {
+    drawRailLine(118, 456, 1148, 336, visual.accent);
+    drawRailLine(88, 514, 1118, 394, "rgba(241, 193, 91, 0.7)");
+    drawStationSign(768, 92, "环线 03:32");
+  }
+
+  if (currentChapterIndex === 2) {
+    for (let index = 0; index < 18; index += 1) {
+      const x = 86 + index * 66;
+      ctx.strokeStyle = index % 2 ? "rgba(150, 224, 114, 0.24)" : "rgba(216, 178, 110, 0.26)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x, 82);
+      ctx.lineTo(x - 34, 210);
+      ctx.stroke();
+    }
+    drawMarketCanopy(168, 456, "#d8b26e", "摊位 12");
+    drawMarketCanopy(836, 342, "#96e072", "HASH");
+  }
+
+  if (currentChapterIndex === 3) {
+    ctx.strokeStyle = "rgba(150, 224, 114, 0.35)";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(640, 720);
+    ctx.bezierCurveTo(610, 568, 696, 442, 656, 300);
+    ctx.bezierCurveTo(632, 220, 700, 154, 682, 78);
+    ctx.stroke();
+    drawBranch(640, 470, 430, 330);
+    drawBranch(656, 344, 890, 214);
+    drawBranch(642, 230, 520, 132);
+    drawStationSign(824, 92, "根承诺");
+  }
+
+  if (currentChapterIndex === 4) {
+    const nodes = [
+      [230, 174],
+      [442, 110],
+      [706, 168],
+      [956, 112],
+      [1096, 334],
+      [842, 492],
+      [560, 420],
+      [302, 560],
+    ];
+    ctx.strokeStyle = "rgba(239, 106, 112, 0.22)";
+    ctx.lineWidth = 2;
+    for (let index = 0; index < nodes.length; index += 1) {
+      const [x1, y1] = nodes[index];
+      const [x2, y2] = nodes[(index + 2) % nodes.length];
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+    for (const [x, y] of nodes) {
+      fillCircle(x, y, 8, "rgba(239, 106, 112, 0.35)");
+      strokeCircle(x, y, 16 + Math.sin(world.animTime * 2 + x) * 4, "rgba(114, 165, 255, 0.35)", 2);
+    }
+    drawStationSign(748, 92, "差异保留");
+  }
+
+  ctx.restore();
+}
+
+function drawRailLine(x1, y1, x2, y2, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 5;
+  ctx.setLineDash([22, 16]);
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawStationSign(x, y, text) {
+  ctx.save();
+  ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
+  ctx.fillRect(x - 72, y - 20, 144, 38);
+  ctx.strokeStyle = "rgba(26, 42, 68, 0.16)";
+  ctx.strokeRect(x - 72, y - 20, 144, 38);
+  drawSmallText(text, x - 52, y + 4, "#26364d", 14);
+  ctx.restore();
+}
+
+function drawMarketCanopy(x, y, color, text) {
+  ctx.save();
+  ctx.fillStyle = "rgba(255, 255, 255, 0.68)";
+  ctx.fillRect(x - 82, y - 36, 164, 82);
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.38;
+  ctx.fillRect(x - 82, y - 36, 164, 18);
+  ctx.globalAlpha = 1;
+  drawSmallText(text, x - 28, y - 12, "#26364d", 12);
+  ctx.restore();
+}
+
+function drawBranch(x1, y1, x2, y2) {
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.quadraticCurveTo((x1 + x2) / 2, y1 - 58, x2, y2);
+  ctx.stroke();
+}
+
 function drawDeliveryPickupZone(x, y) {
   ctx.save();
   ctx.fillStyle = "rgba(241, 193, 91, 0.16)";
@@ -1749,7 +2425,7 @@ function drawDeliveryPickupZone(x, y) {
   ctx.lineTo(x + 198, y + 72);
   ctx.stroke();
   ctx.setLineDash([]);
-  drawLabel("外卖取餐区", x - 8, y + 80, "#9a6615");
+  drawLabel(getChapterVisual().label, x - 8, y + 80, "#9a6615");
   ctx.restore();
 }
 
@@ -2257,7 +2933,7 @@ function drawBoss() {
   const drawn = drawSpriteAsset(assetKey, boss.x, boss.y, spriteSize, spriteSize, {
     bob: bossBob,
     glowAlpha: boss.phase === 3 ? 0.12 : boss.state === "handshake" ? 0.08 : 0,
-    glowColor: boss.phase === 3 ? "#ef6a70" : "#5de2d1",
+    glowColor: boss.phase === 3 ? "#ef6a70" : boss.themeColor ?? "#5de2d1",
     rotate: bossTilt,
     scale: bossScale,
   });
@@ -2302,25 +2978,37 @@ function drawBossHud() {
   ctx.fillText(`${boss.name}  阶段 ${boss.phase}`, x, y - 9);
   ctx.fillStyle = "#26364d";
   ctx.fillRect(x, y + 4, width, 12);
-  ctx.fillStyle = boss.phase === 3 ? "#ef6a70" : boss.phase === 2 ? "#f1c15b" : "#5de2d1";
+  ctx.fillStyle = boss.phase === 3 ? "#ef6a70" : boss.phase === 2 ? "#f1c15b" : boss.themeColor ?? "#5de2d1";
   ctx.fillRect(x, y + 4, width * clamp(boss.hp / boss.maxHp, 0, 1), 12);
   ctx.restore();
 }
 
 function drawAllies() {
-  if (!chapterState.allies.includes("qiao-you")) {
-    return;
-  }
-
   const bob = Math.sin(performance.now() / 240) * 3;
-  const x = clamp(player.x - 42, 24, world.width - 24);
-  const y = clamp(player.y + 28 + bob, 88, world.height - 24);
 
-  if (!drawSpriteAsset("qiaoYou", x, y, 76, 76)) {
-    drawQiaoYouSprite(x, y, 0.74);
+  if (chapterState.allies.includes("qiao-you")) {
+    const x = clamp(player.x - 42, 24, world.width - 24);
+    const y = clamp(player.y + 28 + bob, 88, world.height - 24);
+
+    if (!drawSpriteAsset("qiaoYou", x, y, 76, 76)) {
+      drawQiaoYouSprite(x, y, 0.74);
+    }
+
+    drawLabel("乔柚", x - 14, y - 33, "#ffd7ea");
   }
 
-  drawLabel("乔柚", x - 14, y - 33, "#ffd7ea");
+  if (chapterState.allies.includes("whitebox")) {
+    const x = clamp(player.x + 54, 24, world.width - 24);
+    const y = clamp(player.y + 24 - bob, 88, world.height - 24);
+    ctx.save();
+    ctx.globalAlpha = 0.52;
+    strokeCircle(x, y - 20, 42 + Math.sin(world.animTime * 3.2) * 4, "#72a5ff", 2);
+    ctx.restore();
+    if (!drawSpriteAsset("inspector", x, y, 68, 68)) {
+      drawPatrolSprite(x, y, 0.66, false);
+    }
+    drawLabel("白箱", x - 14, y - 34, "#72a5ff");
+  }
 }
 
 function drawPropAsset(key, x, y, width, height) {
