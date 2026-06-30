@@ -152,6 +152,15 @@ const chapterMaps = [
       { kind: "serverDoor", x: 738, y: 388 },
       { kind: "printer", x: 1034, y: 526 },
       { kind: "deliveryZone", x: 940, y: 558 },
+      { kind: "deliveryCrates", x: 900, y: 456, w: 146, h: 58, label: "超时件" },
+      { kind: "routeTerminal", x: 1160, y: 426, w: 64, h: 76, label: "路由" },
+      { kind: "phoneBeacon", x: 814, y: 540, label: "999" },
+    ],
+    decorations: [
+      { kind: "parcelTape", x: 884, y: 500, w: 296, h: 142, color: "#f1c15b" },
+      { kind: "floorCable", x1: 738, y1: 454, x2: 1016, y2: 552, color: "#5de2d1" },
+      { kind: "routeArrow", x: 852, y: 560, angle: -0.08, label: "配送路线", color: "#f1c15b" },
+      { kind: "stickyCluster", x: 392, y: 76, count: 7, color: "#f1c15b" },
     ],
   },
   {
@@ -205,8 +214,18 @@ const chapterMaps = [
     props: [
       { kind: "stationSign", x: 760, y: 92, label: "环线 03:32" },
       { kind: "train", x: 42, y: 604, w: 338, h: 72, label: "停摆车厢" },
+      { kind: "metroBench", x: 388, y: 412, w: 188, h: 42, label: "候车椅" },
+      { kind: "metroBench", x: 758, y: 386, w: 188, h: 42, label: "候车椅" },
+      { kind: "ticketMachine", x: 1058, y: 492, w: 84, h: 92, label: "补票机" },
+      { kind: "signalLight", x: 108, y: 334, w: 54, h: 94, label: "信号" },
       { kind: "plant", x: 1168, y: 520, scale: 0.78 },
       { kind: "printer", x: 1048, y: 306 },
+    ],
+    decorations: [
+      { kind: "platformEdge", x: 94, y: 574, w: 1090, h: 24, color: "#f1c15b" },
+      { kind: "ticketTrail", x: 252, y: 292, count: 9, color: "#72a5ff" },
+      { kind: "signalPulse", x: 136, y: 338, color: "#ef6a70" },
+      { kind: "crowdGhosts", x: 286, y: 252, count: 11, color: "#5de2d1" },
     ],
   },
   {
@@ -253,8 +272,18 @@ const chapterMaps = [
     props: [
       { kind: "marketCanopy", x: 198, y: 584, color: "#d8b26e", label: "夜市出口" },
       { kind: "marketCanopy", x: 806, y: 328, color: "#96e072", label: "HASH" },
+      { kind: "saltCrates", x: 456, y: 438, w: 128, h: 58, label: "盐值箱" },
+      { kind: "noodleCart", x: 636, y: 500, w: 142, h: 64, label: "同号面摊" },
+      { kind: "memoryReceipt", x: 842, y: 556, w: 98, h: 44, label: "昨日小票" },
+      { kind: "hashCounter", x: 596, y: 302, w: 86, h: 76, label: "#12" },
       { kind: "plant", x: 620, y: 624, scale: 0.82 },
       { kind: "water", x: 1170, y: 570 },
+    ],
+    decorations: [
+      { kind: "lanternString", x1: 72, y1: 92, x2: 1188, y2: 128, color: "#f1c15b" },
+      { kind: "neonPuddle", x: 628, y: 348, radius: 120, color: "#96e072" },
+      { kind: "saltRain", x: 438, y: 238, w: 398, h: 178, color: "#96e072" },
+      { kind: "receiptTrail", x: 766, y: 482, count: 8, color: "#d8b26e" },
     ],
   },
   {
@@ -307,8 +336,18 @@ const chapterMaps = [
     props: [
       { kind: "stationSign", x: 824, y: 92, label: "根承诺" },
       { kind: "coreTree", x: 610, y: 468, w: 92, h: 142, label: "承诺中枢" },
+      { kind: "promiseTablet", x: 270, y: 210, w: 92, h: 118, label: "空值合同" },
+      { kind: "awaitHourglass", x: 874, y: 546, w: 78, h: 86, label: "await" },
+      { kind: "rootLantern", x: 1028, y: 182, w: 68, h: 76, label: "叶灯" },
+      { kind: "contractMonolith", x: 116, y: 354, w: 72, h: 112, label: "责任碑" },
       { kind: "plant", x: 1160, y: 160, scale: 0.86 },
       { kind: "whiteboard", x: 86, y: 92, w: 184, h: 46 },
+    ],
+    decorations: [
+      { kind: "contractRibbon", x1: 236, y1: 188, x2: 1018, y2: 566, color: "#96e072" },
+      { kind: "rootBud", x: 640, y: 418, count: 12, color: "#96e072" },
+      { kind: "awaitGlyphs", x: 736, y: 448, w: 260, h: 92, color: "#72a5ff" },
+      { kind: "recursionRings", x: 524, y: 272, radius: 92, color: "#96e072" },
     ],
   },
   {
@@ -357,8 +396,18 @@ const chapterMaps = [
     props: [
       { kind: "stationSign", x: 744, y: 92, label: "差异保留" },
       { kind: "whiteboard", x: 90, y: 92, w: 190, h: 44 },
+      { kind: "scanConsole", x: 352, y: 312, w: 92, h: 72, label: "扫描台" },
+      { kind: "evidencePod", x: 846, y: 310, w: 86, h: 84, label: "反例舱" },
+      { kind: "archiveTerminal", x: 704, y: 560, w: 88, h: 82, label: "归档端" },
+      { kind: "calibrationObelisk", x: 602, y: 286, w: 86, h: 122, label: "校准柱" },
       { kind: "rack", x: 1120, y: 548 },
       { kind: "rack", x: 62, y: 542 },
+    ],
+    decorations: [
+      { kind: "scanGrid", x: 240, y: 180, w: 800, h: 392, color: "#ef6a70" },
+      { kind: "evidenceLinks", color: "#72a5ff" },
+      { kind: "coreConduit", x1: 640, y1: 184, x2: 640, y2: 636, color: "#ef6a70" },
+      { kind: "exceptionDots", x: 492, y: 384, w: 318, h: 154, color: "#72a5ff" },
     ],
   },
 ];
@@ -2816,6 +2865,7 @@ function drawOffice() {
   drawMapPaths(map, visual);
   drawMapZones(map, visual);
   drawChapterBackdrop(visual);
+  drawMapDecorations(map, visual);
 
   ctx.fillStyle = visual.wall;
   ctx.fillRect(0, 0, world.width, 68);
@@ -2980,7 +3030,473 @@ function drawMapObject(object, visual) {
 
   if (object.kind === "rootWall" || object.kind === "coreTree") {
     drawRootObject(object, visual);
+    return;
   }
+
+  if (
+    object.kind === "deliveryCrates" ||
+    object.kind === "routeTerminal" ||
+    object.kind === "phoneBeacon" ||
+    object.kind === "metroBench" ||
+    object.kind === "ticketMachine" ||
+    object.kind === "signalLight" ||
+    object.kind === "saltCrates" ||
+    object.kind === "noodleCart" ||
+    object.kind === "memoryReceipt" ||
+    object.kind === "hashCounter" ||
+    object.kind === "promiseTablet" ||
+    object.kind === "awaitHourglass" ||
+    object.kind === "rootLantern" ||
+    object.kind === "contractMonolith" ||
+    object.kind === "scanConsole" ||
+    object.kind === "evidencePod" ||
+    object.kind === "archiveTerminal" ||
+    object.kind === "calibrationObelisk"
+  ) {
+    drawThemedMapProp(object, visual);
+  }
+}
+
+function drawMapDecorations(map, visual) {
+  for (const decoration of map.decorations ?? []) {
+    drawMapDecoration(decoration, visual);
+  }
+}
+
+function drawMapDecoration(decoration, visual) {
+  if (decoration.kind === "parcelTape") {
+    ctx.save();
+    ctx.globalAlpha = 0.28;
+    ctx.strokeStyle = decoration.color ?? visual.accent;
+    ctx.lineWidth = 4;
+    ctx.setLineDash([18, 12]);
+    ctx.strokeRect(decoration.x, decoration.y, decoration.w, decoration.h);
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 0.18;
+    for (let x = decoration.x - decoration.h; x < decoration.x + decoration.w; x += 36) {
+      ctx.beginPath();
+      ctx.moveTo(x, decoration.y + decoration.h);
+      ctx.lineTo(x + decoration.h, decoration.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (decoration.kind === "floorCable" || decoration.kind === "contractRibbon" || decoration.kind === "coreConduit") {
+    ctx.save();
+    const pulse = (world.animTime * 0.9) % 1;
+    ctx.strokeStyle = decoration.color ?? visual.accent;
+    ctx.globalAlpha = decoration.kind === "contractRibbon" ? 0.34 : 0.42;
+    ctx.lineWidth = decoration.kind === "coreConduit" ? 7 : 5;
+    ctx.setLineDash(decoration.kind === "coreConduit" ? [] : [20, 14]);
+    ctx.beginPath();
+    ctx.moveTo(decoration.x1, decoration.y1);
+    ctx.quadraticCurveTo((decoration.x1 + decoration.x2) / 2, Math.min(decoration.y1, decoration.y2) - 52, decoration.x2, decoration.y2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const x = decoration.x1 + (decoration.x2 - decoration.x1) * pulse;
+    const y = decoration.y1 + (decoration.y2 - decoration.y1) * pulse;
+    fillCircle(x, y, decoration.kind === "coreConduit" ? 8 : 6, decoration.color ?? visual.accent);
+    ctx.restore();
+    return;
+  }
+
+  if (decoration.kind === "routeArrow") {
+    ctx.save();
+    ctx.translate(decoration.x, decoration.y);
+    ctx.rotate(decoration.angle ?? 0);
+    ctx.globalAlpha = 0.72;
+    ctx.strokeStyle = decoration.color ?? visual.accent;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(-62, 0);
+    ctx.lineTo(54, 0);
+    ctx.stroke();
+    ctx.fillStyle = decoration.color ?? visual.accent;
+    ctx.beginPath();
+    ctx.moveTo(72, 0);
+    ctx.lineTo(42, -16);
+    ctx.lineTo(42, 16);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    drawSmallText(decoration.label, decoration.x - 56, decoration.y - 22, "#7a5b16", 12);
+    return;
+  }
+
+  if (decoration.kind === "stickyCluster") {
+    ctx.save();
+    for (let index = 0; index < (decoration.count ?? 5); index += 1) {
+      const x = decoration.x + (index % 4) * 26;
+      const y = decoration.y + Math.floor(index / 4) * 20;
+      ctx.fillStyle = index % 3 === 0 ? "#f1c15b" : index % 3 === 1 ? "#72a5ff" : "#96e072";
+      ctx.globalAlpha = 0.46;
+      ctx.fillRect(x, y, 18, 14);
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (decoration.kind === "platformEdge") {
+    ctx.save();
+    ctx.globalAlpha = 0.62;
+    ctx.fillStyle = decoration.color ?? "#f1c15b";
+    ctx.fillRect(decoration.x, decoration.y, decoration.w, decoration.h);
+    ctx.fillStyle = "rgba(25, 28, 36, 0.38)";
+    for (let x = decoration.x + 8; x < decoration.x + decoration.w; x += 32) {
+      ctx.beginPath();
+      ctx.moveTo(x, decoration.y + decoration.h);
+      ctx.lineTo(x + 18, decoration.y);
+      ctx.lineTo(x + 30, decoration.y);
+      ctx.lineTo(x + 12, decoration.y + decoration.h);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (decoration.kind === "ticketTrail" || decoration.kind === "receiptTrail") {
+    ctx.save();
+    for (let index = 0; index < (decoration.count ?? 7); index += 1) {
+      const x = decoration.x + index * 48;
+      const y = decoration.y + Math.sin(index * 1.7) * 26;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.sin(index) * 0.32);
+      ctx.globalAlpha = 0.56;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.86)";
+      ctx.fillRect(-16, -9, 32, 18);
+      ctx.strokeStyle = decoration.color ?? visual.accent;
+      ctx.strokeRect(-16, -9, 32, 18);
+      ctx.fillStyle = decoration.color ?? visual.accent;
+      ctx.globalAlpha = 0.38;
+      ctx.fillRect(-10, -2, 20, 3);
+      ctx.restore();
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (decoration.kind === "signalPulse") {
+    ctx.save();
+    const pulse = 1 + Math.sin(world.animTime * 4) * 0.12;
+    for (let index = 0; index < 3; index += 1) {
+      ctx.globalAlpha = 0.26 - index * 0.055;
+      strokeCircle(decoration.x, decoration.y, (26 + index * 22) * pulse, decoration.color ?? "#ef6a70", 3);
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (decoration.kind === "crowdGhosts") {
+    ctx.save();
+    for (let index = 0; index < (decoration.count ?? 9); index += 1) {
+      const x = decoration.x + index * 62;
+      const y = decoration.y + Math.sin(world.animTime * 1.3 + index) * 8;
+      ctx.globalAlpha = 0.16 + (index % 3) * 0.03;
+      fillCircle(x, y, 10, decoration.color ?? visual.accent);
+      ctx.fillRect(x - 7, y + 10, 14, 26);
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (decoration.kind === "lanternString") {
+    ctx.save();
+    ctx.globalAlpha = 0.58;
+    ctx.strokeStyle = decoration.color ?? "#f1c15b";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(decoration.x1, decoration.y1);
+    ctx.quadraticCurveTo((decoration.x1 + decoration.x2) / 2, decoration.y1 + 48, decoration.x2, decoration.y2);
+    ctx.stroke();
+    for (let index = 0; index < 13; index += 1) {
+      const t = index / 12;
+      const x = decoration.x1 + (decoration.x2 - decoration.x1) * t;
+      const y = decoration.y1 + (decoration.y2 - decoration.y1) * t + Math.sin(t * Math.PI) * 38;
+      fillCircle(x, y + 14, 11 + Math.sin(world.animTime * 3 + index) * 1.5, index % 2 ? "#f1c15b" : "#ef6a70");
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (decoration.kind === "neonPuddle" || decoration.kind === "recursionRings") {
+    ctx.save();
+    const radius = decoration.radius ?? 100;
+    const gradient = ctx.createRadialGradient(decoration.x, decoration.y, 12, decoration.x, decoration.y, radius);
+    gradient.addColorStop(0, decoration.kind === "neonPuddle" ? "rgba(150, 224, 114, 0.28)" : "rgba(150, 224, 114, 0.18)");
+    gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(decoration.x, decoration.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    for (let index = 0; index < 3; index += 1) {
+      const ring = radius * (0.34 + index * 0.22) + Math.sin(world.animTime * 2 + index) * 3;
+      strokeCircle(decoration.x, decoration.y, ring, decoration.color ?? visual.accent, 2);
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (decoration.kind === "saltRain") {
+    ctx.save();
+    ctx.strokeStyle = decoration.color ?? visual.accent;
+    ctx.globalAlpha = 0.34;
+    ctx.lineWidth = 2;
+    for (let index = 0; index < 18; index += 1) {
+      const x = decoration.x + 16 + ((index * 37 + world.animTime * 22) % decoration.w);
+      const y = decoration.y + 8 + ((index * 23) % decoration.h);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - 12, y + 28);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (decoration.kind === "rootBud" || decoration.kind === "exceptionDots") {
+    ctx.save();
+    const count = decoration.count ?? 16;
+    for (let index = 0; index < count; index += 1) {
+      const x = decoration.kind === "exceptionDots"
+        ? decoration.x + 20 + (index % 8) * (decoration.w / 8)
+        : decoration.x + Math.cos(index * 2.1) * (34 + (index % 4) * 16);
+      const y = decoration.kind === "exceptionDots"
+        ? decoration.y + 18 + Math.floor(index / 8) * 48
+        : decoration.y + Math.sin(index * 2.1) * (24 + (index % 3) * 18);
+      const pulse = 1 + Math.sin(world.animTime * 3 + index) * 0.16;
+      fillCircle(x, y, (decoration.kind === "exceptionDots" ? 5 : 7) * pulse, decoration.color ?? visual.accent);
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (decoration.kind === "awaitGlyphs") {
+    ctx.save();
+    ctx.globalAlpha = 0.36;
+    ctx.strokeStyle = decoration.color ?? visual.accent;
+    ctx.lineWidth = 2;
+    for (let index = 0; index < 6; index += 1) {
+      const x = decoration.x + 18 + index * 40;
+      ctx.beginPath();
+      ctx.moveTo(x, decoration.y + 18);
+      ctx.lineTo(x + 18, decoration.y + decoration.h - 18);
+      ctx.stroke();
+      fillCircle(x + 22, decoration.y + 24 + Math.sin(world.animTime * 2 + index) * 18, 4, decoration.color ?? visual.accent);
+    }
+    drawSmallText("await await await", decoration.x + 16, decoration.y + decoration.h - 10, "#3e72d8", 11);
+    ctx.restore();
+    return;
+  }
+
+  if (decoration.kind === "scanGrid") {
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.strokeStyle = decoration.color ?? visual.accent;
+    ctx.lineWidth = 1;
+    for (let x = decoration.x; x <= decoration.x + decoration.w; x += 42) {
+      ctx.beginPath();
+      ctx.moveTo(x, decoration.y);
+      ctx.lineTo(x, decoration.y + decoration.h);
+      ctx.stroke();
+    }
+    for (let y = decoration.y; y <= decoration.y + decoration.h; y += 42) {
+      ctx.beginPath();
+      ctx.moveTo(decoration.x, y);
+      ctx.lineTo(decoration.x + decoration.w, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (decoration.kind === "evidenceLinks") {
+    const nodes = [
+      [232, 222], [410, 348], [640, 184], [874, 352], [1034, 226], [704, 604],
+    ];
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    ctx.strokeStyle = decoration.color ?? visual.accent;
+    ctx.lineWidth = 2;
+    for (let index = 0; index < nodes.length; index += 1) {
+      const [x1, y1] = nodes[index];
+      const [x2, y2] = nodes[(index + 2) % nodes.length];
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+    for (const [x, y] of nodes) {
+      fillCircle(x, y, 6, decoration.color ?? visual.accent);
+    }
+    ctx.restore();
+  }
+}
+
+function drawThemedMapProp(object, visual) {
+  ctx.save();
+  const color = object.color ?? visual.accent;
+
+  if (object.kind === "deliveryCrates" || object.kind === "saltCrates") {
+    ctx.fillStyle = object.kind === "deliveryCrates" ? "#d8b26e" : "#e8f3d8";
+    ctx.fillRect(object.x, object.y + 18, object.w, object.h);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    for (let index = 0; index < 3; index += 1) {
+      const x = object.x + index * (object.w / 3);
+      ctx.strokeRect(x + 4, object.y + 18 + (index % 2) * 8, object.w / 3 - 8, object.h - 10);
+      drawSmallText(index === 1 ? "999" : "#", x + 16, object.y + 48, "#6b4d1d", 12);
+    }
+    drawLabel(object.label, object.x + 12, object.y + object.h + 34, "#6b4d1d");
+    ctx.restore();
+    return;
+  }
+
+  if (object.kind === "routeTerminal" || object.kind === "scanConsole" || object.kind === "archiveTerminal") {
+    ctx.fillStyle = "rgba(28, 38, 52, 0.88)";
+    ctx.fillRect(object.x, object.y, object.w, object.h);
+    ctx.fillStyle = object.kind === "scanConsole" ? "#ef6a70" : object.kind === "archiveTerminal" ? "#72a5ff" : "#5de2d1";
+    ctx.globalAlpha = 0.75;
+    ctx.fillRect(object.x + 10, object.y + 10, object.w - 20, object.h * 0.42);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "rgba(247, 250, 255, 0.78)";
+    ctx.fillRect(object.x + 14, object.y + object.h - 22, object.w - 28, 6);
+    drawLabel(object.label, object.x - 2, object.y + object.h + 18, "#224250");
+    ctx.restore();
+    return;
+  }
+
+  if (object.kind === "phoneBeacon") {
+    ctx.translate(object.x, object.y);
+    ctx.fillStyle = "#1c2634";
+    ctx.fillRect(-16, -28, 32, 56);
+    ctx.fillStyle = "#f7fbff";
+    ctx.fillRect(-12, -22, 24, 42);
+    ctx.fillStyle = "#ef6a70";
+    ctx.globalAlpha = 0.78 + Math.sin(world.animTime * 5) * 0.12;
+    ctx.fillRect(-8, -12, 16, 20);
+    ctx.globalAlpha = 1;
+    drawSmallText(object.label, -9, 4, "#ffffff", 10);
+    ctx.restore();
+    return;
+  }
+
+  if (object.kind === "metroBench") {
+    ctx.fillStyle = "rgba(247, 250, 255, 0.86)";
+    ctx.fillRect(object.x, object.y, object.w, object.h);
+    ctx.strokeStyle = "#72a5ff";
+    ctx.strokeRect(object.x, object.y, object.w, object.h);
+    ctx.fillStyle = "#2f486b";
+    for (let index = 0; index < 4; index += 1) {
+      ctx.fillRect(object.x + 14 + index * 42, object.y + 8, 26, object.h - 16);
+    }
+    drawLabel(object.label, object.x + 18, object.y + object.h + 18, "#224250");
+    ctx.restore();
+    return;
+  }
+
+  if (object.kind === "ticketMachine" || object.kind === "signalLight") {
+    ctx.fillStyle = object.kind === "ticketMachine" ? "#d9e7f6" : "#273448";
+    ctx.fillRect(object.x, object.y, object.w, object.h);
+    ctx.strokeStyle = color;
+    ctx.strokeRect(object.x, object.y, object.w, object.h);
+    const lights = object.kind === "signalLight" ? ["#ef6a70", "#f1c15b", "#96e072"] : ["#72a5ff", "#f7fbff", "#f1c15b"];
+    for (let index = 0; index < lights.length; index += 1) {
+      fillCircle(object.x + object.w / 2, object.y + 20 + index * 24, 8, lights[index]);
+    }
+    drawLabel(object.label, object.x + 4, object.y + object.h + 18, "#224250");
+    ctx.restore();
+    return;
+  }
+
+  if (object.kind === "noodleCart") {
+    ctx.fillStyle = "rgba(255, 255, 255, 0.86)";
+    ctx.fillRect(object.x, object.y, object.w, object.h);
+    ctx.fillStyle = "#d8b26e";
+    ctx.fillRect(object.x, object.y, object.w, 18);
+    fillCircle(object.x + 22, object.y + object.h + 4, 10, "#1c2634");
+    fillCircle(object.x + object.w - 22, object.y + object.h + 4, 10, "#1c2634");
+    drawSmallText("12 = 12", object.x + 20, object.y + 44, "#6b4d1d", 13);
+    drawLabel(object.label, object.x + 18, object.y + object.h - 6, "#6b4d1d");
+    ctx.restore();
+    return;
+  }
+
+  if (object.kind === "memoryReceipt") {
+    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.fillRect(object.x, object.y, object.w, object.h);
+    ctx.strokeStyle = "#d8b26e";
+    ctx.strokeRect(object.x, object.y, object.w, object.h);
+    drawSmallText("YESTERDAY?", object.x + 8, object.y + 24, "#9a6615", 10);
+    drawLabel(object.label, object.x + 4, object.y + object.h + 18, "#6b4d1d");
+    ctx.restore();
+    return;
+  }
+
+  if (object.kind === "hashCounter") {
+    ctx.fillStyle = "rgba(28, 38, 52, 0.86)";
+    ctx.fillRect(object.x, object.y, object.w, object.h);
+    ctx.fillStyle = "#96e072";
+    ctx.globalAlpha = 0.82;
+    ctx.fillRect(object.x + 10, object.y + 12, object.w - 20, object.h - 24);
+    ctx.globalAlpha = 1;
+    drawSmallText(object.label, object.x + 24, object.y + 48, "#1d3b22", 20);
+    ctx.restore();
+    return;
+  }
+
+  if (object.kind === "promiseTablet" || object.kind === "contractMonolith") {
+    ctx.fillStyle = object.kind === "promiseTablet" ? "rgba(247, 255, 244, 0.88)" : "rgba(48, 82, 54, 0.82)";
+    ctx.fillRect(object.x, object.y, object.w, object.h);
+    ctx.strokeStyle = "#96e072";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(object.x, object.y, object.w, object.h);
+    for (let index = 0; index < 4; index += 1) {
+      ctx.fillStyle = index % 2 ? "rgba(114, 165, 255, 0.42)" : "rgba(150, 224, 114, 0.46)";
+      ctx.fillRect(object.x + 14, object.y + 18 + index * 20, object.w - 28, 6);
+    }
+    drawLabel(object.label, object.x + 8, object.y + object.h + 18, "#315f34");
+    ctx.restore();
+    return;
+  }
+
+  if (object.kind === "awaitHourglass" || object.kind === "rootLantern") {
+    ctx.translate(object.x + object.w / 2, object.y + object.h / 2);
+    ctx.strokeStyle = object.kind === "awaitHourglass" ? "#72a5ff" : "#96e072";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-22, -34);
+    ctx.lineTo(22, -34);
+    ctx.lineTo(-18, 34);
+    ctx.lineTo(18, 34);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.fillStyle = object.kind === "awaitHourglass" ? "rgba(114, 165, 255, 0.45)" : "rgba(150, 224, 114, 0.45)";
+    fillCircle(0, Math.sin(world.animTime * 2) * 10, 12, ctx.fillStyle);
+    ctx.restore();
+    drawLabel(object.label, object.x + 4, object.y + object.h + 18, "#315f34");
+    return;
+  }
+
+  if (object.kind === "evidencePod" || object.kind === "calibrationObelisk") {
+    const cx = object.x + object.w / 2;
+    const cy = object.y + object.h / 2;
+    ctx.fillStyle = object.kind === "evidencePod" ? "rgba(114, 165, 255, 0.18)" : "rgba(239, 106, 112, 0.18)";
+    fillCircle(cx, cy, Math.max(object.w, object.h) * 0.52, ctx.fillStyle);
+    ctx.strokeStyle = object.kind === "evidencePod" ? "#72a5ff" : "#ef6a70";
+    ctx.lineWidth = 3;
+    strokeCircle(cx, cy, Math.max(object.w, object.h) * 0.46, ctx.strokeStyle, 3);
+    ctx.fillStyle = "rgba(28, 38, 52, 0.82)";
+    ctx.fillRect(cx - 14, cy - 28, 28, 56);
+    drawLabel(object.label, object.x - 4, object.y + object.h + 18, "#224250");
+    ctx.restore();
+    return;
+  }
+
+  ctx.restore();
 }
 
 function getChapterVisual() {
