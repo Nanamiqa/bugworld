@@ -149,6 +149,9 @@ const chapterMaps = [
       { kind: "plant", x: 1196, y: 602, scale: 1.1 },
       { kind: "plant", x: 650, y: 622, scale: 0.85 },
       { kind: "meeting", x: 750, y: 262 },
+      { kind: "visitorStool", x: 700, y: 360, w: 42, h: 46, label: "临时座" },
+      { kind: "visitorStool", x: 1010, y: 352, w: 42, h: 46, label: "临时座" },
+      { kind: "meetingBench", x: 818, y: 218, w: 148, h: 78, label: "协作凳" },
       { kind: "serverDoor", x: 738, y: 388 },
       { kind: "printer", x: 1034, y: 526 },
       { kind: "deliveryZone", x: 940, y: 558 },
@@ -161,6 +164,9 @@ const chapterMaps = [
       { kind: "floorCable", x1: 738, y1: 454, x2: 1016, y2: 552, color: "#5de2d1" },
       { kind: "routeArrow", x: 852, y: 560, angle: -0.08, label: "配送路线", color: "#f1c15b" },
       { kind: "stickyCluster", x: 392, y: 76, count: 7, color: "#f1c15b" },
+      { kind: "deskGlowGrid", x: 72, y: 96, w: 560, h: 210, color: "#5de2d1" },
+      { kind: "chairScuffs", x: 98, y: 184, count: 9, color: "#718096" },
+      { kind: "chairScuffs", x: 306, y: 314, count: 7, color: "#718096" },
     ],
   },
   {
@@ -533,15 +539,16 @@ const assetSources = {
   abilityQueueProcessing: "src/assets/abilities/queue-processing-v2.png",
   abilityStackRebound: "src/assets/abilities/stack-rebound-v2.png",
   abilityHashLock: "src/assets/abilities/hash-lock-v2.png",
-  propWorkstationA: "src/assets/props/workstation-a.png",
-  propWorkstationB: "src/assets/props/workstation-b.png",
-  propWorkstationC: "src/assets/props/workstation-c.png",
-  propWorkstationD: "src/assets/props/workstation-d.png",
-  propWorkstationE: "src/assets/props/workstation-e.png",
-  propWorkstationF: "src/assets/props/workstation-f.png",
-  propSingleDesk: "src/assets/props/single-desk.png",
-  propDeskChair: "src/assets/props/desk-chair.png",
-  propOfficeChair: "src/assets/props/office-chair.png",
+  propWorkstationA: "src/assets/props/workstation-a-v2.png",
+  propWorkstationB: "src/assets/props/workstation-b-v2.png",
+  propWorkstationC: "src/assets/props/workstation-c-v2.png",
+  propWorkstationD: "src/assets/props/workstation-d-v2.png",
+  propWorkstationE: "src/assets/props/workstation-e-v2.png",
+  propWorkstationF: "src/assets/props/workstation-f-v2.png",
+  propSingleDesk: "src/assets/props/single-desk-v2.png",
+  propDeskChair: "src/assets/props/desk-chair-v2.png",
+  propOfficeChair: "src/assets/props/visitor-stool-v2.png",
+  propMeetingBench: "src/assets/props/meeting-bench-v2.png",
   propFileCabinet: "src/assets/props/file-cabinet.png",
   propPrinter: "src/assets/props/printer.png",
   propCopier: "src/assets/props/copier.png",
@@ -559,7 +566,7 @@ const assetSources = {
   propPartitionWide: "src/assets/props/partition-wide.png",
   propPartitionLeft: "src/assets/props/partition-left.png",
   propPartitionRight: "src/assets/props/partition-right.png",
-  propMeetingTable: "src/assets/props/meeting-table.png",
+  propMeetingTable: "src/assets/props/meeting-table-v2.png",
 };
 const storyAvatarSources = {
   安渡: "src/assets/characters/andu-avatar.png",
@@ -2936,7 +2943,7 @@ function drawMapObject(object, visual) {
   }
 
   if (object.kind === "singleDesk") {
-    if (!drawPropAsset("propSingleDesk", object.x, object.y, 210, 124)) {
+    if (!drawPropAsset("propSingleDesk", object.x + 4, object.y - 96, 190, 214)) {
       ctx.fillStyle = "#d8e4f0";
       ctx.fillRect(object.x, object.y + 32, 206, 50);
       ctx.fillStyle = "#0f9f95";
@@ -3037,6 +3044,8 @@ function drawMapObject(object, visual) {
     object.kind === "deliveryCrates" ||
     object.kind === "routeTerminal" ||
     object.kind === "phoneBeacon" ||
+    object.kind === "visitorStool" ||
+    object.kind === "meetingBench" ||
     object.kind === "metroBench" ||
     object.kind === "ticketMachine" ||
     object.kind === "signalLight" ||
@@ -3133,6 +3142,45 @@ function drawMapDecoration(decoration, visual) {
       ctx.fillStyle = index % 3 === 0 ? "#f1c15b" : index % 3 === 1 ? "#72a5ff" : "#96e072";
       ctx.globalAlpha = 0.46;
       ctx.fillRect(x, y, 18, 14);
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (decoration.kind === "deskGlowGrid") {
+    ctx.save();
+    ctx.globalAlpha = 0.16 + Math.sin(world.animTime * 1.8) * 0.03;
+    ctx.strokeStyle = decoration.color ?? visual.accent;
+    ctx.lineWidth = 1.5;
+    for (let x = decoration.x; x <= decoration.x + decoration.w; x += 42) {
+      ctx.beginPath();
+      ctx.moveTo(x, decoration.y);
+      ctx.lineTo(x, decoration.y + decoration.h);
+      ctx.stroke();
+    }
+    for (let y = decoration.y; y <= decoration.y + decoration.h; y += 34) {
+      ctx.beginPath();
+      ctx.moveTo(decoration.x, y);
+      ctx.lineTo(decoration.x + decoration.w, y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 0.22;
+    fillCircle(decoration.x + decoration.w * 0.52, decoration.y + decoration.h * 0.45, 38, decoration.color ?? visual.accent);
+    ctx.restore();
+    return;
+  }
+
+  if (decoration.kind === "chairScuffs") {
+    ctx.save();
+    ctx.strokeStyle = decoration.color ?? "rgba(113, 128, 150, 0.44)";
+    ctx.globalAlpha = 0.26;
+    ctx.lineWidth = 2;
+    for (let index = 0; index < (decoration.count ?? 6); index += 1) {
+      const x = decoration.x + (index % 5) * 42;
+      const y = decoration.y + Math.floor(index / 5) * 48 + Math.sin(index) * 7;
+      ctx.beginPath();
+      ctx.ellipse(x, y, 16 + (index % 3) * 4, 5, Math.sin(index * 1.8) * 0.55, 0, Math.PI * 2);
+      ctx.stroke();
     }
     ctx.restore();
     return;
@@ -3382,6 +3430,22 @@ function drawThemedMapProp(object, visual) {
     drawSmallText(object.label, -9, 4, "#ffffff", 10);
     ctx.restore();
     return;
+  }
+
+  if (object.kind === "visitorStool") {
+    if (drawPropAsset("propOfficeChair", object.x - 8, object.y - 24, object.w ?? 58, object.h ?? 68)) {
+      drawLabel(object.label, object.x - 8, object.y + (object.h ?? 46) + 18, "#224250");
+      ctx.restore();
+      return;
+    }
+  }
+
+  if (object.kind === "meetingBench") {
+    if (drawPropAsset("propMeetingBench", object.x - 14, object.y - 30, object.w ?? 164, object.h ?? 92)) {
+      drawLabel(object.label, object.x + 12, object.y + (object.h ?? 78) + 16, "#224250");
+      ctx.restore();
+      return;
+    }
   }
 
   if (object.kind === "metroBench") {
@@ -3841,9 +3905,9 @@ function drawRootObject(object, visual) {
 function drawDesk(desk) {
   if (desk.assetKey) {
     const width = desk.w + 42;
-    const height = desk.h + 82;
+    const height = Math.round(width * 1.1);
     const x = desk.x - 20;
-    const y = desk.y - 22;
+    const y = desk.y - 62;
     if (drawPropAsset(desk.assetKey, x, y, width, height)) {
       drawLabel(desk.tag, desk.x + 12, desk.y + desk.h - 10, "#5c6878");
       return;
@@ -3902,6 +3966,10 @@ function drawWhiteboard(x, y, w, h) {
 }
 
 function drawChair(x, y) {
+  if (drawPropAsset("propDeskChair", x - 24, y - 42, 50, 80)) {
+    return;
+  }
+
   ctx.fillStyle = "#b7c4d4";
   ctx.fillRect(x - 14, y - 8, 28, 14);
   ctx.fillStyle = "#8ea1b8";
@@ -5033,8 +5101,9 @@ function burst(x, y, color, count) {
 
 function resolveDeskCollision(entity) {
   for (const desk of getMapObstacles()) {
-    const nearestX = clamp(entity.x, desk.x, desk.x + desk.w);
-    const nearestY = clamp(entity.y, desk.y, desk.y + desk.h);
+    const rect = getObjectCollisionRect(desk);
+    const nearestX = clamp(entity.x, rect.x, rect.x + rect.w);
+    const nearestY = clamp(entity.y, rect.y, rect.y + rect.h);
     const dx = entity.x - nearestX;
     const dy = entity.y - nearestY;
     const overlap = entity.radius - Math.hypot(dx, dy);
@@ -5047,7 +5116,29 @@ function resolveDeskCollision(entity) {
 }
 
 function isPointBlockedByMap(x, y, radius = 18) {
-  return getMapObstacles().some((object) => circleOverlapsRect(x, y, radius, object));
+  return getMapObstacles().some((object) => circleOverlapsRect(x, y, radius, getObjectCollisionRect(object)));
+}
+
+function getObjectCollisionRect(object) {
+  if (object.collision) {
+    return {
+      x: object.x + (object.collision.x ?? 0),
+      y: object.y + (object.collision.y ?? 0),
+      w: object.collision.w ?? object.w,
+      h: object.collision.h ?? object.h,
+    };
+  }
+
+  if (currentChapterIndex === 0 && object.kind === "desk") {
+    return {
+      x: object.x - 4,
+      y: object.y,
+      w: object.w + 8,
+      h: object.h + 86,
+    };
+  }
+
+  return object;
 }
 
 function circleOverlapsRect(x, y, radius, rect) {
