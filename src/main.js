@@ -57,6 +57,7 @@ const world = {
   dashCooldown: 0,
   allyAssistCooldown: 0,
   mapHazardCooldown: 0,
+  enemyLogCooldown: 0,
   cameraShake: 0,
 };
 
@@ -90,6 +91,7 @@ let bugPickups;
 let cleaners;
 let boss;
 let protocolHazards;
+let enemyHazards;
 let activeEvent = null;
 let nextUpgradeAt = 2;
 let chapterState;
@@ -672,6 +674,7 @@ function resetGame() {
   cleaners = [];
   boss = null;
   protocolHazards = [];
+  enemyHazards = [];
   activeEvent = null;
   nextUpgradeAt = 2;
   runPanelSignature = "";
@@ -683,6 +686,7 @@ function resetGame() {
   world.dashCooldown = 0;
   world.allyAssistCooldown = 0;
   world.mapHazardCooldown = 0;
+  world.enemyLogCooldown = 0;
   world.cameraShake = 0;
   hidePanels();
   storyState = null;
@@ -711,25 +715,40 @@ function getEventById(eventId) {
   return bugEvents.find((event) => event.id === eventId) ?? bugEvents[0];
 }
 
-function spawnEnemyNear(x, y, type = "stress") {
+function spawnEnemyNear(x, y, type = "stress", overrides = {}) {
   const definition = enemyTypes[type] ?? enemyTypes.stress ?? {};
   const speedMin = definition.speedMin ?? 72;
   const speedMax = definition.speedMax ?? speedMin;
+  const scale = overrides.scale ?? 1;
+  const hpMultiplier = overrides.hpMultiplier ?? 1;
+  const speedMultiplier = overrides.speedMultiplier ?? 1;
+  const mechanic = definition.mechanic ? JSON.parse(JSON.stringify(definition.mechanic)) : null;
   const enemy = {
     x: clamp(x + random(-40, 40), 40, world.width - 40),
     y: clamp(y + random(-40, 40), 80, world.height - 40),
-    radius: definition.radius ?? 15,
-    hp: definition.hp ?? 55,
-    speed: random(speedMin, speedMax),
+    radius: (definition.radius ?? 15) * scale,
+    hp: Math.ceil((definition.hp ?? 55) * hpMultiplier),
+    maxHp: Math.ceil((definition.hp ?? 55) * hpMultiplier),
+    speed: random(speedMin, speedMax) * speedMultiplier,
     damage: definition.damage ?? 10,
     xpValue: definition.xpValue ?? 2,
     bugValue: definition.bugValue ?? 1,
     render: definition.render ?? "emo",
     assetKey: definition.assetKey,
-    spriteSize: definition.spriteSize,
+    spriteSize: definition.spriteSize ? definition.spriteSize * scale : undefined,
     deathColor: definition.deathColor ?? "#ef6a70",
     hitLog: definition.hitLog ?? "异常实体撞上来，报表又多了一页。",
     type,
+    mechanic,
+    mechanicTimer: mechanic?.initialDelay ?? random(0.8, 1.8),
+    mechanicState: "idle",
+    mechanicStateTimer: 0,
+    mechanicDepth: overrides.mechanicDepth ?? 0,
+    shieldActive: mechanic?.type === "shieldAura",
+    shieldTimer: 0,
+    trailTimer: random(0.1, 0.42),
+    phaseAlpha: 0,
+    scanPulse: 0,
     animPhase: random(0, Math.PI * 2),
     hitFlash: 0,
     slowTimer: 0,
@@ -1086,6 +1105,8 @@ function startBossFight(bossId = null) {
   enemies = enemies.slice(0, 4);
   cleaners = [];
   protocolHazards = [];
+  enemyHazards = [];
+  world.enemyLogCooldown = 0;
   boss = {
     id: bossId ?? bossConfig.id ?? "delivery-rider",
     name: bossConfig.name ?? "协议骑手·周行",
@@ -1142,6 +1163,7 @@ function beginNextChapter(allies) {
   cleaners = [];
   boss = null;
   protocolHazards = [];
+  enemyHazards = [];
   activeEvent = null;
   chapterState = createChapterState(allies);
   world.mode = "story";
@@ -1150,6 +1172,7 @@ function beginNextChapter(allies) {
   world.dashCooldown = 0;
   world.allyAssistCooldown = 0.6;
   world.mapHazardCooldown = 0;
+  world.enemyLogCooldown = 0;
   world.cameraShake = 0.12;
   positionPlayerAtMapStart();
   player.hp = clamp(player.hp + Math.ceil(player.maxHp * 0.35), 1, player.maxHp);
@@ -1409,15 +1432,18 @@ function updatePlaying(dt) {
   world.dashCooldown = Math.max(0, world.dashCooldown - dt);
   world.allyAssistCooldown = Math.max(0, world.allyAssistCooldown - dt);
   world.mapHazardCooldown = Math.max(0, world.mapHazardCooldown - dt);
+  world.enemyLogCooldown = Math.max(0, world.enemyLogCooldown - dt);
   player.invulnerable = Math.max(0, player.invulnerable - dt);
   world.cameraShake = Math.max(0, world.cameraShake - dt);
 
   movePlayer(dt);
   updateMapZones(dt);
+  updateEnemyHazards(dt);
   updateWeapon(dt);
   updateBullets(dt);
   updateBoss(dt);
   updateProtocolHazards(dt);
+  updateEnemyMechanics(dt);
   updateEnemies(dt);
   updateAllyAssist(dt);
   updateBugPickups(dt);
@@ -1614,6 +1640,14 @@ function getMapMoveMultiplier(entity, isPlayer = false) {
       factor = Math.min(factor, zone.slowFactor);
     }
   }
+  for (const hazard of enemyHazards ?? []) {
+    if (!hazard.slowFactor || (!isPlayer && hazard.affectsEnemies === false)) {
+      continue;
+    }
+    if (distance(entity, hazard) <= hazard.radius + (entity.radius ?? 0)) {
+      factor = Math.min(factor, hazard.slowFactor);
+    }
+  }
   return factor;
 }
 
@@ -1642,6 +1676,30 @@ function getEnemySpawnPool() {
     return ["stress", "stress", "deadline", "floatError", "queueSnake"];
   }
   return ["stress", "stress", "deadline"];
+}
+
+function applyEnemyDamage(enemy, amount, source = "weapon") {
+  let finalDamage = amount;
+  const mechanic = enemy.mechanic;
+
+  if (mechanic?.type === "shieldAura" && enemy.shieldActive) {
+    finalDamage *= mechanic.damageMultiplier ?? 0.42;
+    enemy.shieldFlash = 0.22;
+    if (source === "pulse") {
+      enemy.shieldActive = false;
+      enemy.shieldTimer = mechanic.refresh ?? 4;
+      burst(enemy.x, enemy.y, mechanic.breakColor ?? "#96e072", 18);
+      setLog(mechanic.breakLog ?? "修复脉冲短暂拆掉了承诺护盾。");
+    }
+  }
+
+  if (mechanic?.type === "phaseShift" && enemy.phaseAlpha > 0.45 && source === "weapon") {
+    finalDamage *= mechanic.phaseDamageMultiplier ?? 0.55;
+  }
+
+  enemy.hp -= finalDamage;
+  enemy.hitFlash = Math.max(enemy.hitFlash ?? 0, 0.14);
+  return finalDamage;
 }
 
 function dash() {
@@ -1677,8 +1735,8 @@ function repairPulse() {
   }
   for (const enemy of allHostiles) {
     if (distance(enemy, player) <= player.pulseRadius + enemy.radius) {
-      enemy.hp -= player.pulseDamage;
-      enemy.hitFlash = 0.16;
+      applyEnemyDamage(enemy, player.pulseDamage, "pulse");
+      enemy.hitFlash = Math.max(enemy.hitFlash ?? 0, 0.16);
     }
   }
   for (const hazard of protocolHazards) {
@@ -1714,8 +1772,7 @@ function updateBullets(dt) {
         continue;
       }
 
-      enemy.hp -= bullet.damage;
-      enemy.hitFlash = 0.14;
+      applyEnemyDamage(enemy, bullet.damage, "weapon");
       bullet.hitTargets.add(enemy);
       burst(enemy.x, enemy.y, bullet.color, 7);
       if (bullet.knockback > 0) {
@@ -1764,25 +1821,30 @@ function updateBullets(dt) {
 }
 
 function clearDefeatedHostiles() {
+  const deferredSpawns = [];
   enemies = enemies.filter((enemy) => {
     if (enemy.hp > 0) {
       return true;
     }
-    defeatEnemy(enemy, 14);
+    defeatEnemy(enemy, 14, deferredSpawns);
     return false;
   });
   cleaners = cleaners.filter((enemy) => {
     if (enemy.hp > 0) {
       return true;
     }
-    defeatEnemy(enemy, 20);
+    defeatEnemy(enemy, 20, deferredSpawns);
     return false;
   });
+  for (const spawn of deferredSpawns) {
+    spawnEnemyNear(spawn.x, spawn.y, spawn.type, spawn.overrides);
+  }
 }
 
-function defeatEnemy(enemy, particleCount) {
+function defeatEnemy(enemy, particleCount, deferredSpawns = null) {
   runStats.enemiesDefeated += 1;
   burst(enemy.x, enemy.y, enemy.deathColor, particleCount);
+  applyEnemyDeathMechanic(enemy, deferredSpawns);
   spawnBugPickup(enemy.x, enemy.y, enemy.bugValue, enemy.xpValue);
   if (Math.random() < 0.22) {
     spawnBugPickup(enemy.x + random(-18, 18), enemy.y + random(-18, 18), 1, 1);
@@ -2130,6 +2192,7 @@ function checkBossDefeat() {
   chapterState.bossCleared = true;
   runStats.bossesDefeated += 1;
   protocolHazards = [];
+  enemyHazards = [];
   enemies = [];
   cleaners = [];
   const victoryStory = currentChapter().bossVictory;
@@ -2137,6 +2200,273 @@ function checkBossDefeat() {
   boss = null;
   world.cameraShake = 0.28;
   openStory(victoryStory);
+}
+
+function setEnemyMechanicLog(message) {
+  if (!message || world.enemyLogCooldown > 0) {
+    return;
+  }
+  setLog(message);
+  world.enemyLogCooldown = 1.8;
+}
+
+function updateEnemyHazards(dt) {
+  if (!enemyHazards?.length) {
+    return;
+  }
+
+  for (const hazard of enemyHazards) {
+    hazard.life -= dt;
+    hazard.hitCooldown = Math.max(0, (hazard.hitCooldown ?? 0) - dt);
+    if (hazard.armTime !== undefined) {
+      hazard.armTime -= dt;
+      hazard.armed = hazard.armTime <= 0;
+    }
+
+    const touchingPlayer = distance(player, hazard) <= player.radius + hazard.radius;
+    if (!touchingPlayer) {
+      continue;
+    }
+
+    if (hazard.backlashPerSecond) {
+      player.backlash = clamp(player.backlash + hazard.backlashPerSecond * dt, 0, 100);
+    }
+
+    if (hazard.backlashOnHit && !hazard.backlashApplied && (hazard.armed ?? true)) {
+      player.backlash = clamp(player.backlash + hazard.backlashOnHit, 0, 100);
+      hazard.backlashApplied = true;
+    }
+
+    if (hazard.damage && (hazard.armed ?? true) && hazard.hitCooldown <= 0) {
+      damagePlayer(hazard.damage, hazard.hitLog ?? "异常机制在脚下生效，稳定值被扣掉一截。");
+      hazard.hitCooldown = hazard.cooldown ?? 0.8;
+      if (hazard.once) {
+        hazard.life = 0;
+      }
+    }
+  }
+
+  enemyHazards = enemyHazards.filter((hazard) => hazard.life > 0);
+}
+
+function updateEnemyMechanics(dt) {
+  for (const enemy of [...enemies, ...cleaners]) {
+    enemy.shieldFlash = Math.max(0, (enemy.shieldFlash ?? 0) - dt);
+    enemy.phaseAlpha = Math.max(0, (enemy.phaseAlpha ?? 0) - dt * 1.8);
+    enemy.scanPulse = Math.max(0, (enemy.scanPulse ?? 0) - dt * 1.4);
+
+    const mechanic = enemy.mechanic;
+    if (!mechanic) {
+      continue;
+    }
+
+    if (mechanic.type === "dashAtPlayer") {
+      updateDashMechanic(enemy, mechanic, dt);
+    }
+
+    if (mechanic.type === "leaveTrail") {
+      updateTrailMechanic(enemy, mechanic, dt);
+    }
+
+    if (mechanic.type === "shieldAura") {
+      updateShieldAuraMechanic(enemy, mechanic, dt);
+    }
+
+    if (mechanic.type === "phaseShift") {
+      updatePhaseShiftMechanic(enemy, mechanic, dt);
+    }
+
+    if (mechanic.type === "scanLock") {
+      updateScanLockMechanic(enemy, mechanic, dt);
+    }
+  }
+}
+
+function updateDashMechanic(enemy, mechanic, dt) {
+  if (enemy.mechanicState === "dash") {
+    return;
+  }
+
+  if (enemy.mechanicState === "telegraph") {
+    enemy.mechanicStateTimer -= dt;
+    enemy.hitFlash = Math.max(enemy.hitFlash ?? 0, 0.08);
+    if (enemy.mechanicStateTimer > 0) {
+      return;
+    }
+
+    const targetX = enemy.telegraphX ?? player.x;
+    const targetY = enemy.telegraphY ?? player.y;
+    const angle = Math.atan2(targetY - enemy.y, targetX - enemy.x);
+    enemy.dashVx = Math.cos(angle);
+    enemy.dashVy = Math.sin(angle);
+    enemy.mechanicState = "dash";
+    enemy.mechanicStateTimer = mechanic.duration ?? 0.36;
+    enemy.dashDamaged = false;
+    return;
+  }
+
+  enemy.mechanicTimer -= dt;
+  if (enemy.mechanicTimer > 0 || distance(enemy, player) > (mechanic.triggerRange ?? 560)) {
+    return;
+  }
+
+  enemy.telegraphX = player.x;
+  enemy.telegraphY = player.y;
+  enemy.mechanicState = "telegraph";
+  enemy.mechanicStateTimer = mechanic.telegraph ?? 0.42;
+  setEnemyMechanicLog(mechanic.warnLog ?? "工单飞虫锁定了一条直线，半秒后会冲刺。");
+}
+
+function updateEnemySpecialMovement(enemy, dt) {
+  if (enemy.mechanicState === "telegraph") {
+    return true;
+  }
+
+  if (enemy.mechanicState !== "dash") {
+    return false;
+  }
+
+  const mechanic = enemy.mechanic ?? {};
+  const speed = mechanic.dashSpeed ?? 430;
+  enemy.x = clamp(enemy.x + (enemy.dashVx ?? 0) * speed * dt, enemy.radius, world.width - enemy.radius);
+  enemy.y = clamp(enemy.y + (enemy.dashVy ?? 0) * speed * dt, 76, world.height - enemy.radius);
+  resolveDeskCollision(enemy);
+
+  if (!enemy.dashDamaged && distance(enemy, player) < enemy.radius + player.radius + 4) {
+    enemy.dashDamaged = true;
+    damagePlayer(mechanic.dashDamage ?? enemy.damage + 5, mechanic.hitLog ?? enemy.hitLog);
+  }
+
+  enemy.mechanicStateTimer -= dt;
+  if (enemy.mechanicStateTimer <= 0) {
+    enemy.mechanicState = "idle";
+    enemy.mechanicTimer = mechanic.cooldown ?? 2.6;
+  }
+  return true;
+}
+
+function updateTrailMechanic(enemy, mechanic, dt) {
+  enemy.trailTimer -= dt;
+  if (enemy.trailTimer > 0) {
+    return;
+  }
+
+  enemyHazards.push({
+    type: "enemyTrail",
+    x: enemy.x,
+    y: enemy.y,
+    radius: mechanic.radius ?? 30,
+    life: mechanic.life ?? 3.2,
+    maxLife: mechanic.life ?? 3.2,
+    slowFactor: mechanic.slowFactor ?? 0.64,
+    backlashPerSecond: mechanic.backlashPerSecond ?? 0,
+    affectsEnemies: false,
+    color: mechanic.color ?? "#72a5ff",
+  });
+  enemy.trailTimer = mechanic.interval ?? 0.42;
+}
+
+function updateShieldAuraMechanic(enemy, mechanic, dt) {
+  if (enemy.shieldActive) {
+    return;
+  }
+
+  enemy.shieldTimer -= dt;
+  if (enemy.shieldTimer <= 0) {
+    enemy.shieldActive = true;
+    enemy.shieldFlash = 0.5;
+    burst(enemy.x, enemy.y, mechanic.color ?? "#96e072", 14);
+    setEnemyMechanicLog(mechanic.refreshLog ?? "承诺球重新套上护盾，用修复脉冲可以拆掉它。");
+  }
+}
+
+function updatePhaseShiftMechanic(enemy, mechanic, dt) {
+  enemy.mechanicTimer -= dt;
+  if (enemy.mechanicTimer > 0) {
+    return;
+  }
+
+  const oldX = enemy.x;
+  const oldY = enemy.y;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const angle = random(0, Math.PI * 2);
+    const radius = random(mechanic.minDistance ?? 110, mechanic.maxDistance ?? 250);
+    const candidate = {
+      x: clamp(player.x + Math.cos(angle) * radius, enemy.radius + 24, world.width - enemy.radius - 24),
+      y: clamp(player.y + Math.sin(angle) * radius, 90, world.height - enemy.radius - 24),
+    };
+    if (!isPointBlockedByMap(candidate.x, candidate.y, enemy.radius)) {
+      enemy.x = candidate.x;
+      enemy.y = candidate.y;
+      break;
+    }
+  }
+  resolveDeskCollision(enemy);
+  enemy.phaseAlpha = mechanic.fadeTime ?? 0.72;
+  burst(oldX, oldY, mechanic.color ?? "#8edcff", 9);
+  burst(enemy.x, enemy.y, mechanic.color ?? "#8edcff", 9);
+  setEnemyMechanicLog(mechanic.log ?? "浮点误差泡重新取整了坐标，短时间内远程伤害降低。");
+  enemy.mechanicTimer = random((mechanic.interval ?? 3.2) * 0.82, (mechanic.interval ?? 3.2) * 1.18);
+}
+
+function updateScanLockMechanic(enemy, mechanic, dt) {
+  enemy.mechanicTimer -= dt;
+  if (enemy.mechanicTimer > 0) {
+    return;
+  }
+
+  enemy.scanPulse = 1;
+  enemyHazards.push({
+    type: "scanLock",
+    x: player.x,
+    y: player.y,
+    radius: mechanic.radius ?? 72,
+    life: mechanic.life ?? 0.95,
+    maxLife: mechanic.life ?? 0.95,
+    armTime: mechanic.armTime ?? 0.34,
+    damage: mechanic.damage ?? 9,
+    cooldown: mechanic.cooldown ?? 1,
+    once: true,
+    backlashOnHit: mechanic.backlashOnHit ?? 4,
+    color: mechanic.color ?? "#72a5ff",
+    hitLog: mechanic.hitLog ?? "巡检探针完成点名扫描，当前位置被白箱记录。",
+  });
+  setEnemyMechanicLog(mechanic.warnLog ?? "巡检探针正在点名，离开蓝色扫描圈。");
+  enemy.mechanicTimer = random((mechanic.interval ?? 3.4) * 0.84, (mechanic.interval ?? 3.4) * 1.18);
+}
+
+function applyEnemyDeathMechanic(enemy, deferredSpawns = null) {
+  const mechanic = enemy.mechanic;
+  if (!mechanic || mechanic.type !== "splitOnDeath") {
+    return;
+  }
+  if ((enemy.mechanicDepth ?? 0) >= (mechanic.maxDepth ?? 1)) {
+    return;
+  }
+
+  const count = mechanic.count ?? 2;
+  for (let index = 0; index < count; index += 1) {
+    const angle = (Math.PI * 2 * index) / count + random(-0.24, 0.24);
+    const childX = clamp(enemy.x + Math.cos(angle) * (mechanic.spread ?? 46), 48, world.width - 48);
+    const childY = clamp(enemy.y + Math.sin(angle) * (mechanic.spread ?? 46), 86, world.height - 48);
+    const spawn = {
+      x: childX,
+      y: childY,
+      type: mechanic.enemyType ?? enemy.type,
+      overrides: {
+        hpMultiplier: mechanic.hpMultiplier ?? 0.45,
+        speedMultiplier: mechanic.speedMultiplier ?? 1.12,
+        scale: mechanic.scale ?? 0.72,
+        mechanicDepth: (enemy.mechanicDepth ?? 0) + 1,
+      },
+    };
+    if (deferredSpawns) {
+      deferredSpawns.push(spawn);
+    } else {
+      spawnEnemyNear(spawn.x, spawn.y, spawn.type, spawn.overrides);
+    }
+  }
+  setEnemyMechanicLog(mechanic.log ?? "异常实体被击破后分裂成更小的待办。");
 }
 
 function damagePlayer(amount, message) {
@@ -2155,15 +2485,20 @@ function damagePlayer(amount, message) {
 
 function updateEnemies(dt) {
   for (const enemy of [...enemies, ...cleaners]) {
-    const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
     enemy.slowTimer = Math.max(0, enemy.slowTimer - dt);
     if (enemy.slowTimer <= 0) {
       enemy.slowFactor = 1;
     }
+    enemy.hitFlash = Math.max(0, enemy.hitFlash - dt);
+
+    if (updateEnemySpecialMovement(enemy, dt)) {
+      continue;
+    }
+
+    const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
     const speed = enemy.speed * enemy.slowFactor * getMapMoveMultiplier(enemy, false);
     enemy.x += Math.cos(angle) * speed * dt;
     enemy.y += Math.sin(angle) * speed * dt;
-    enemy.hitFlash = Math.max(0, enemy.hitFlash - dt);
     resolveDeskCollision(enemy);
 
     if (distance(enemy, player) < enemy.radius + player.radius && player.invulnerable <= 0) {
@@ -2188,7 +2523,7 @@ function updateAllyAssist(dt) {
   }
 
   const damage = 34 + player.level * 2;
-  target.hp -= damage;
+  applyEnemyDamage(target, damage, "ally");
   target.hitFlash = 0.2;
   target.slowTimer = Math.max(target.slowTimer ?? 0, 0.8);
   target.slowFactor = Math.min(target.slowFactor ?? 1, 0.62);
@@ -2439,6 +2774,7 @@ function draw(dt) {
   drawBugNodes(dt);
   drawBugPickups();
   drawProtocolHazards();
+  drawEnemyHazards();
   drawBullets();
   drawEnemies();
   drawBoss();
@@ -3301,6 +3637,40 @@ function drawProtocolHazards() {
   }
 }
 
+function drawEnemyHazards() {
+  for (const hazard of enemyHazards ?? []) {
+    const progress = clamp(1 - hazard.life / (hazard.maxLife ?? (hazard.life || 1)), 0, 1);
+    const armed = hazard.armed ?? hazard.armTime === undefined;
+    const color = hazard.color ?? "#72a5ff";
+    ctx.save();
+    ctx.globalAlpha = hazard.type === "scanLock" ? 0.18 + progress * 0.16 : 0.12 + (1 - progress) * 0.2;
+    fillCircle(hazard.x, hazard.y, hazard.radius, color);
+    ctx.globalAlpha = hazard.type === "scanLock" ? 0.72 : 0.36;
+    ctx.strokeStyle = armed ? (hazard.type === "scanLock" ? "#ef6a70" : color) : color;
+    ctx.lineWidth = hazard.type === "scanLock" ? 3 : 2;
+    if (!armed) {
+      ctx.setLineDash([8, 8]);
+    }
+    ctx.beginPath();
+    ctx.arc(hazard.x, hazard.y, hazard.radius * (hazard.type === "scanLock" ? 1 + Math.sin(world.animTime * 18) * 0.035 : 1), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (hazard.type === "enemyTrail") {
+      ctx.globalAlpha = 0.28;
+      ctx.strokeStyle = "#f7fbff";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(hazard.x - hazard.radius * 0.55, hazard.y);
+      ctx.lineTo(hazard.x + hazard.radius * 0.55, hazard.y);
+      ctx.moveTo(hazard.x, hazard.y - hazard.radius * 0.55);
+      ctx.lineTo(hazard.x, hazard.y + hazard.radius * 0.55);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
 function drawProtocolRoute(route, color, alpha, width, dashed = false) {
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -3438,12 +3808,70 @@ function drawDnsMarker(hazard) {
   ctx.restore();
 }
 
+function drawEnemyMechanicUnderlay(enemy) {
+  if (enemy.mechanicState === "telegraph") {
+    const targetX = enemy.telegraphX ?? player.x;
+    const targetY = enemy.telegraphY ?? player.y;
+    ctx.save();
+    ctx.globalAlpha = 0.76;
+    ctx.strokeStyle = "#ef6a70";
+    ctx.lineWidth = 4;
+    ctx.setLineDash([14, 10]);
+    ctx.beginPath();
+    ctx.moveTo(enemy.x, enemy.y);
+    ctx.lineTo(targetX, targetY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    fillCircle(targetX, targetY, 8 + Math.sin(world.animTime * 18) * 2, "#ef6a70");
+    ctx.restore();
+  }
+
+  if (enemy.scanPulse > 0) {
+    ctx.save();
+    ctx.globalAlpha = enemy.scanPulse * 0.38;
+    ctx.strokeStyle = "#72a5ff";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(enemy.x, enemy.y, enemy.radius + 52 * (1 - enemy.scanPulse), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawEnemyMechanicOverlay(enemy) {
+  if (enemy.shieldActive || enemy.shieldFlash > 0) {
+    ctx.save();
+    const flash = enemy.shieldFlash ?? 0;
+    ctx.globalAlpha = enemy.shieldActive ? 0.78 : flash * 0.6;
+    ctx.strokeStyle = flash > 0 ? "#ffffff" : "#96e072";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(enemy.x, enemy.y, enemy.radius + 7 + Math.sin(world.animTime * 5 + enemy.animPhase) * 2, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha *= 0.22;
+    fillCircle(enemy.x, enemy.y, enemy.radius + 12, "#96e072");
+    ctx.restore();
+  }
+
+  if (enemy.phaseAlpha > 0) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(0.5, enemy.phaseAlpha * 0.46);
+    strokeCircle(enemy.x, enemy.y, enemy.radius + 14, "#8edcff", 2);
+    strokeCircle(enemy.x, enemy.y, enemy.radius + 22, "#8edcff", 1);
+    ctx.restore();
+  }
+}
+
 function drawEnemies() {
   for (const enemy of enemies) {
+    drawEnemyMechanicUnderlay(enemy);
     drawEnemy(enemy);
+    drawEnemyMechanicOverlay(enemy);
   }
   for (const cleaner of cleaners) {
+    drawEnemyMechanicUnderlay(cleaner);
     drawEnemy(cleaner);
+    drawEnemyMechanicOverlay(cleaner);
     ctx.strokeStyle = "#72a5ff";
     ctx.lineWidth = 3;
     const ringPulse = Math.sin(world.animTime * 5 + cleaner.animPhase) * 4;
@@ -3716,10 +4144,12 @@ function drawEnemyAsset(enemy) {
   const bob = Math.sin(world.animTime * 3.4 + phase) * (enemy.type === "queueSnake" ? 1.3 : 2.4);
   const scale = 1 + Math.sin(world.animTime * 4 + phase) * 0.035 + Math.abs(hurt);
   const rotate = Math.sin(world.animTime * 2.2 + phase) * (enemy.type === "inspectionProbe" ? 0.08 : 0.04);
+  const phaseAlpha = enemy.phaseAlpha > 0 ? 0.48 + Math.sin(world.animTime * 18 + phase) * 0.08 : 1;
   const drawn = drawSpriteAsset(enemy.assetKey, enemy.x, enemy.y, size, size, {
+    alpha: phaseAlpha,
     bob,
-    glowAlpha: enemy.slowTimer > 0 ? 0.07 : 0,
-    glowColor: "#72a5ff",
+    glowAlpha: enemy.phaseAlpha > 0 ? 0.14 : enemy.slowTimer > 0 ? 0.07 : 0,
+    glowColor: enemy.phaseAlpha > 0 ? "#8edcff" : "#72a5ff",
     rotate,
     scale,
   });
