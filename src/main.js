@@ -49,6 +49,10 @@ const keys = new Set();
 const world = {
   width: 1280,
   height: 720,
+  viewWidth: canvas.width,
+  viewHeight: canvas.height,
+  cameraX: 0,
+  cameraY: 0,
   mode: "playing",
   lastTime: 0,
   animTime: 0,
@@ -117,10 +121,43 @@ const chapterMaps = [
   {
     id: "office-dispatch",
     name: "超时订单办公室",
+    width: 2240,
+    height: 1280,
     start: { x: 170, y: 560 },
+    bossSpawn: { x: 1890, y: 680 },
+    bossPayload: { x: 1814, y: 694 },
+    stepTargets: {
+      0: [{ eventId: "bullet-comments", x: 540, y: 190 }],
+      1: [{ eventId: "debug-badge", x: 250, y: 430 }],
+      2: [
+        { eventId: "emo-fluff", x: 1230, y: 865 },
+        { eventId: "delivery-meat", x: 1582, y: 606 },
+      ],
+      3: [
+        { eventId: "promise-bloat", x: 1916, y: 382 },
+        { eventId: "talking-cat", x: 1840, y: 932 },
+      ],
+    },
+    stepHints: {
+      0: "目标信标已亮起：先检查工位区的弹幕异常。",
+      1: "断点工牌在旧工位旁闪烁，靠近青蓝信标即可交互。",
+      2: "办公室向茶水间和配送走廊展开，跟着地面路线继续推进。",
+      3: "外卖取餐区在东侧深处，穿过重算路线后再进入 Boss 区。",
+    },
+    paths: [
+      { kind: "corridor", x: 58, y: 332, w: 760, h: 92, label: "工位通道", color: "#5de2d1" },
+      { kind: "corridor", x: 676, y: 512, w: 684, h: 112, label: "配送走廊", color: "#f1c15b" },
+      { kind: "corridor", x: 1138, y: 756, w: 456, h: 150, label: "茶水间", color: "#72a5ff" },
+      { kind: "corridor", x: 1508, y: 420, w: 520, h: 246, label: "外卖取餐区", color: "#f1c15b" },
+      { kind: "corridor", x: 1712, y: 842, w: 408, h: 210, label: "服务器入口", color: "#5de2d1" },
+      { kind: "route", x1: 614, y1: 380, x2: 1200, y2: 822, color: "#72a5ff", label: "去茶水间" },
+      { kind: "route", x1: 1018, y1: 558, x2: 1842, y2: 620, color: "#f1c15b", label: "去取餐区" },
+      { kind: "route", x1: 1846, y1: 704, x2: 1900, y2: 936, color: "#5de2d1", label: "去服务器间" },
+    ],
     spawnPoints: [
       { x: 72, y: 92 }, { x: 1188, y: 102 }, { x: 86, y: 628 }, { x: 1166, y: 634 },
-      { x: 624, y: 94 }, { x: 622, y: 646 },
+      { x: 624, y: 94 }, { x: 622, y: 646 }, { x: 1360, y: 1028 }, { x: 2144, y: 164 },
+      { x: 2106, y: 1096 }, { x: 1518, y: 740 },
     ],
     zones: [
       {
@@ -134,39 +171,112 @@ const chapterMaps = [
         color: "#f1c15b",
         slowFactor: 0.9,
       },
+      {
+        id: "tea-break",
+        x: 1138,
+        y: 756,
+        w: 456,
+        h: 150,
+        type: "focus",
+        label: "茶水间低语",
+        color: "#72a5ff",
+        slowFactor: 0.94,
+      },
+      {
+        id: "route-recalculate",
+        x: 1512,
+        y: 314,
+        w: 232,
+        h: 462,
+        type: "hazard",
+        label: "重算路线",
+        color: "#ef6a70",
+        damage: 5,
+        cooldown: 1.45,
+        slowFactor: 0.78,
+        log: "地面路线突然重算，错误坐标擦过脚边。",
+      },
+      {
+        id: "server-threshold",
+        x: 1712,
+        y: 842,
+        w: 408,
+        h: 210,
+        type: "slow",
+        label: "服务器门禁",
+        color: "#5de2d1",
+        slowFactor: 0.86,
+      },
     ],
     obstacles: [
       ...desks.map((desk) => ({ ...desk, kind: "desk" })),
       { kind: "singleDesk", x: 34, y: 586, w: 210, h: 80, label: "安渡工位" },
+      { kind: "desk", x: 1124, y: 802, w: 136, h: 54, tag: "咖啡因", assetKey: "propWorkstationD" },
+      { kind: "desk", x: 1332, y: 802, w: 136, h: 54, tag: "排班表", assetKey: "propWorkstationE" },
+      { kind: "kiosk", x: 1506, y: 254, w: 146, h: 112, label: "路线柜" },
+      { kind: "serverCluster", x: 1816, y: 292, w: 246, h: 112, label: "取餐柜背板" },
+      { kind: "singleDesk", x: 1842, y: 966, w: 210, h: 80, label: "临时调度台" },
+      { kind: "partitionWide", x: 760, y: 682, w: 360, h: 72, label: "玻璃隔断" },
+      { kind: "partitionWide", x: 1210, y: 594, w: 320, h: 72, label: "路线隔断" },
     ],
     props: [
       { kind: "windowRow", x: 32, y: 14, count: 4 },
       { kind: "windowRow", x: 788, y: 14, count: 3 },
+      { kind: "windowRow", x: 1440, y: 14, count: 4 },
       { kind: "whiteboard", x: 386, y: 14, w: 170, h: 38 },
+      { kind: "whiteboard", x: 1200, y: 698, w: 190, h: 42 },
       { kind: "water", x: 628, y: 94 },
+      { kind: "water", x: 1452, y: 846 },
       { kind: "copier", x: 1116, y: 96 },
       { kind: "plant", x: 52, y: 96, scale: 1 },
       { kind: "plant", x: 1196, y: 602, scale: 1.1 },
       { kind: "plant", x: 650, y: 622, scale: 0.85 },
+      { kind: "plant", x: 1380, y: 740, scale: 0.9 },
+      { kind: "plant", x: 2106, y: 1034, scale: 1.05 },
       { kind: "meeting", x: 750, y: 262 },
+      { kind: "meeting", x: 1198, y: 964 },
       { kind: "visitorStool", x: 700, y: 360, w: 42, h: 46, label: "临时座" },
       { kind: "visitorStool", x: 1010, y: 352, w: 42, h: 46, label: "临时座" },
+      { kind: "visitorStool", x: 1288, y: 910, w: 42, h: 46, label: "咖啡凳" },
+      { kind: "visitorStool", x: 1430, y: 910, w: 42, h: 46, label: "咖啡凳" },
       { kind: "meetingBench", x: 818, y: 218, w: 148, h: 78, label: "协作凳" },
+      { kind: "meetingBench", x: 1248, y: 736, w: 148, h: 78, label: "等候凳" },
       { kind: "serverDoor", x: 738, y: 388 },
+      { kind: "serverDoor", x: 1686, y: 908 },
       { kind: "printer", x: 1034, y: 526 },
+      { kind: "printer", x: 1628, y: 780 },
       { kind: "deliveryZone", x: 940, y: 558 },
+      { kind: "deliveryZone", x: 1810, y: 626 },
       { kind: "deliveryCrates", x: 900, y: 456, w: 146, h: 58, label: "超时件" },
+      { kind: "deliveryCrates", x: 1704, y: 520, w: 180, h: 72, label: "待取件" },
+      { kind: "deliveryCrates", x: 1958, y: 710, w: 156, h: 62, label: "重传件" },
       { kind: "routeTerminal", x: 1160, y: 426, w: 64, h: 76, label: "路由" },
+      { kind: "routeTerminal", x: 1648, y: 536, w: 74, h: 92, label: "重算" },
       { kind: "phoneBeacon", x: 814, y: 540, label: "999" },
+      { kind: "phoneBeacon", x: 1960, y: 562, label: "ACK?" },
+      { kind: "areaGate", x: 676, y: 534, w: 260, h: 58, label: "前往茶水间", color: "#72a5ff" },
+      { kind: "areaGate", x: 1406, y: 522, w: 274, h: 58, label: "前往取餐区", color: "#f1c15b" },
+      { kind: "areaGate", x: 1760, y: 888, w: 294, h: 62, label: "进入服务器入口", color: "#5de2d1" },
+      { kind: "fileCabinet", x: 1098, y: 688, w: 92, h: 112, label: "茶水档案" },
+      { kind: "planterBox", x: 1516, y: 1008, w: 210, h: 84, label: "绿植隔离带" },
     ],
     decorations: [
       { kind: "parcelTape", x: 884, y: 500, w: 296, h: 142, color: "#f1c15b" },
+      { kind: "parcelTape", x: 1662, y: 478, w: 496, h: 326, color: "#f1c15b" },
       { kind: "floorCable", x1: 738, y1: 454, x2: 1016, y2: 552, color: "#5de2d1" },
+      { kind: "floorCable", x1: 1016, y1: 552, x2: 1814, y2: 694, color: "#5de2d1" },
+      { kind: "floorCable", x1: 1272, y1: 820, x2: 1842, y2: 938, color: "#72a5ff" },
       { kind: "routeArrow", x: 852, y: 560, angle: -0.08, label: "配送路线", color: "#f1c15b" },
+      { kind: "routeArrow", x: 1208, y: 844, angle: 0.04, label: "茶水间", color: "#72a5ff" },
+      { kind: "routeArrow", x: 1710, y: 620, angle: 0.02, label: "取餐区", color: "#f1c15b" },
+      { kind: "routeArrow", x: 1906, y: 924, angle: 1.44, label: "服务器入口", color: "#5de2d1" },
       { kind: "stickyCluster", x: 392, y: 76, count: 7, color: "#f1c15b" },
+      { kind: "stickyCluster", x: 1296, y: 706, count: 6, color: "#72a5ff" },
       { kind: "deskGlowGrid", x: 72, y: 96, w: 560, h: 210, color: "#5de2d1" },
+      { kind: "deskGlowGrid", x: 1116, y: 776, w: 370, h: 132, color: "#72a5ff" },
       { kind: "chairScuffs", x: 98, y: 184, count: 9, color: "#718096" },
       { kind: "chairScuffs", x: 306, y: 314, count: 7, color: "#718096" },
+      { kind: "chairScuffs", x: 1188, y: 912, count: 8, color: "#718096" },
     ],
   },
   {
@@ -611,6 +721,16 @@ function currentMap() {
   return chapterMaps[currentChapterIndex] ?? chapterMaps[0];
 }
 
+function syncWorldToCurrentMap() {
+  const map = currentMap();
+  world.viewWidth = canvas.width;
+  world.viewHeight = canvas.height;
+  world.width = Math.max(world.viewWidth, map.width ?? 1280);
+  world.height = Math.max(world.viewHeight, map.height ?? 720);
+  world.cameraX = clamp(world.cameraX ?? 0, 0, Math.max(0, world.width - world.viewWidth));
+  world.cameraY = clamp(world.cameraY ?? 0, 0, Math.max(0, world.height - world.viewHeight));
+}
+
 function getMapObstacles() {
   return (currentMap().obstacles ?? desks).filter((object) => object.solid !== false);
 }
@@ -620,9 +740,12 @@ function getMapZones() {
 }
 
 function positionPlayerAtMapStart() {
+  syncWorldToCurrentMap();
   const start = currentMap().start ?? { x: 170, y: 560 };
-  player.x = start.x;
-  player.y = start.y;
+  const safeStart = findNearestFreePoint(start.x, start.y, player?.radius ?? playerBase.radius);
+  player.x = safeStart.x;
+  player.y = safeStart.y;
+  centerCameraOnPlayer();
 }
 
 function createRunStats() {
@@ -755,11 +878,13 @@ function resetGame() {
 
 function createBugNode(x = random(90, world.width - 90), y = random(96, world.height - 86), eventId = null) {
   const event = eventId ? getEventById(eventId) : bugEvents[Math.floor(Math.random() * bugEvents.length)];
+  const safePoint = findNearestFreePoint(x, y, 42);
 
   return {
-    x,
-    y,
+    x: safePoint.x,
+    y: safePoint.y,
     radius: 17,
+    interactRadius: 54,
     pulse: random(0, Math.PI * 2),
     animPhase: random(0, Math.PI * 2),
     event,
@@ -1004,6 +1129,9 @@ function seedOfficeBugPickups() {
     { x: 704, y: 360, xp: 3 },
     { x: 1160, y: 360, xp: 3 },
     { x: 430, y: 598, xp: 2 },
+    { x: 1188, y: 820, xp: 3 },
+    { x: 1608, y: 594, xp: 3 },
+    { x: 1904, y: 732, xp: 4 },
   ];
 
   for (const seed of seeds) {
@@ -1012,9 +1140,10 @@ function seedOfficeBugPickups() {
 }
 
 function spawnBugPickup(x, y, bugValue = 1, xpValue = 2) {
+  const safePoint = findNearestFreePoint(x + random(-12, 12), y + random(-12, 12), 18);
   bugPickups.push({
-    x: x + random(-12, 12),
-    y: y + random(-12, 12),
+    x: safePoint.x,
+    y: safePoint.y,
     vx: random(-20, 20),
     vy: random(-20, 20),
     radius: 8,
@@ -1149,14 +1278,20 @@ function resumeChapterStep() {
 }
 
 function spawnChapterNodes(step) {
-  const nodes = step.nodes ?? [step.node];
+  const mapTargets = currentMap().stepTargets?.[chapterState.stepIndex];
+  const nodes = mapTargets ?? (step.nodes ?? [step.node]);
   bugNodes = nodes.map((node) => createBugNode(node.x, node.y, node.eventId));
   world.mode = "playing";
+  const hint = currentMap().stepHints?.[chapterState.stepIndex];
+  if (hint) {
+    setLog(hint);
+  }
 }
 
 function startBossFight(bossId = null) {
   const chapter = currentChapter();
   const bossConfig = chapter.boss ?? {};
+  const mapBossSpawn = currentMap().bossSpawn ?? {};
   bugNodes = [];
   enemies = enemies.slice(0, 4);
   cleaners = [];
@@ -1166,8 +1301,8 @@ function startBossFight(bossId = null) {
   boss = {
     id: bossId ?? bossConfig.id ?? "delivery-rider",
     name: bossConfig.name ?? "协议骑手·周行",
-    x: bossConfig.x ?? 1034,
-    y: bossConfig.y ?? 548,
+    x: bossConfig.x ?? mapBossSpawn.x ?? 1034,
+    y: bossConfig.y ?? mapBossSpawn.y ?? 548,
     radius: bossConfig.radius ?? 34,
     hp: bossConfig.hp ?? 1750,
     maxHp: bossConfig.hp ?? 1750,
@@ -2122,10 +2257,11 @@ function startFtpTransfer() {
   const tuning = getBossTuning();
   const existingFtp = protocolHazards.some((hazard) => hazard.type === "ftp");
   if (!existingFtp) {
+    const payloadPoint = currentMap().bossPayload ?? { x: 870, y: 348 };
     protocolHazards.push({
       type: "ftp",
-      x: 870,
-      y: 348,
+      x: payloadPoint.x,
+      y: payloadPoint.y,
       radius: 44,
       hp: tuning.ftpHp,
       maxHp: tuning.ftpHp,
@@ -2596,10 +2732,10 @@ function updateBugPickups(dt) {
   for (const pickup of bugPickups) {
     pickup.pulse += dt * 4;
     const pullDistance = distance(pickup, player);
-    if (pullDistance < 130) {
+    if (pullDistance < 230) {
       const angle = Math.atan2(player.y - pickup.y, player.x - pickup.x);
-      pickup.vx += Math.cos(angle) * 360 * dt;
-      pickup.vy += Math.sin(angle) * 360 * dt;
+      pickup.vx += Math.cos(angle) * 520 * dt;
+      pickup.vy += Math.sin(angle) * 520 * dt;
     }
     pickup.x += pickup.vx * dt;
     pickup.y += pickup.vy * dt;
@@ -2608,7 +2744,7 @@ function updateBugPickups(dt) {
   }
 
   bugPickups = bugPickups.filter((pickup) => {
-    if (distance(pickup, player) > pickup.radius + player.radius + 4) {
+    if (distance(pickup, player) > pickup.radius + player.radius + 18) {
       return true;
     }
     player.bugPoints += pickup.bugValue;
@@ -2647,7 +2783,7 @@ function updateParticles(dt) {
 function checkBugCollision() {
   for (let index = 0; index < bugNodes.length; index += 1) {
     const node = bugNodes[index];
-    if (distance(player, node) < player.radius + node.radius + 10) {
+    if (distance(player, node) < player.radius + (node.interactRadius ?? node.radius + 24)) {
       activeEvent = { ...node.event, index };
       openEvent(activeEvent);
       break;
@@ -2823,9 +2959,13 @@ function endGame(victory) {
 function draw(dt) {
   const shakeX = world.cameraShake > 0 ? random(-5, 5) : 0;
   const shakeY = world.cameraShake > 0 ? random(-5, 5) : 0;
+  updateCamera();
+  const camera = { x: world.cameraX, y: world.cameraY, w: world.viewWidth, h: world.viewHeight };
   ctx.save();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.translate(shakeX, shakeY);
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
   drawOffice();
   drawBugNodes(dt);
   drawBugPickups();
@@ -2837,6 +2977,9 @@ function draw(dt) {
   drawAllies();
   drawPlayer();
   drawParticles();
+  ctx.restore();
+  drawObjectiveCompass(camera);
+  drawExplorationMiniMap(camera);
   drawBossHud();
   ctx.restore();
 }
@@ -2888,6 +3031,44 @@ function drawOffice() {
 
 function drawMapPaths(map, visual) {
   for (const path of map.paths ?? []) {
+    if (path.kind === "corridor") {
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = path.color ?? visual.accent;
+      ctx.fillRect(path.x, path.y, path.w, path.h);
+      ctx.globalAlpha = 0.34;
+      ctx.strokeStyle = path.color ?? visual.accent;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([14, 12]);
+      ctx.strokeRect(path.x, path.y, path.w, path.h);
+      ctx.setLineDash([]);
+      drawSmallText(path.label, path.x + 14, path.y + 28, "#26364d", 13);
+      ctx.restore();
+      continue;
+    }
+
+    if (path.kind === "route") {
+      ctx.save();
+      const pulse = (world.animTime * 0.55 + (path.x1 + path.y1) * 0.002) % 1;
+      ctx.globalAlpha = 0.44;
+      ctx.strokeStyle = path.color ?? visual.accent;
+      ctx.lineWidth = 5;
+      ctx.setLineDash([22, 16]);
+      ctx.beginPath();
+      ctx.moveTo(path.x1, path.y1);
+      ctx.quadraticCurveTo((path.x1 + path.x2) / 2, Math.min(path.y1, path.y2) - 74, path.x2, path.y2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const x = path.x1 + (path.x2 - path.x1) * pulse;
+      const y = path.y1 + (path.y2 - path.y1) * pulse + Math.sin(pulse * Math.PI) * -42;
+      fillCircle(x, y, 7, path.color ?? visual.accent);
+      if (path.label) {
+        drawSmallText(path.label, (path.x1 + path.x2) / 2 - 36, (path.y1 + path.y2) / 2 - 34, "#26364d", 12);
+      }
+      ctx.restore();
+      continue;
+    }
+
     if (path.kind === "rail") {
       drawRailLine(path.x1, path.y1, path.x2, path.y2, path.color ?? visual.accent);
       drawRailLine(path.x1, path.y1 + 40, path.x2, path.y2 + 40, "rgba(241, 193, 91, 0.55)");
@@ -3000,6 +3181,17 @@ function drawMapObject(object, visual) {
     return;
   }
 
+  if (
+    object.kind === "fileCabinet" ||
+    object.kind === "planterBox" ||
+    object.kind === "partitionWide" ||
+    object.kind === "partitionLeft" ||
+    object.kind === "partitionRight"
+  ) {
+    drawOfficeFixture(object, visual);
+    return;
+  }
+
   if (object.kind === "deliveryZone") {
     drawDeliveryPickupZone(object.x, object.y);
     return;
@@ -3044,6 +3236,7 @@ function drawMapObject(object, visual) {
     object.kind === "deliveryCrates" ||
     object.kind === "routeTerminal" ||
     object.kind === "phoneBeacon" ||
+    object.kind === "areaGate" ||
     object.kind === "visitorStool" ||
     object.kind === "meetingBench" ||
     object.kind === "metroBench" ||
@@ -3428,6 +3621,30 @@ function drawThemedMapProp(object, visual) {
     ctx.fillRect(-8, -12, 16, 20);
     ctx.globalAlpha = 1;
     drawSmallText(object.label, -9, 4, "#ffffff", 10);
+    ctx.restore();
+    return;
+  }
+
+  if (object.kind === "areaGate") {
+    const pulse = 0.6 + Math.sin(world.animTime * 3.6 + object.x * 0.01) * 0.16;
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = color;
+    ctx.fillRect(object.x, object.y, object.w, object.h);
+    ctx.globalAlpha = 0.68;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.setLineDash([18, 10]);
+    ctx.strokeRect(object.x, object.y, object.w, object.h);
+    ctx.setLineDash([]);
+    ctx.globalAlpha = pulse;
+    ctx.beginPath();
+    ctx.moveTo(object.x + object.w - 44, object.y + object.h / 2);
+    ctx.lineTo(object.x + object.w - 78, object.y + 18);
+    ctx.lineTo(object.x + object.w - 78, object.y + object.h - 18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    drawLabel(object.label, object.x + 18, object.y + object.h / 2 + 5, "#224250");
     ctx.restore();
     return;
   }
@@ -3902,6 +4119,47 @@ function drawRootObject(object, visual) {
   ctx.restore();
 }
 
+function drawOfficeFixture(object, visual) {
+  const assetKeys = {
+    fileCabinet: "propFileCabinet",
+    planterBox: "propPlanterBox",
+    partitionWide: "propPartitionWide",
+    partitionLeft: "propPartitionLeft",
+    partitionRight: "propPartitionRight",
+  };
+  const key = assetKeys[object.kind];
+  const width = object.w ?? 96;
+  const height = object.h ?? 80;
+  if (key && drawPropAsset(key, object.x, object.y, width, height)) {
+    if (object.label) {
+      drawLabel(object.label, object.x + 12, object.y + height - 8, "#224250");
+    }
+    return;
+  }
+
+  ctx.save();
+  ctx.fillStyle = object.kind === "planterBox" ? "rgba(150, 224, 114, 0.3)" : "rgba(247, 250, 255, 0.76)";
+  ctx.fillRect(object.x, object.y, width, height);
+  ctx.strokeStyle = object.color ?? visual.accent;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(object.x, object.y, width, height);
+  if (object.kind === "planterBox") {
+    for (let index = 0; index < 5; index += 1) {
+      fillCircle(object.x + 24 + index * 34, object.y + 22 + Math.sin(index) * 6, 15, "#3bb579");
+    }
+  } else {
+    ctx.globalAlpha = 0.34;
+    ctx.fillStyle = object.color ?? visual.accent;
+    for (let x = object.x + 18; x < object.x + width - 18; x += 44) {
+      ctx.fillRect(x, object.y + 14, 24, height - 28);
+    }
+  }
+  if (object.label) {
+    drawLabel(object.label, object.x + 12, object.y + height - 8, "#224250");
+  }
+  ctx.restore();
+}
+
 function drawDesk(desk) {
   if (desk.assetKey) {
     const width = desk.w + 42;
@@ -4091,6 +4349,10 @@ function drawBugNodes(dt) {
     ctx.save();
     ctx.translate(node.x, node.y + bob);
     ctx.fillStyle = node.event.color;
+    ctx.globalAlpha = 0.08;
+    ctx.beginPath();
+    ctx.arc(0, 0, node.interactRadius ?? node.radius + 28, 0, Math.PI * 2);
+    ctx.fill();
     ctx.globalAlpha = 0.16;
     ctx.beginPath();
     ctx.arc(0, 0, node.radius + 18 + glow, 0, Math.PI * 2);
@@ -4529,13 +4791,130 @@ function getBossPhaseAssetKey(phase) {
   return "bossDeliveryPhase1";
 }
 
+function getObjectiveTargets() {
+  if (bugNodes.length > 0) {
+    return bugNodes.map((node) => ({
+      x: node.x,
+      y: node.y,
+      color: node.event?.color ?? "#5de2d1",
+      label: node.event?.title ?? "目标",
+    }));
+  }
+
+  if (boss && boss.hp > 0) {
+    return [{ x: boss.x, y: boss.y, color: boss.themeColor ?? "#ef6a70", label: boss.name ?? "Boss" }];
+  }
+
+  const bossSpawn = currentMap().bossSpawn;
+  if ((chapterState?.stepIndex ?? -1) >= 4 && bossSpawn) {
+    return [{ ...bossSpawn, color: "#f1c15b", label: "Boss 区" }];
+  }
+
+  return [];
+}
+
+function drawObjectiveCompass(camera) {
+  const targets = getObjectiveTargets();
+  if (!targets.length) {
+    return;
+  }
+
+  const target = targets.reduce((nearest, candidate) => {
+    return distance(player, candidate) < distance(player, nearest) ? candidate : nearest;
+  }, targets[0]);
+  const screenX = target.x - camera.x;
+  const screenY = target.y - camera.y;
+  const margin = 56;
+  const visible = screenX > margin && screenX < world.viewWidth - margin && screenY > 86 && screenY < world.viewHeight - margin;
+  const pulse = 1 + Math.sin(world.animTime * 5.2) * 0.12;
+
+  ctx.save();
+  if (visible) {
+    ctx.globalAlpha = 0.78;
+    ctx.strokeStyle = target.color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(screenX, screenY, 44 * pulse, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.92;
+    drawSmallText("目标", screenX - 14, screenY - 52, "#26364d", 13);
+    ctx.restore();
+    return;
+  }
+
+  const centerX = world.viewWidth / 2;
+  const centerY = world.viewHeight / 2;
+  const angle = Math.atan2(screenY - centerY, screenX - centerX);
+  const x = clamp(screenX, margin, world.viewWidth - margin);
+  const y = clamp(screenY, 92, world.viewHeight - margin);
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.globalAlpha = 0.92;
+  ctx.fillStyle = target.color;
+  ctx.beginPath();
+  ctx.moveTo(24 * pulse, 0);
+  ctx.lineTo(-14, -13);
+  ctx.lineTo(-8, 0);
+  ctx.lineTo(-14, 13);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 0.22;
+  fillCircle(0, 0, 34, target.color);
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+  drawSmallText(target.label, clamp(x - 42, 14, world.viewWidth - 150), clamp(y + 32, 110, world.viewHeight - 24), "#26364d", 12);
+  ctx.restore();
+}
+
+function drawExplorationMiniMap(camera) {
+  if (world.width <= world.viewWidth && world.height <= world.viewHeight) {
+    return;
+  }
+
+  const mapWidth = 184;
+  const mapHeight = Math.max(92, Math.round(mapWidth * (world.height / world.width)));
+  const x = world.viewWidth - mapWidth - 18;
+  const y = world.viewHeight - mapHeight - 18;
+  const scaleX = mapWidth / world.width;
+  const scaleY = mapHeight / world.height;
+
+  ctx.save();
+  ctx.globalAlpha = 0.78;
+  ctx.fillStyle = "rgba(247, 250, 255, 0.88)";
+  ctx.fillRect(x, y, mapWidth, mapHeight);
+  ctx.strokeStyle = "rgba(26, 42, 68, 0.22)";
+  ctx.strokeRect(x, y, mapWidth, mapHeight);
+
+  for (const zone of getMapZones()) {
+    ctx.globalAlpha = zone.type === "hazard" ? 0.34 : 0.22;
+    ctx.fillStyle = zone.color ?? "#5de2d1";
+    ctx.fillRect(x + zone.x * scaleX, y + zone.y * scaleY, zone.w * scaleX, zone.h * scaleY);
+  }
+
+  ctx.globalAlpha = 0.58;
+  ctx.strokeStyle = "#26364d";
+  ctx.strokeRect(x + camera.x * scaleX, y + camera.y * scaleY, camera.w * scaleX, camera.h * scaleY);
+
+  for (const target of getObjectiveTargets()) {
+    ctx.globalAlpha = 0.92;
+    fillCircle(x + target.x * scaleX, y + target.y * scaleY, 3.5, target.color ?? "#5de2d1");
+  }
+
+  ctx.globalAlpha = 1;
+  fillCircle(x + player.x * scaleX, y + player.y * scaleY, 4, "#17202a");
+  drawSmallText("地图", x + 8, y + 16, "#26364d", 11);
+  ctx.restore();
+}
+
 function drawBossHud() {
   if (!boss || boss.hp <= 0) {
     return;
   }
 
   const width = 420;
-  const x = world.width / 2 - width / 2;
+  const x = world.viewWidth / 2 - width / 2;
   const y = 82;
   ctx.save();
   ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
@@ -5149,6 +5528,45 @@ function circleOverlapsRect(x, y, radius, rect) {
 
 function pointInRect(x, y, rect) {
   return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
+}
+
+function findNearestFreePoint(x, y, radius = 22) {
+  const base = {
+    x: clamp(x, radius + 10, world.width - radius - 10),
+    y: clamp(y, 82 + radius, world.height - radius - 10),
+  };
+  if (!isPointBlockedByMap(base.x, base.y, radius)) {
+    return base;
+  }
+
+  for (let ring = 1; ring <= 7; ring += 1) {
+    const step = 34 * ring;
+    const samples = 8 + ring * 4;
+    for (let index = 0; index < samples; index += 1) {
+      const angle = (Math.PI * 2 * index) / samples;
+      const candidate = {
+        x: clamp(base.x + Math.cos(angle) * step, radius + 10, world.width - radius - 10),
+        y: clamp(base.y + Math.sin(angle) * step, 82 + radius, world.height - radius - 10),
+      };
+      if (!isPointBlockedByMap(candidate.x, candidate.y, radius)) {
+        return candidate;
+      }
+    }
+  }
+
+  return base;
+}
+
+function centerCameraOnPlayer() {
+  if (!player) {
+    return;
+  }
+  world.cameraX = clamp(player.x - world.viewWidth / 2, 0, Math.max(0, world.width - world.viewWidth));
+  world.cameraY = clamp(player.y - world.viewHeight / 2, 0, Math.max(0, world.height - world.viewHeight));
+}
+
+function updateCamera() {
+  centerCameraOnPlayer();
 }
 
 function distance(a, b) {
