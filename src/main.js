@@ -56,6 +56,7 @@ const world = {
   pulseCooldown: 0,
   dashCooldown: 0,
   allyAssistCooldown: 0,
+  mapHazardCooldown: 0,
   cameraShake: 0,
 };
 
@@ -108,6 +109,256 @@ const desks = [
   { x: 742, y: 132, w: 210, h: 74, tag: "会议室" },
   { x: 1006, y: 132, w: 152, h: 74, tag: "老板室", assetKey: "propWorkstationB" },
   { x: 742, y: 420, w: 416, h: 78, tag: "0号服务器间" },
+];
+
+const chapterMaps = [
+  {
+    id: "office-dispatch",
+    name: "超时订单办公室",
+    start: { x: 170, y: 560 },
+    spawnPoints: [
+      { x: 72, y: 92 }, { x: 1188, y: 102 }, { x: 86, y: 628 }, { x: 1166, y: 634 },
+      { x: 624, y: 94 }, { x: 622, y: 646 },
+    ],
+    zones: [
+      {
+        id: "delivery-buffer",
+        x: 888,
+        y: 510,
+        w: 282,
+        h: 118,
+        type: "focus",
+        label: "外卖缓存区",
+        color: "#f1c15b",
+        slowFactor: 0.9,
+      },
+    ],
+    obstacles: [
+      ...desks.map((desk) => ({ ...desk, kind: "desk" })),
+      { kind: "singleDesk", x: 34, y: 586, w: 210, h: 80, label: "安渡工位" },
+    ],
+    props: [
+      { kind: "windowRow", x: 32, y: 14, count: 4 },
+      { kind: "windowRow", x: 788, y: 14, count: 3 },
+      { kind: "whiteboard", x: 386, y: 14, w: 170, h: 38 },
+      { kind: "water", x: 628, y: 94 },
+      { kind: "copier", x: 1116, y: 96 },
+      { kind: "plant", x: 52, y: 96, scale: 1 },
+      { kind: "plant", x: 1196, y: 602, scale: 1.1 },
+      { kind: "plant", x: 650, y: 622, scale: 0.85 },
+      { kind: "meeting", x: 750, y: 262 },
+      { kind: "serverDoor", x: 738, y: 388 },
+      { kind: "printer", x: 1034, y: 526 },
+      { kind: "deliveryZone", x: 940, y: 558 },
+    ],
+  },
+  {
+    id: "metro-loop",
+    name: "03:32 环线站台",
+    start: { x: 160, y: 610 },
+    spawnPoints: [
+      { x: 90, y: 106 }, { x: 1190, y: 112 }, { x: 94, y: 618 }, { x: 1188, y: 624 },
+      { x: 520, y: 98 }, { x: 760, y: 638 },
+    ],
+    paths: [
+      { kind: "rail", x1: 84, y1: 504, x2: 1196, y2: 384, color: "#72a5ff" },
+      { kind: "rail", x1: 92, y1: 558, x2: 1198, y2: 440, color: "#f1c15b" },
+    ],
+    zones: [
+      {
+        id: "frame-track",
+        x: 118,
+        y: 474,
+        w: 1046,
+        h: 74,
+        type: "hazard",
+        label: "失帧轨道",
+        color: "#72a5ff",
+        damage: 7,
+        cooldown: 1.25,
+        slowFactor: 0.72,
+        log: "脚下轨道突然丢帧，安渡被下一班车的残影擦过。",
+      },
+      {
+        id: "commuter-flow",
+        x: 236,
+        y: 256,
+        w: 760,
+        h: 58,
+        type: "slow",
+        label: "通勤人流",
+        color: "#5de2d1",
+        slowFactor: 0.84,
+      },
+    ],
+    obstacles: [
+      { kind: "gate", x: 172, y: 164, w: 178, h: 52, label: "检票闸机" },
+      { kind: "gate", x: 458, y: 164, w: 178, h: 52, label: "补票窗口" },
+      { kind: "gate", x: 744, y: 164, w: 178, h: 52, label: "换乘门" },
+      { kind: "kiosk", x: 1048, y: 182, w: 132, h: 96, label: "调度亭" },
+      { kind: "pillar", x: 292, y: 360, w: 52, h: 52, label: "立柱" },
+      { kind: "pillar", x: 608, y: 334, w: 52, h: 52, label: "立柱" },
+      { kind: "pillar", x: 924, y: 310, w: 52, h: 52, label: "立柱" },
+    ],
+    props: [
+      { kind: "stationSign", x: 760, y: 92, label: "环线 03:32" },
+      { kind: "train", x: 42, y: 604, w: 338, h: 72, label: "停摆车厢" },
+      { kind: "plant", x: 1168, y: 520, scale: 0.78 },
+      { kind: "printer", x: 1048, y: 306 },
+    ],
+  },
+  {
+    id: "hash-market",
+    name: "哈希夜市雨棚",
+    start: { x: 158, y: 602 },
+    spawnPoints: [
+      { x: 86, y: 110 }, { x: 1190, y: 116 }, { x: 92, y: 636 }, { x: 1170, y: 628 },
+      { x: 636, y: 104 }, { x: 640, y: 634 },
+    ],
+    zones: [
+      {
+        id: "salt-rain",
+        x: 438,
+        y: 238,
+        w: 398,
+        h: 178,
+        type: "backlash",
+        label: "哈希盐雨",
+        color: "#96e072",
+        backlashPerSecond: 3.8,
+        slowFactor: 0.88,
+      },
+      {
+        id: "crowd-corridor",
+        x: 192,
+        y: 500,
+        w: 884,
+        h: 56,
+        type: "slow",
+        label: "摊位人潮",
+        color: "#d8b26e",
+        slowFactor: 0.78,
+      },
+    ],
+    obstacles: [
+      { kind: "stall", x: 92, y: 144, w: 214, h: 110, label: "字符串烤摊", color: "#d8b26e" },
+      { kind: "stall", x: 382, y: 118, w: 214, h: 110, label: "数组糖水", color: "#96e072" },
+      { kind: "stall", x: 686, y: 126, w: 214, h: 110, label: "弱引用铺", color: "#72a5ff" },
+      { kind: "stall", x: 978, y: 156, w: 210, h: 106, label: "盐值档案" },
+      { kind: "stall", x: 104, y: 384, w: 214, h: 112, label: "冲突修补" },
+      { kind: "stall", x: 902, y: 406, w: 234, h: 112, label: "桶扩容" },
+    ],
+    props: [
+      { kind: "marketCanopy", x: 198, y: 584, color: "#d8b26e", label: "夜市出口" },
+      { kind: "marketCanopy", x: 806, y: 328, color: "#96e072", label: "HASH" },
+      { kind: "plant", x: 620, y: 624, scale: 0.82 },
+      { kind: "water", x: 1170, y: 570 },
+    ],
+  },
+  {
+    id: "promise-tower",
+    name: "承诺塔根层",
+    start: { x: 160, y: 604 },
+    spawnPoints: [
+      { x: 82, y: 112 }, { x: 1192, y: 110 }, { x: 86, y: 638 }, { x: 1188, y: 634 },
+      { x: 640, y: 92 }, { x: 640, y: 642 },
+    ],
+    paths: [
+      { kind: "root", x1: 640, y1: 688, x2: 640, y2: 92, color: "#96e072" },
+      { kind: "root", x1: 640, y1: 420, x2: 286, y2: 262, color: "#96e072" },
+      { kind: "root", x1: 640, y1: 350, x2: 1028, y2: 216, color: "#96e072" },
+    ],
+    zones: [
+      {
+        id: "recursion-pool",
+        x: 432,
+        y: 206,
+        w: 184,
+        h: 132,
+        type: "hazard",
+        label: "递归回声池",
+        color: "#96e072",
+        damage: 6,
+        cooldown: 1.35,
+        slowFactor: 0.66,
+        log: "递归回声把脚步重新压栈，安渡被承诺残响拖住。",
+      },
+      {
+        id: "await-fog",
+        x: 736,
+        y: 448,
+        w: 260,
+        h: 92,
+        type: "slow",
+        label: "await 雾带",
+        color: "#72a5ff",
+        slowFactor: 0.74,
+      },
+    ],
+    obstacles: [
+      { kind: "rootWall", x: 584, y: 116, w: 112, h: 168, label: "主根" },
+      { kind: "rootWall", x: 322, y: 348, w: 226, h: 58, label: "分枝承诺" },
+      { kind: "rootWall", x: 760, y: 298, w: 256, h: 58, label: "未决链" },
+      { kind: "pillar", x: 176, y: 488, w: 62, h: 62, label: "叶节点" },
+      { kind: "pillar", x: 1078, y: 514, w: 62, h: 62, label: "叶节点" },
+    ],
+    props: [
+      { kind: "stationSign", x: 824, y: 92, label: "根承诺" },
+      { kind: "coreTree", x: 610, y: 468, w: 92, h: 142, label: "承诺中枢" },
+      { kind: "plant", x: 1160, y: 160, scale: 0.86 },
+      { kind: "whiteboard", x: 86, y: 92, w: 184, h: 46 },
+    ],
+  },
+  {
+    id: "whitebox-core",
+    name: "零号白箱核心",
+    start: { x: 150, y: 600 },
+    spawnPoints: [
+      { x: 84, y: 106 }, { x: 1190, y: 110 }, { x: 90, y: 632 }, { x: 1190, y: 632 },
+      { x: 640, y: 94 }, { x: 640, y: 640 },
+    ],
+    zones: [
+      {
+        id: "scan-lane-a",
+        x: 268,
+        y: 214,
+        w: 742,
+        h: 46,
+        type: "hazard",
+        label: "白箱扫描线",
+        color: "#ef6a70",
+        damage: 8,
+        cooldown: 1.15,
+        log: "白箱扫描线扫过，差异值被强制归档。",
+      },
+      {
+        id: "exception-grid",
+        x: 492,
+        y: 384,
+        w: 318,
+        h: 154,
+        type: "backlash",
+        label: "例外网格",
+        color: "#72a5ff",
+        backlashPerSecond: -5.5,
+        slowFactor: 0.92,
+      },
+    ],
+    obstacles: [
+      { kind: "coreBlock", x: 520, y: 118, w: 240, h: 132, label: "零号核心" },
+      { kind: "serverCluster", x: 126, y: 170, w: 188, h: 112, label: "证据柜" },
+      { kind: "serverCluster", x: 962, y: 172, w: 188, h: 112, label: "归档柜" },
+      { kind: "gate", x: 228, y: 464, w: 228, h: 62, label: "保留门" },
+      { kind: "gate", x: 824, y: 464, w: 228, h: 62, label: "重写门" },
+      { kind: "pillar", x: 606, y: 586, w: 68, h: 68, label: "判定柱" },
+    ],
+    props: [
+      { kind: "stationSign", x: 744, y: 92, label: "差异保留" },
+      { kind: "whiteboard", x: 90, y: 92, w: 190, h: 44 },
+      { kind: "rack", x: 1120, y: 548 },
+      { kind: "rack", x: 62, y: 542 },
+    ],
+  },
 ];
 
 const gameData = window.GameData ?? { eventDeck: [], upgrades: [] };
@@ -298,6 +549,24 @@ function currentChapter() {
   return chapters[currentChapterIndex] ?? chapters[0] ?? { title: "变量城夜巡", steps: [], totalObjectives: 1 };
 }
 
+function currentMap() {
+  return chapterMaps[currentChapterIndex] ?? chapterMaps[0];
+}
+
+function getMapObstacles() {
+  return (currentMap().obstacles ?? desks).filter((object) => object.solid !== false);
+}
+
+function getMapZones() {
+  return currentMap().zones ?? [];
+}
+
+function positionPlayerAtMapStart() {
+  const start = currentMap().start ?? { x: 170, y: 560 };
+  player.x = start.x;
+  player.y = start.y;
+}
+
 function createRunStats() {
   return {
     startedAt: Date.now(),
@@ -394,6 +663,7 @@ function resetGame() {
   player.concepts = {};
   player.unlockedSynergies = [];
   currentChapterIndex = 0;
+  positionPlayerAtMapStart();
   bugNodes = [];
   enemies = [];
   particles = [];
@@ -412,6 +682,7 @@ function resetGame() {
   world.pulseCooldown = 0;
   world.dashCooldown = 0;
   world.allyAssistCooldown = 0;
+  world.mapHazardCooldown = 0;
   world.cameraShake = 0;
   hidePanels();
   storyState = null;
@@ -464,6 +735,7 @@ function spawnEnemyNear(x, y, type = "stress") {
     slowTimer: 0,
     slowFactor: 1,
   };
+  resolveDeskCollision(enemy);
   if (definition.role === "cleaner" || type === "cleaner") {
     cleaners.push(enemy);
   } else {
@@ -877,9 +1149,9 @@ function beginNextChapter(allies) {
   world.pulseCooldown = 0;
   world.dashCooldown = 0;
   world.allyAssistCooldown = 0.6;
+  world.mapHazardCooldown = 0;
   world.cameraShake = 0.12;
-  player.x = 170;
-  player.y = 560;
+  positionPlayerAtMapStart();
   player.hp = clamp(player.hp + Math.ceil(player.maxHp * 0.35), 1, player.maxHp);
   player.backlash = clamp(player.backlash - 18, 0, 100);
   seedOfficeBugPickups();
@@ -1136,10 +1408,12 @@ function updatePlaying(dt) {
   world.pulseCooldown = Math.max(0, world.pulseCooldown - dt);
   world.dashCooldown = Math.max(0, world.dashCooldown - dt);
   world.allyAssistCooldown = Math.max(0, world.allyAssistCooldown - dt);
+  world.mapHazardCooldown = Math.max(0, world.mapHazardCooldown - dt);
   player.invulnerable = Math.max(0, player.invulnerable - dt);
   world.cameraShake = Math.max(0, world.cameraShake - dt);
 
   movePlayer(dt);
+  updateMapZones(dt);
   updateWeapon(dt);
   updateBullets(dt);
   updateBoss(dt);
@@ -1179,9 +1453,10 @@ function movePlayer(dt) {
 
   if (dx || dy) {
     const len = Math.hypot(dx, dy);
+    const speedMultiplier = getMapMoveMultiplier(player, true);
     const next = {
-      x: player.x + (dx / len) * player.speed * dt,
-      y: player.y + (dy / len) * player.speed * dt,
+      x: player.x + (dx / len) * player.speed * speedMultiplier * dt,
+      y: player.y + (dy / len) * player.speed * speedMultiplier * dt,
     };
     player.x = clamp(next.x, player.radius, world.width - player.radius);
     player.y = clamp(next.y, 76, world.height - player.radius);
@@ -1277,14 +1552,69 @@ function spawnEnemyWave(count = 2) {
   for (let index = 0; index < count; index += 1) {
     const side = Math.floor(random(0, 4));
     const type = pool[Math.floor(random(0, pool.length))] ?? "stress";
-    let x = random(80, world.width - 80);
-    let y = random(100, world.height - 80);
-    if (side === 0) y = 92;
-    if (side === 1) x = world.width - 64;
-    if (side === 2) y = world.height - 42;
-    if (side === 3) x = 64;
+    const point = getMapSpawnPoint(side);
+    const x = point.x;
+    const y = point.y;
     spawnEnemyNear(x, y, type);
   }
+}
+
+function getMapSpawnPoint(side = 0) {
+  const map = currentMap();
+  const points = map.spawnPoints ?? [];
+  const fallback = [
+    { x: random(80, world.width - 80), y: 92 },
+    { x: world.width - 64, y: random(100, world.height - 80) },
+    { x: random(80, world.width - 80), y: world.height - 42 },
+    { x: 64, y: random(100, world.height - 80) },
+  ];
+  const candidates = points.length ? points : fallback;
+  const preferred = candidates[side % candidates.length] ?? fallback[side % fallback.length];
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const x = clamp(preferred.x + random(-36, 36), 44, world.width - 44);
+    const y = clamp(preferred.y + random(-34, 34), 88, world.height - 44);
+    if (!isPointBlockedByMap(x, y, 22)) {
+      return { x, y };
+    }
+  }
+
+  return { x: preferred.x, y: preferred.y };
+}
+
+function updateMapZones(dt) {
+  const zones = getMapZones();
+  if (!zones.length || world.mode !== "playing") {
+    return;
+  }
+
+  for (const zone of zones) {
+    if (!pointInRect(player.x, player.y, zone)) {
+      continue;
+    }
+
+    if (zone.damage && world.mapHazardCooldown <= 0) {
+      damagePlayer(zone.damage, zone.log ?? `${zone.label}正在吞掉稳定帧。`);
+      world.mapHazardCooldown = zone.cooldown ?? 1.2;
+    }
+
+    if (zone.backlashPerSecond) {
+      player.backlash = clamp(player.backlash + zone.backlashPerSecond * dt, 0, 100);
+    }
+  }
+}
+
+function getMapMoveMultiplier(entity, isPlayer = false) {
+  let factor = 1;
+  for (const zone of getMapZones()) {
+    if (!zone.slowFactor || (!isPlayer && zone.affectsEnemies === false)) {
+      continue;
+    }
+    if (pointInRect(entity.x, entity.y, zone)) {
+      factor = Math.min(factor, zone.slowFactor);
+    }
+  }
+  return factor;
 }
 
 function getEnemySpawnPool() {
@@ -1368,6 +1698,12 @@ function updateBullets(dt) {
     bullet.x += bullet.vx * dt;
     bullet.y += bullet.vy * dt;
     bullet.life -= dt;
+
+    if (isPointBlockedByMap(bullet.x, bullet.y, bullet.radius)) {
+      bullet.life = 0;
+      burst(bullet.x, bullet.y, bullet.color, 5);
+      continue;
+    }
 
     const hostiles = [...enemies, ...cleaners];
     if (boss && boss.hp > 0) {
@@ -1824,7 +2160,7 @@ function updateEnemies(dt) {
     if (enemy.slowTimer <= 0) {
       enemy.slowFactor = 1;
     }
-    const speed = enemy.speed * enemy.slowFactor;
+    const speed = enemy.speed * enemy.slowFactor * getMapMoveMultiplier(enemy, false);
     enemy.x += Math.cos(angle) * speed * dt;
     enemy.y += Math.sin(angle) * speed * dt;
     enemy.hitFlash = Math.max(0, enemy.hitFlash - dt);
@@ -2116,6 +2452,7 @@ function draw(dt) {
 function drawOffice() {
   const visual = getChapterVisual();
   const hasKeyArt = assets.sceneKeyArt?.ready;
+  const map = currentMap();
 
   drawKeyArtBackdrop(visual);
 
@@ -2140,44 +2477,174 @@ function drawOffice() {
     ctx.stroke();
   }
 
+  drawMapPaths(map, visual);
+  drawMapZones(map, visual);
   drawChapterBackdrop(visual);
 
   ctx.fillStyle = visual.wall;
   ctx.fillRect(0, 0, world.width, 68);
   ctx.fillStyle = visual.trim;
   ctx.fillRect(0, 66, world.width, 3);
-  drawWindowRow(32, 14, 4);
-  drawWindowRow(788, 14, 3);
-  drawWhiteboard(386, 14, 170, 38);
-  drawWaterCooler(628, 94);
-  drawCopier(1116, 96);
-  drawPlant(52, 96, 1);
-  drawPlant(1196, 602, 1.1);
-  drawPlant(650, 622, 0.85);
-
-  for (const desk of desks) {
-    drawDesk(desk);
-  }
-
-  drawMeetingTable(750, 262);
-  drawServerRoomDoor(738, 388);
-  drawPrinter(1034, 526);
-  drawDeliveryPickupZone(940, 558);
+  drawMapObjects(map, visual);
 
   if ((chapterState?.stepIndex ?? -1) >= 3 || player.fixed >= 3) {
     drawLaoLiangSprite(1080, 118, 0.88);
     drawLabel("老梁", 1062, 84, "#9a6615");
   }
+}
 
-  if (!drawPropAsset("propSingleDesk", 34, 586, 210, 124)) {
-    ctx.fillStyle = "#d8e4f0";
-    ctx.fillRect(34, 618, 206, 50);
-    ctx.fillStyle = "#0f9f95";
-    ctx.globalAlpha = 0.18;
-    ctx.fillRect(44, 628, 186, 30);
-    ctx.globalAlpha = 1;
+function drawMapPaths(map, visual) {
+  for (const path of map.paths ?? []) {
+    if (path.kind === "rail") {
+      drawRailLine(path.x1, path.y1, path.x2, path.y2, path.color ?? visual.accent);
+      drawRailLine(path.x1, path.y1 + 40, path.x2, path.y2 + 40, "rgba(241, 193, 91, 0.55)");
+      continue;
+    }
+
+    if (path.kind === "root") {
+      ctx.save();
+      ctx.strokeStyle = path.color ?? visual.accent;
+      ctx.globalAlpha = 0.42;
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(path.x1, path.y1);
+      ctx.quadraticCurveTo((path.x1 + path.x2) / 2, Math.min(path.y1, path.y2) - 70, path.x2, path.y2);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
-  drawLabel("安渡工位", 78, 650, "#224250");
+}
+
+function drawMapZones(map, visual) {
+  for (const zone of map.zones ?? []) {
+    const pulse = 0.14 + Math.sin(world.animTime * 2.2 + zone.x * 0.01) * 0.04;
+    ctx.save();
+    ctx.globalAlpha = zone.type === "focus" ? 0.18 : pulse;
+    ctx.fillStyle = zone.color ?? visual.accent;
+    ctx.fillRect(zone.x, zone.y, zone.w, zone.h);
+    ctx.globalAlpha = zone.type === "hazard" ? 0.52 : 0.34;
+    ctx.strokeStyle = zone.color ?? visual.accent;
+    ctx.lineWidth = zone.type === "hazard" ? 3 : 2;
+    ctx.setLineDash(zone.type === "hazard" ? [14, 10] : [8, 8]);
+    ctx.strokeRect(zone.x, zone.y, zone.w, zone.h);
+    ctx.setLineDash([]);
+    drawSmallText(zone.label, zone.x + 12, zone.y + 24, "#26364d", 13);
+    ctx.restore();
+  }
+}
+
+function drawMapObjects(map, visual) {
+  const objects = [...(map.props ?? []), ...(map.obstacles ?? [])].sort((a, b) => {
+    return (a.y ?? 0) + (a.h ?? 0) - ((b.y ?? 0) + (b.h ?? 0));
+  });
+
+  for (const object of objects) {
+    drawMapObject(object, visual);
+  }
+}
+
+function drawMapObject(object, visual) {
+  if (object.kind === "desk") {
+    drawDesk(object);
+    return;
+  }
+
+  if (object.kind === "singleDesk") {
+    if (!drawPropAsset("propSingleDesk", object.x, object.y, 210, 124)) {
+      ctx.fillStyle = "#d8e4f0";
+      ctx.fillRect(object.x, object.y + 32, 206, 50);
+      ctx.fillStyle = "#0f9f95";
+      ctx.globalAlpha = 0.18;
+      ctx.fillRect(object.x + 10, object.y + 42, 186, 30);
+      ctx.globalAlpha = 1;
+    }
+    drawLabel(object.label, object.x + 44, object.y + 64, "#224250");
+    return;
+  }
+
+  if (object.kind === "windowRow") {
+    drawWindowRow(object.x, object.y, object.count);
+    return;
+  }
+
+  if (object.kind === "whiteboard") {
+    drawWhiteboard(object.x, object.y, object.w, object.h);
+    return;
+  }
+
+  if (object.kind === "water") {
+    drawWaterCooler(object.x, object.y);
+    return;
+  }
+
+  if (object.kind === "copier") {
+    drawCopier(object.x, object.y);
+    return;
+  }
+
+  if (object.kind === "plant") {
+    drawPlant(object.x, object.y, object.scale ?? 1);
+    return;
+  }
+
+  if (object.kind === "meeting") {
+    drawMeetingTable(object.x, object.y);
+    return;
+  }
+
+  if (object.kind === "serverDoor") {
+    drawServerRoomDoor(object.x, object.y);
+    return;
+  }
+
+  if (object.kind === "printer") {
+    drawPrinter(object.x, object.y);
+    return;
+  }
+
+  if (object.kind === "rack") {
+    drawServerRack(object.x, object.y);
+    return;
+  }
+
+  if (object.kind === "deliveryZone") {
+    drawDeliveryPickupZone(object.x, object.y);
+    return;
+  }
+
+  if (object.kind === "stationSign") {
+    drawStationSign(object.x, object.y, object.label);
+    return;
+  }
+
+  if (object.kind === "marketCanopy") {
+    drawMarketCanopy(object.x, object.y, object.color ?? visual.accent, object.label ?? "");
+    return;
+  }
+
+  if (object.kind === "stall") {
+    drawMarketStall(object, visual);
+    return;
+  }
+
+  if (object.kind === "gate") {
+    drawGateObject(object, visual);
+    return;
+  }
+
+  if (object.kind === "pillar") {
+    drawPillarObject(object, visual);
+    return;
+  }
+
+  if (object.kind === "kiosk" || object.kind === "train" || object.kind === "serverCluster" || object.kind === "coreBlock") {
+    drawTechBlockObject(object, visual);
+    return;
+  }
+
+  if (object.kind === "rootWall" || object.kind === "coreTree") {
+    drawRootObject(object, visual);
+  }
 }
 
 function getChapterVisual() {
@@ -2426,6 +2893,96 @@ function drawDeliveryPickupZone(x, y) {
   ctx.stroke();
   ctx.setLineDash([]);
   drawLabel(getChapterVisual().label, x - 8, y + 80, "#9a6615");
+  ctx.restore();
+}
+
+function drawMarketStall(object, visual) {
+  const color = object.color ?? visual.accent;
+  ctx.save();
+  ctx.fillStyle = "rgba(255, 255, 255, 0.72)";
+  ctx.fillRect(object.x, object.y, object.w, object.h);
+  ctx.strokeStyle = "rgba(26, 42, 68, 0.14)";
+  ctx.strokeRect(object.x, object.y, object.w, object.h);
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.32;
+  ctx.fillRect(object.x, object.y, object.w, 22);
+  ctx.globalAlpha = 1;
+  for (let index = 0; index < 4; index += 1) {
+    const px = object.x + 18 + index * 42;
+    ctx.fillStyle = index % 2 ? "rgba(150, 224, 114, 0.38)" : "rgba(241, 193, 91, 0.42)";
+    ctx.fillRect(px, object.y + 48, 28, 22);
+  }
+  drawLabel(object.label, object.x + 16, object.y + object.h - 14, "#6b4d1d");
+  ctx.restore();
+}
+
+function drawGateObject(object, visual) {
+  ctx.save();
+  ctx.fillStyle = "rgba(247, 250, 255, 0.86)";
+  ctx.fillRect(object.x, object.y, object.w, object.h);
+  ctx.strokeStyle = "rgba(26, 42, 68, 0.18)";
+  ctx.strokeRect(object.x, object.y, object.w, object.h);
+  ctx.fillStyle = visual.accent;
+  ctx.globalAlpha = 0.32;
+  for (let x = object.x + 14; x < object.x + object.w - 12; x += 42) {
+    ctx.fillRect(x, object.y + 12, 22, object.h - 24);
+  }
+  ctx.globalAlpha = 1;
+  drawLabel(object.label, object.x + 12, object.y + object.h - 8, "#224250");
+  ctx.restore();
+}
+
+function drawPillarObject(object, visual) {
+  ctx.save();
+  const cx = object.x + object.w / 2;
+  const cy = object.y + object.h / 2;
+  fillCircle(cx, cy, Math.max(object.w, object.h) * 0.52, "rgba(255, 255, 255, 0.82)");
+  strokeCircle(cx, cy, Math.max(object.w, object.h) * 0.52, "rgba(26, 42, 68, 0.15)", 2);
+  strokeCircle(cx, cy, Math.max(object.w, object.h) * 0.34, visual.accent, 2);
+  drawSmallText(object.label, object.x - 2, object.y + object.h + 18, "#5c6878", 11);
+  ctx.restore();
+}
+
+function drawTechBlockObject(object, visual) {
+  ctx.save();
+  const gradient = ctx.createLinearGradient(object.x, object.y, object.x + object.w, object.y + object.h);
+  gradient.addColorStop(0, "rgba(33, 48, 68, 0.9)");
+  gradient.addColorStop(0.52, "rgba(247, 250, 255, 0.86)");
+  gradient.addColorStop(1, "rgba(33, 48, 68, 0.84)");
+  ctx.fillStyle = object.kind === "train" ? "rgba(232, 241, 250, 0.9)" : gradient;
+  ctx.fillRect(object.x, object.y, object.w, object.h);
+  ctx.strokeStyle = object.kind === "coreBlock" ? "rgba(239, 106, 112, 0.5)" : "rgba(26, 42, 68, 0.18)";
+  ctx.lineWidth = object.kind === "coreBlock" ? 3 : 2;
+  ctx.strokeRect(object.x, object.y, object.w, object.h);
+  ctx.fillStyle = visual.accent;
+  ctx.globalAlpha = 0.55;
+  for (let index = 0; index < 5; index += 1) {
+    const px = object.x + 18 + index * Math.max(34, object.w / 6);
+    ctx.fillRect(px, object.y + object.h * 0.34, 28, 8);
+  }
+  ctx.globalAlpha = 1;
+  drawLabel(object.label, object.x + 18, object.y + object.h - 12, object.kind === "coreBlock" ? "#ef6a70" : "#224250");
+  ctx.restore();
+}
+
+function drawRootObject(object, visual) {
+  ctx.save();
+  const color = object.kind === "coreTree" ? "#96e072" : visual.accent;
+  ctx.fillStyle = object.kind === "coreTree" ? "rgba(150, 224, 114, 0.26)" : "rgba(255, 255, 255, 0.72)";
+  ctx.fillRect(object.x, object.y, object.w, object.h);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(object.x, object.y, object.w, object.h);
+  ctx.strokeStyle = "rgba(65, 124, 72, 0.38)";
+  ctx.lineWidth = 4;
+  for (let index = 0; index < 4; index += 1) {
+    const y = object.y + 18 + index * (object.h / 4);
+    ctx.beginPath();
+    ctx.moveTo(object.x + 8, y);
+    ctx.quadraticCurveTo(object.x + object.w / 2, y - 28, object.x + object.w - 8, y + 8);
+    ctx.stroke();
+  }
+  drawLabel(object.label, object.x + 12, object.y + object.h - 10, "#315f34");
   ctx.restore();
 }
 
@@ -3529,7 +4086,7 @@ function burst(x, y, color, count) {
 }
 
 function resolveDeskCollision(entity) {
-  for (const desk of desks) {
+  for (const desk of getMapObstacles()) {
     const nearestX = clamp(entity.x, desk.x, desk.x + desk.w);
     const nearestY = clamp(entity.y, desk.y, desk.y + desk.h);
     const dx = entity.x - nearestX;
@@ -3541,6 +4098,20 @@ function resolveDeskCollision(entity) {
       entity.y += Math.sin(angle) * overlap;
     }
   }
+}
+
+function isPointBlockedByMap(x, y, radius = 18) {
+  return getMapObstacles().some((object) => circleOverlapsRect(x, y, radius, object));
+}
+
+function circleOverlapsRect(x, y, radius, rect) {
+  const nearestX = clamp(x, rect.x, rect.x + rect.w);
+  const nearestY = clamp(y, rect.y, rect.y + rect.h);
+  return Math.hypot(x - nearestX, y - nearestY) < radius;
+}
+
+function pointInRect(x, y, rect) {
+  return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
 }
 
 function distance(a, b) {
