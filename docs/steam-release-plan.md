@@ -7,6 +7,7 @@
 - `index.html` 和 `src/` 继续作为网页试玩入口，GitHub Pages 必须始终可玩。
 - Steam 专属能力通过平台适配层接入，网页环境提供 no-op 或 localStorage fallback。
 - 每轮自动推进至少交付一个端到端切片，并完成语法、资源、页面或构建验证。
+- 所有涉及图片素材的任务，包括地图元素、怪物、武器、特效、UI、Steam 商店图、截图占位和宣传素材，都优先自行生成、导出或处理成好看的可用素材，并保存到仓库合适目录；不要只写素材需求清单。
 - 新依赖、桌面构建、Steamworks SDK 接入需要按权限流程请求批准。
 
 ## 优先级路线
@@ -56,13 +57,13 @@
 
 1. `git status -sb` 和 `git fetch origin`。
 2. 阅读本文档，更新“当前切片”状态。
-3. 完成一个小切片。
+3. 完成一个小切片；如果涉及图片素材，先生成或导出素材，再接入代码、数据或文档。
 4. 运行：
    - `node --check src/main.js`
    - `node --check src/data/game-data.js`
    - `node --check src/platform/web-platform.js`
    - 新增桌面脚本的 `node --check`
-   - 资源引用检查
+   - 资源引用检查、图片尺寸或透明度等素材检查
    - 必要时浏览器本地加载检查
 5. 提交并推送 `origin/main`。
 6. 检查 GitHub Pages 仍可访问。
