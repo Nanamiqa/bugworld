@@ -34,6 +34,23 @@ function requireFile(relativePath, label) {
   }
 }
 
+function readPngSize(relativePath) {
+  const absolutePath = path.join(root, relativePath);
+  if (!fs.existsSync(absolutePath)) {
+    return null;
+  }
+  const buffer = fs.readFileSync(absolutePath);
+  const signature = buffer.subarray(0, 8).toString("hex");
+  if (signature !== "89504e470d0a1a0a") {
+    errors.push(`PNG expected: ${relativePath}`);
+    return null;
+  }
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20)
+  };
+}
+
 function requireUnique(items, selector, label) {
   const seen = new Set();
   for (const item of items) {
@@ -86,6 +103,12 @@ if (manifest) {
     }
     if (capsule.status === "ready") {
       requireFile(capsule.plannedOutput, `Ready capsule output ${id}`);
+      const pngSize = readPngSize(capsule.plannedOutput);
+      if (pngSize && (pngSize.width !== width || pngSize.height !== height)) {
+        errors.push(
+          `Ready capsule ${id} output must be ${width}x${height}, got ${pngSize.width}x${pngSize.height}`
+        );
+      }
     }
   }
 

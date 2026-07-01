@@ -9,6 +9,7 @@
     "check:achievements": "node desktop/tools/check-achievements.cjs",
     "check:cloud": "node desktop/tools/check-steam-cloud-layout.cjs",
     "check:store-assets": "node desktop/tools/check-store-assets.cjs",
+    "export:store-capsules": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tools/export-store-capsules.ps1",
     "desktop": "electron .",
     "dist:win": "electron-builder --win dir"
   },

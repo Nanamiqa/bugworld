@@ -47,7 +47,8 @@
 - [x] 接入音频系统的设置项、静音和第一批 UI / 战斗音效。
 - [x] 增加本地成就事件、成就清单与 Steamworks 映射草案。
 - [x] 准备 Steam 商店截图、capsule 和宣传片素材清单。
-- [ ] 从 capsule source board 导出最终 PNG/JPG，并接入截图自动捕获或人工复核流程。
+- [x] 从 capsule source board 导出最终 capsule PNG，并接入尺寸校验流程。
+- [ ] 接入截图自动捕获或人工复核流程，生成首批 1920x1080 商店截图。
 
 ## 每小时自动检查模板
 

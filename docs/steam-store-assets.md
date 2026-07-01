@@ -11,6 +11,7 @@
 
 - `desktop/steam/store-assets/store-assets.json`：capsule、截图、宣传片镜头和中英文短描述清单。
 - `desktop/steam/store-assets/capsules.html`：使用现有 key art 排版的 capsule source board。
+- `desktop/tools/export-store-capsules.ps1`：使用现有 key art 和 manifest 导出 Steam capsule PNG。
 - `desktop/tools/check-store-assets.cjs`：校验必需 capsule 尺寸、截图数量、源素材引用、宣传片镜头结构。
 - `desktop/steam/store-assets/export/`：后续导出 PNG 的目标目录。
 - `desktop/steam/store-assets/screenshots/`：后续捕获商店截图的目标目录。
@@ -19,13 +20,29 @@
 
 | 素材 | 尺寸 | 当前状态 |
 | --- | --- | --- |
-| Header Capsule | 920 x 430 | source-ready |
-| Small Capsule | 462 x 174 | source-ready |
-| Main Capsule | 1232 x 706 | source-ready |
-| Vertical Capsule | 748 x 896 | source-ready |
-| Library Capsule | 600 x 900 | source-ready |
-| Library Hero | 3840 x 1240 | source-ready |
-| Community Icon | 184 x 184 | source-ready |
+| Header Capsule | 920 x 430 | ready |
+| Small Capsule | 462 x 174 | ready |
+| Main Capsule | 1232 x 706 | ready |
+| Vertical Capsule | 748 x 896 | ready |
+| Library Capsule | 600 x 900 | ready |
+| Library Hero | 3840 x 1240 | ready |
+| Community Icon | 184 x 184 | ready |
+
+导出当前 capsule PNG：
+
+```powershell
+npm run export:store-capsules
+```
+
+输出文件：
+
+- `desktop/steam/store-assets/export/header_capsule.png`
+- `desktop/steam/store-assets/export/small_capsule.png`
+- `desktop/steam/store-assets/export/main_capsule.png`
+- `desktop/steam/store-assets/export/vertical_capsule.png`
+- `desktop/steam/store-assets/export/library_capsule.png`
+- `desktop/steam/store-assets/export/library_hero.png`
+- `desktop/steam/store-assets/export/community_icon.png`
 
 ## 截图计划
 

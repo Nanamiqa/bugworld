@@ -42,7 +42,7 @@
       "width": 920,
       "height": 430,
       "required": true,
-      "status": "source-ready",
+      "status": "ready",
       "source": "desktop/steam/store-assets/capsules.html#header_capsule",
       "plannedOutput": "desktop/steam/store-assets/export/header_capsule.png",
       "composition": "Key art crop with Chinese title, English subtitle, and a readable action silhouette."
@@ -53,7 +53,7 @@
       "width": 462,
       "height": 174,
       "required": true,
-      "status": "source-ready",
+      "status": "ready",
       "source": "desktop/steam/store-assets/capsules.html#small_capsule",
       "plannedOutput": "desktop/steam/store-assets/export/small_capsule.png",
       "composition": "High-contrast title mark and compact key art crop for list views."
@@ -64,7 +64,7 @@
       "width": 1232,
       "height": 706,
       "required": true,
-      "status": "source-ready",
+      "status": "ready",
       "source": "desktop/steam/store-assets/capsules.html#main_capsule",
       "plannedOutput": "desktop/steam/store-assets/export/main_capsule.png",
       "composition": "Full hero crop, chapter silhouettes, and roguelite/debugging value proposition."
@@ -75,7 +75,7 @@
       "width": 748,
       "height": 896,
       "required": true,
-      "status": "source-ready",
+      "status": "ready",
       "source": "desktop/steam/store-assets/capsules.html#vertical_capsule",
       "plannedOutput": "desktop/steam/store-assets/export/vertical_capsule.png",
       "composition": "Poster-like version for discount and discovery surfaces."
@@ -86,7 +86,7 @@
       "width": 600,
       "height": 900,
       "required": true,
-      "status": "source-ready",
+      "status": "ready",
       "source": "desktop/steam/store-assets/capsules.html#library_capsule",
       "plannedOutput": "desktop/steam/store-assets/export/library_capsule.png",
       "composition": "Tall library cover with large title and clean center subject."
@@ -97,7 +97,7 @@
       "width": 3840,
       "height": 1240,
       "required": true,
-      "status": "source-ready",
+      "status": "ready",
       "source": "desktop/steam/store-assets/capsules.html#library_hero",
       "plannedOutput": "desktop/steam/store-assets/export/library_hero.png",
       "composition": "Wide hero background with title-safe empty area and no dense UI text."
@@ -108,7 +108,7 @@
       "width": 184,
       "height": 184,
       "required": true,
-      "status": "source-ready",
+      "status": "ready",
       "source": "desktop/steam/store-assets/capsules.html#community_icon",
       "plannedOutput": "desktop/steam/store-assets/export/community_icon.png",
       "composition": "Square debug shard icon using the game's teal/yellow anomaly palette."
