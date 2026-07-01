@@ -151,8 +151,29 @@
               </span>
               <input id="fullscreenPrefToggle" type="checkbox" />
             </label>
+            <label class="setting-row">
+              <span>
+                <strong>静音</strong>
+                <small>关闭 UI、战斗提示和 Boss 警报音效</small>
+              </span>
+              <input id="audioMuteToggle" type="checkbox" />
+            </label>
+            <label class="setting-row range-setting">
+              <span>
+                <strong>总音量</strong>
+                <small>控制当前 WebAudio 合成音效，后续 BGM 也会接入</small>
+              </span>
+              <span class="range-control">
+                <input id="masterVolumeSlider" type="range" min="0" max="100" step="1" />
+                <small id="masterVolumeValue" class="volume-value">62%</small>
+              </span>
+            </label>
           </div>
           <div class="system-choice-grid compact">
+            <button id="audioTestButton" class="choice-button" type="button">
+              <span class="choice-title">试听音效</span>
+              <span class="choice-effect">测试当前音量与静音设置</span>
+            </button>
             <button id="settingsFullscreenButton" class="choice-button" type="button">
               <span class="choice-title">切换全屏</span>
               <span class="choice-effect">适配 Steam Deck / 客厅模式</span>
@@ -171,6 +192,7 @@
     </main>
 
     <script defer src="./src/platform/web-platform.js"></script>
+    <script defer src="./src/audio/synth-audio.js"></script>
     <script defer src="./src/data/game-data.js"></script>
     <script defer src="./src/main.js"></script>
   </body>

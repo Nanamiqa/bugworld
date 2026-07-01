@@ -52,6 +52,10 @@ const ui = {
   gamepadToggle: document.querySelector("#gamepadToggle"),
   inputHintToggle: document.querySelector("#inputHintToggle"),
   fullscreenPrefToggle: document.querySelector("#fullscreenPrefToggle"),
+  audioMuteToggle: document.querySelector("#audioMuteToggle"),
+  masterVolumeSlider: document.querySelector("#masterVolumeSlider"),
+  masterVolumeValue: document.querySelector("#masterVolumeValue"),
+  audioTestButton: document.querySelector("#audioTestButton"),
   settingsFullscreenButton: document.querySelector("#settingsFullscreenButton"),
   settingsCloseButton: document.querySelector("#settingsCloseButton"),
   upgradePanel: document.querySelector("#upgradePanel"),
@@ -175,6 +179,7 @@ let archiveState;
 let runPanelSignature = "";
 let gameSettings;
 let gamepadState;
+let audioSystem;
 let lastInputMethod = "keyboard";
 
 const desks = [
@@ -797,6 +802,22 @@ function removePlatformJson(key) {
   platform.storage?.remove?.(key);
 }
 
+function createAudioSystem() {
+  return window.createVariableCityAudio?.({ getSettings: () => gameSettings }) ?? null;
+}
+
+function unlockAudioContext() {
+  audioSystem?.unlock?.();
+}
+
+function syncAudioSettings() {
+  audioSystem?.syncSettings?.();
+}
+
+function playAudioCue(cue, options = {}) {
+  audioSystem?.playCue?.(cue, options);
+}
+
 function describePlatformStorage() {
   try {
     return platform.storage?.describe?.() ?? null;
@@ -844,20 +865,26 @@ function createDefaultSettings() {
     gamepadEnabled: true,
     showInputHints: true,
     fullscreenOnStart: false,
+    audioMuted: false,
+    masterVolume: 0.62,
     controllerDeadzone: 0.24,
   };
 }
 
 function loadGameSettings() {
   const saved = readPlatformJson(SETTINGS_STORAGE_KEY, {});
-  return {
+  const settings = {
     ...createDefaultSettings(),
     ...(saved && typeof saved === "object" ? saved : {}),
   };
+  settings.masterVolume = clamp(Number(settings.masterVolume ?? 0.62), 0, 1);
+  settings.audioMuted = Boolean(settings.audioMuted);
+  return settings;
 }
 
 function saveGameSettings() {
   writePlatformJson(SETTINGS_STORAGE_KEY, gameSettings);
+  syncAudioSettings();
   renderSettingsControls();
   syncSystemControls();
 }
@@ -1197,6 +1224,7 @@ function resetGame(chapterIndex = 0) {
 }
 
 function startNewRun(chapterIndex = 0) {
+  playAudioCue("run-start");
   deleteRunSave();
   archiveState = loadArchive();
   runStats = createRunStats();
@@ -1240,6 +1268,8 @@ function startNewRun(chapterIndex = 0) {
 
 function bootGame() {
   gameSettings = loadGameSettings();
+  audioSystem = createAudioSystem();
+  syncAudioSettings();
   gamepadState = createGamepadState();
   archiveState = loadArchive();
   runStats = createRunStats();
@@ -1744,6 +1774,7 @@ function startBossFight(bossId = null) {
   chapterState.stepIndex = bossConfig.stepIndex ?? chapterState.stepIndex;
   setChapterObjective(bossConfig.objective ?? "打断错误配送协议，救回外卖小哥周行");
   setLog(bossConfig.startLog ?? "Boss 战开始：订单被误识别成网络数据包。躲开路线，打掉大件包。");
+  playAudioCue("boss-start");
   world.mode = "playing";
   saveRunCheckpoint("boss-start");
 }
@@ -1895,6 +1926,7 @@ function pauseGame() {
   ui.pausePanel?.classList.remove("hidden");
   saveRunCheckpoint("pause");
   setLog("夜巡暂停。当前跑局已保存。");
+  playAudioCue("pause");
 }
 
 function resumeGame() {
@@ -1907,6 +1939,7 @@ function resumeGame() {
     world.lastTime = performance.now();
   }
   setLog("继续夜巡。");
+  playAudioCue("resume");
 }
 
 function togglePause() {
@@ -1933,10 +1966,15 @@ function openSettingsPanel() {
   }
   renderSettingsControls();
   ui.settingsPanel?.classList.remove("hidden");
+  playAudioCue("ui-open");
 }
 
 function closeSettingsPanel() {
+  const wasOpen = ui.settingsPanel && !ui.settingsPanel.classList.contains("hidden");
   ui.settingsPanel?.classList.add("hidden");
+  if (wasOpen) {
+    playAudioCue("ui-close");
+  }
 }
 
 function renderSettingsControls() {
@@ -1947,6 +1985,9 @@ function renderSettingsControls() {
   if (ui.gamepadToggle) ui.gamepadToggle.checked = Boolean(gameSettings.gamepadEnabled);
   if (ui.inputHintToggle) ui.inputHintToggle.checked = Boolean(gameSettings.showInputHints);
   if (ui.fullscreenPrefToggle) ui.fullscreenPrefToggle.checked = Boolean(gameSettings.fullscreenOnStart);
+  if (ui.audioMuteToggle) ui.audioMuteToggle.checked = Boolean(gameSettings.audioMuted);
+  if (ui.masterVolumeSlider) ui.masterVolumeSlider.value = String(Math.round((gameSettings.masterVolume ?? 0.62) * 100));
+  if (ui.masterVolumeValue) ui.masterVolumeValue.textContent = `${Math.round((gameSettings.masterVolume ?? 0.62) * 100)}%`;
 }
 
 async function toggleFullscreen() {
@@ -1957,6 +1998,7 @@ async function toggleFullscreen() {
     await platform.requestFullscreen?.(document.documentElement);
   }
   syncSystemControls();
+  playAudioCue("ui-confirm");
 }
 
 function syncSystemControls() {
@@ -2097,7 +2139,10 @@ function createMenuButton(title, effect, className, onClick, disabled = false) {
   button.disabled = disabled;
   button.innerHTML = `<span class="choice-title">${title}</span><span class="choice-effect">${effect}</span>`;
   if (onClick && !disabled) {
-    button.addEventListener("click", onClick);
+    button.addEventListener("click", () => {
+      playAudioCue(className?.includes("danger") ? "ui-danger" : "ui-confirm");
+      onClick();
+    });
   }
   return button;
 }
@@ -2504,6 +2549,7 @@ function fireWeaponAt(target) {
       hitTargets: new Set(),
     });
   }
+  playAudioCue("weapon");
 }
 
 function spawnEnemyWave(count = 2) {
@@ -2648,6 +2694,7 @@ function dash() {
   player.invulnerable = 0.28;
   world.dashCooldown = 0.8;
   burst(player.x, player.y, "#5de2d1", 16);
+  playAudioCue("dash");
 }
 
 function repairPulse() {
@@ -2677,6 +2724,7 @@ function repairPulse() {
   clearResolvedProtocolHazards();
   checkBossDefeat();
   setLog("安渡把错误码拍成了一圈蓝色涟漪。");
+  playAudioCue("pulse");
 }
 
 function updateBullets(dt) {
@@ -2772,6 +2820,7 @@ function clearDefeatedHostiles() {
 function defeatEnemy(enemy, particleCount, deferredSpawns = null) {
   runStats.enemiesDefeated += 1;
   burst(enemy.x, enemy.y, enemy.deathColor, particleCount);
+  playAudioCue("enemy-down");
   applyEnemyDeathMechanic(enemy, deferredSpawns);
   spawnBugPickup(enemy.x, enemy.y, enemy.bugValue, enemy.xpValue);
   if (Math.random() < 0.22) {
@@ -2805,6 +2854,7 @@ function updateBoss(dt) {
     const phaseLog = boss.phaseLogs?.[boss.phase] ?? defaultPhaseLog;
     setLog(phaseLog);
     world.cameraShake = 0.2;
+    playAudioCue("boss-phase");
     boss.attackCooldown = Math.min(boss.attackCooldown, boss.phase === 3 ? 0.22 : 0.36);
   }
 
@@ -3113,6 +3163,7 @@ function setBossAttackLog(message, cooldown = 3.2) {
     return;
   }
   setLog(message);
+  playAudioCue("danger");
   boss.logTimer = cooldown;
 }
 
@@ -3293,6 +3344,7 @@ function startTcpHandshake() {
   boss.attackCooldown = 0.82;
   if (boss.logTimer <= 0) {
     setLog(boss.attackLogs?.handshake ?? "TCP 三次握手：路线先确认三次，第三次亮起后周行会冲刺。");
+    playAudioCue("danger");
     boss.logTimer = 4;
   }
 }
@@ -3366,6 +3418,7 @@ function startUdpBurst() {
   }
   boss.attackCooldown = tuning.udpCooldown;
   setLog(boss.attackLogs?.burst ?? "UDP 乱送模式：外卖包被高速撒出，不确认谁收到了。");
+  playAudioCue("danger");
 }
 
 function startFtpTransfer() {
@@ -3387,6 +3440,7 @@ function startFtpTransfer() {
       hitFlash: 0,
     });
     setLog(boss.attackLogs?.payload ?? "FTP 大件传输中：打爆中央的大件外卖包，别让它上传完成。");
+    playAudioCue("danger");
   }
   boss.attackCooldown = boss.phase === 3 ? 0.82 : 1;
 }
@@ -3407,6 +3461,7 @@ function startDnsError() {
   }
   boss.attackCooldown = boss.phase === 3 ? 0.66 : 0.9;
   setLog(boss.attackLogs?.marker ?? "DNS 地址解析错误：取餐点被翻译到了错误位置。");
+  playAudioCue("danger");
 }
 
 function updateProtocolHazards(dt) {
@@ -3903,6 +3958,7 @@ function damagePlayer(amount, message) {
   player.invulnerable = 0.55;
   world.cameraShake = 0.18;
   burst(player.x, player.y, "#ef6a70", 10);
+  playAudioCue("damage", { intensity: Math.min(1.8, Math.max(0.7, amount / 16)) });
   setLog(message);
   return true;
 }
@@ -3982,6 +4038,7 @@ function updateBugPickups(dt) {
     player.bugPoints += pickup.bugValue;
     addExperience(pickup.xpValue);
     burst(pickup.x, pickup.y, "#0f9f95", 10);
+    playAudioCue("pickup");
     setLog(`拾取 bug 点：经验 +${pickup.xpValue}，bug点数 +${pickup.bugValue}。`);
     return false;
   });
@@ -4040,9 +4097,11 @@ function openEvent(event) {
   }
 
   ui.eventPanel.classList.remove("hidden");
+  playAudioCue("ui-open");
 }
 
 function resolveEvent(choice) {
+  playAudioCue("ui-confirm");
   applyActions(choice.actions);
   runStats.eventsResolved += 1;
   const removed = bugNodes.splice(activeEvent.index, 1)[0];
@@ -4068,6 +4127,7 @@ function openUpgrade() {
   const generalPool = [...upgrades].sort(() => Math.random() - 0.5).slice(0, 1);
   const weaponPool = [...weaponUpgrades].sort(() => Math.random() - 0.5).slice(0, 2);
   const pool = [...weaponPool, ...generalPool].sort(() => Math.random() - 0.5).map(rollBoon);
+  playAudioCue("upgrade-open");
 
   for (const upgrade of pool) {
     const button = document.createElement("button");
@@ -4075,6 +4135,7 @@ function openUpgrade() {
     const icon = upgrade.iconKey ? `<img class="choice-icon ability-icon" src="${assetUrl(upgrade.iconKey)}" alt="" />` : "";
     button.innerHTML = `${icon}<span class="choice-copy"><span class="choice-title">${upgrade.title}<span class="choice-rarity">${upgrade.rarity.name}</span></span><span class="choice-effect">${upgrade.effect}</span></span>`;
     button.addEventListener("click", () => {
+      playAudioCue("upgrade-select");
       applyActions(upgrade.actions);
       registerConcepts(upgrade);
       runStats.upgradesChosen.push(upgrade.title);
@@ -4187,6 +4248,7 @@ function endGame(victory) {
     : "bug点数散落在工位缝里，白箱巡检员把凌晨重新归档为凌晨。";
   renderResultStats(victory);
   ui.resultPanel.classList.remove("hidden");
+  playAudioCue(victory ? "victory" : "defeat");
 }
 
 function draw(dt) {
@@ -7021,6 +7083,7 @@ function random(min, max) {
 window.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
   lastInputMethod = "keyboard";
+  unlockAudioContext();
   if (key === "escape") {
     event.preventDefault();
     if (!ui.settingsPanel?.classList.contains("hidden")) {
@@ -7055,6 +7118,7 @@ window.addEventListener("beforeunload", () => {
   saveRunCheckpoint("beforeunload");
 });
 
+document.addEventListener("pointerdown", unlockAudioContext);
 document.addEventListener("fullscreenchange", syncSystemControls);
 ui.pauseButton?.addEventListener("click", togglePause);
 ui.settingsButton?.addEventListener("click", openSettingsPanel);
@@ -7079,6 +7143,24 @@ ui.inputHintToggle?.addEventListener("change", () => {
 ui.fullscreenPrefToggle?.addEventListener("change", () => {
   gameSettings.fullscreenOnStart = ui.fullscreenPrefToggle.checked;
   saveGameSettings();
+});
+ui.audioMuteToggle?.addEventListener("change", () => {
+  gameSettings.audioMuted = ui.audioMuteToggle.checked;
+  saveGameSettings();
+  if (!gameSettings.audioMuted) {
+    playAudioCue("ui-confirm");
+  }
+});
+ui.masterVolumeSlider?.addEventListener("input", () => {
+  gameSettings.masterVolume = clamp(Number(ui.masterVolumeSlider.value) / 100, 0, 1);
+  saveGameSettings();
+});
+ui.masterVolumeSlider?.addEventListener("change", () => {
+  playAudioCue("ui-confirm");
+});
+ui.audioTestButton?.addEventListener("click", () => {
+  unlockAudioContext();
+  playAudioCue("pulse");
 });
 
 ui.restartButton.addEventListener("click", resetGame);

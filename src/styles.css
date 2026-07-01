@@ -485,6 +485,24 @@ h1 {
   accent-color: var(--cyan);
 }
 
+.setting-row input[type="range"] {
+  width: clamp(128px, 18vw, 196px);
+  height: 18px;
+}
+
+.range-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.volume-value {
+  min-width: 42px;
+  margin-top: 0;
+  text-align: right;
+}
+
 .story-panel {
   position: absolute;
   left: clamp(14px, 3vw, 34px);
