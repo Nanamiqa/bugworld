@@ -38,6 +38,22 @@ const ui = {
   startStats: document.querySelector("#startStats"),
   startActions: document.querySelector("#startActions"),
   chapterSelect: document.querySelector("#chapterSelect"),
+  pauseButton: document.querySelector("#pauseButton"),
+  settingsButton: document.querySelector("#settingsButton"),
+  fullscreenButton: document.querySelector("#fullscreenButton"),
+  inputHint: document.querySelector("#inputHint"),
+  pausePanel: document.querySelector("#pausePanel"),
+  pauseSummary: document.querySelector("#pauseSummary"),
+  resumeButton: document.querySelector("#resumeButton"),
+  pauseSettingsButton: document.querySelector("#pauseSettingsButton"),
+  returnMenuButton: document.querySelector("#returnMenuButton"),
+  settingsPanel: document.querySelector("#settingsPanel"),
+  shakeToggle: document.querySelector("#shakeToggle"),
+  gamepadToggle: document.querySelector("#gamepadToggle"),
+  inputHintToggle: document.querySelector("#inputHintToggle"),
+  fullscreenPrefToggle: document.querySelector("#fullscreenPrefToggle"),
+  settingsFullscreenButton: document.querySelector("#settingsFullscreenButton"),
+  settingsCloseButton: document.querySelector("#settingsCloseButton"),
   upgradePanel: document.querySelector("#upgradePanel"),
   upgradeKicker: document.querySelector("#upgradeKicker"),
   upgradeTitle: document.querySelector("#upgradeTitle"),
@@ -51,8 +67,51 @@ const ui = {
 };
 
 const keys = new Set();
+const platform = window.VariableCityPlatform ?? {
+  id: "web-fallback",
+  label: "Web",
+  storage: {
+    readJson(key, fallback = null) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw === null ? fallback : JSON.parse(raw);
+      } catch {
+        return fallback;
+      }
+    },
+    writeJson(key, value) {
+      try {
+        localStorage.setItem(key, JSON.stringify(value));
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    remove(key) {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        // Ignore unavailable local storage.
+      }
+    },
+  },
+  requestFullscreen: async (target = document.documentElement) => {
+    if (!target?.requestFullscreen) return false;
+    await target.requestFullscreen();
+    return true;
+  },
+  exitFullscreen: async () => {
+    if (!document.exitFullscreen) return false;
+    await document.exitFullscreen();
+    return true;
+  },
+  isFullscreen: () => Boolean(document.fullscreenElement),
+  getGamepads: () => (navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : []),
+  unlockAchievement: () => false,
+};
 const ARCHIVE_STORAGE_KEY = "variableCityArchive";
 const RUN_SAVE_STORAGE_KEY = "variableCityRunSave";
+const SETTINGS_STORAGE_KEY = "variableCitySettings";
 const RUN_SAVE_VERSION = 2;
 const world = {
   width: 1280,
@@ -72,6 +131,7 @@ const world = {
   enemyLogCooldown: 0,
   cameraShake: 0,
   saveCooldown: 0,
+  previousMode: "playing",
 };
 
 const playerBase = {
@@ -113,6 +173,9 @@ let currentChapterIndex = 0;
 let runStats;
 let archiveState;
 let runPanelSignature = "";
+let gameSettings;
+let gamepadState;
+let lastInputMethod = "keyboard";
 
 const desks = [
   { x: 84, y: 104, w: 136, h: 54, tag: "Q3报表", assetKey: "propWorkstationA" },
@@ -722,6 +785,53 @@ function assetUrl(key) {
   return src ? encodeURI(src) : "";
 }
 
+function readPlatformJson(key, fallback = null) {
+  return platform.storage?.readJson?.(key, fallback) ?? fallback;
+}
+
+function writePlatformJson(key, value) {
+  return platform.storage?.writeJson?.(key, value) ?? false;
+}
+
+function removePlatformJson(key) {
+  platform.storage?.remove?.(key);
+}
+
+function createDefaultSettings() {
+  return {
+    screenShake: true,
+    gamepadEnabled: true,
+    showInputHints: true,
+    fullscreenOnStart: false,
+    controllerDeadzone: 0.24,
+  };
+}
+
+function loadGameSettings() {
+  const saved = readPlatformJson(SETTINGS_STORAGE_KEY, {});
+  return {
+    ...createDefaultSettings(),
+    ...(saved && typeof saved === "object" ? saved : {}),
+  };
+}
+
+function saveGameSettings() {
+  writePlatformJson(SETTINGS_STORAGE_KEY, gameSettings);
+  renderSettingsControls();
+  syncSystemControls();
+}
+
+function createGamepadState() {
+  return {
+    active: false,
+    moveX: 0,
+    moveY: 0,
+    buttons: new Set(),
+    justPressed: new Set(),
+    name: "",
+  };
+}
+
 function currentChapter() {
   return chapters[currentChapterIndex] ?? chapters[0] ?? { title: "变量城夜巡", steps: [], totalObjectives: 1 };
 }
@@ -789,7 +899,7 @@ function createArchiveFallback() {
 function loadArchive() {
   const fallback = createArchiveFallback();
   try {
-    const saved = JSON.parse(localStorage.getItem(ARCHIVE_STORAGE_KEY) ?? "null");
+    const saved = readPlatformJson(ARCHIVE_STORAGE_KEY, null);
     if (!saved || typeof saved !== "object") {
       return fallback;
     }
@@ -810,7 +920,7 @@ function loadArchive() {
 
 function saveArchive() {
   try {
-    localStorage.setItem(ARCHIVE_STORAGE_KEY, JSON.stringify(archiveState));
+    writePlatformJson(ARCHIVE_STORAGE_KEY, archiveState);
   } catch {
     // Local storage can be unavailable in some embedded previews.
   }
@@ -854,7 +964,7 @@ function restoreBugNode(node) {
 
 function loadRunSave() {
   try {
-    const saved = JSON.parse(localStorage.getItem(RUN_SAVE_STORAGE_KEY) ?? "null");
+    const saved = readPlatformJson(RUN_SAVE_STORAGE_KEY, null);
     if (!saved || saved.version !== RUN_SAVE_VERSION || !saved.player || !saved.chapterState) {
       return null;
     }
@@ -898,7 +1008,7 @@ function saveRunCheckpoint(reason = "auto") {
   };
 
   try {
-    localStorage.setItem(RUN_SAVE_STORAGE_KEY, JSON.stringify(save));
+    writePlatformJson(RUN_SAVE_STORAGE_KEY, save);
   } catch {
     // A full storage quota should never break the run itself.
   }
@@ -906,7 +1016,7 @@ function saveRunCheckpoint(reason = "auto") {
 
 function deleteRunSave() {
   try {
-    localStorage.removeItem(RUN_SAVE_STORAGE_KEY);
+    removePlatformJson(RUN_SAVE_STORAGE_KEY);
   } catch {
     // Ignore unavailable local storage.
   }
@@ -1088,6 +1198,8 @@ function startNewRun(chapterIndex = 0) {
 }
 
 function bootGame() {
+  gameSettings = loadGameSettings();
+  gamepadState = createGamepadState();
   archiveState = loadArchive();
   runStats = createRunStats();
   player = { ...playerBase };
@@ -1122,6 +1234,7 @@ function bootGame() {
   storyState = null;
   setChapterObjective("选择夜巡档案");
   syncHud();
+  syncSystemControls();
   openStartMenu();
 }
 
@@ -1717,6 +1830,102 @@ function hidePanels() {
   ui.eventPanel.classList.add("hidden");
   ui.upgradePanel.classList.add("hidden");
   ui.resultPanel.classList.add("hidden");
+  ui.pausePanel?.classList.add("hidden");
+  ui.settingsPanel?.classList.add("hidden");
+}
+
+function renderPausePanel() {
+  if (!ui.pauseSummary) {
+    return;
+  }
+  const chapterTitle = currentChapter().title ?? "变量城夜巡";
+  const objective = getCurrentObjectiveText();
+  ui.pauseSummary.textContent = `${chapterTitle} · ${objective}`;
+}
+
+function pauseGame() {
+  if (["menu", "result", "paused"].includes(world.mode)) {
+    return;
+  }
+  world.previousMode = world.mode;
+  world.mode = "paused";
+  renderPausePanel();
+  ui.pausePanel?.classList.remove("hidden");
+  saveRunCheckpoint("pause");
+  setLog("夜巡暂停。当前跑局已保存。");
+}
+
+function resumeGame() {
+  if (world.mode !== "paused") {
+    return;
+  }
+  ui.pausePanel?.classList.add("hidden");
+  world.mode = world.previousMode && world.previousMode !== "paused" ? world.previousMode : "playing";
+  if (world.mode === "playing") {
+    world.lastTime = performance.now();
+  }
+  setLog("继续夜巡。");
+}
+
+function togglePause() {
+  if (world.mode === "paused") {
+    closeSettingsPanel();
+    resumeGame();
+    return;
+  }
+  if (!["menu", "result"].includes(world.mode)) {
+    pauseGame();
+  }
+}
+
+function returnToStartMenuFromPause() {
+  saveRunCheckpoint("pause-menu");
+  closeSettingsPanel();
+  ui.pausePanel?.classList.add("hidden");
+  openStartMenu();
+}
+
+function openSettingsPanel() {
+  if (world.mode === "playing") {
+    pauseGame();
+  }
+  renderSettingsControls();
+  ui.settingsPanel?.classList.remove("hidden");
+}
+
+function closeSettingsPanel() {
+  ui.settingsPanel?.classList.add("hidden");
+}
+
+function renderSettingsControls() {
+  if (!gameSettings) {
+    return;
+  }
+  if (ui.shakeToggle) ui.shakeToggle.checked = Boolean(gameSettings.screenShake);
+  if (ui.gamepadToggle) ui.gamepadToggle.checked = Boolean(gameSettings.gamepadEnabled);
+  if (ui.inputHintToggle) ui.inputHintToggle.checked = Boolean(gameSettings.showInputHints);
+  if (ui.fullscreenPrefToggle) ui.fullscreenPrefToggle.checked = Boolean(gameSettings.fullscreenOnStart);
+}
+
+async function toggleFullscreen() {
+  const isFullscreen = platform.isFullscreen?.() ?? Boolean(document.fullscreenElement);
+  if (isFullscreen) {
+    await platform.exitFullscreen?.();
+  } else {
+    await platform.requestFullscreen?.(document.documentElement);
+  }
+  syncSystemControls();
+}
+
+function syncSystemControls() {
+  const isFullscreen = platform.isFullscreen?.() ?? Boolean(document.fullscreenElement);
+  if (ui.fullscreenButton) {
+    ui.fullscreenButton.textContent = isFullscreen ? "窗口" : "全屏";
+  }
+  if (ui.inputHint) {
+    ui.inputHint.textContent = gameSettings?.showInputHints === false ? "" : lastInputMethod === "gamepad" ? "手柄" : "键鼠";
+    ui.inputHint.classList.toggle("hidden", gameSettings?.showInputHints === false);
+  }
 }
 
 function getBuildSummary() {
@@ -1897,7 +2106,7 @@ function renderStartMenu() {
       deleteRunSave();
       archiveState = createArchiveFallback();
       try {
-        localStorage.setItem(ARCHIVE_STORAGE_KEY, JSON.stringify(archiveState));
+        writePlatformJson(ARCHIVE_STORAGE_KEY, archiveState);
       } catch {
         // Ignore unavailable local storage.
       }
@@ -1983,6 +2192,7 @@ function update(time) {
   const dt = Math.min((time - world.lastTime) / 1000 || 0, 0.033);
   world.lastTime = time;
   world.animTime += dt;
+  updateGamepadInput();
 
   if (world.mode === "playing") {
     updatePlaying(dt);
@@ -1991,6 +2201,99 @@ function update(time) {
   draw(dt);
   syncHud();
   requestAnimationFrame(update);
+}
+
+function updateGamepadInput() {
+  if (!gamepadState) {
+    return;
+  }
+
+  gamepadState.justPressed.clear();
+  gamepadState.moveX = 0;
+  gamepadState.moveY = 0;
+  gamepadState.active = false;
+
+  if (gameSettings?.gamepadEnabled === false) {
+    gamepadState.buttons.clear();
+    return;
+  }
+
+  const pads = platform.getGamepads?.() ?? [];
+  const pad = pads.find((candidate) => candidate?.connected !== false && candidate.buttons?.length);
+  if (!pad) {
+    gamepadState.buttons.clear();
+    syncSystemControls();
+    return;
+  }
+
+  const deadzone = gameSettings?.controllerDeadzone ?? 0.24;
+  const rawX = pad.axes?.[0] ?? 0;
+  const rawY = pad.axes?.[1] ?? 0;
+  gamepadState.moveX = Math.abs(rawX) > deadzone ? rawX : 0;
+  gamepadState.moveY = Math.abs(rawY) > deadzone ? rawY : 0;
+  gamepadState.name = pad.id ?? "Gamepad";
+
+  const pressed = new Set();
+  pad.buttons.forEach((button, index) => {
+    if (button?.pressed || (button?.value ?? 0) > 0.52) {
+      pressed.add(index);
+      if (!gamepadState.buttons.has(index)) {
+        gamepadState.justPressed.add(index);
+      }
+    }
+  });
+  gamepadState.buttons = pressed;
+  gamepadState.active = Boolean(pressed.size || gamepadState.moveX || gamepadState.moveY);
+  if (gamepadState.active) {
+    lastInputMethod = "gamepad";
+  }
+  if (gamepadState.justPressed.has(9)) {
+    togglePause();
+  }
+  handleGamepadUiActions();
+  syncSystemControls();
+}
+
+function handleGamepadUiActions() {
+  const settingsOpen = ui.settingsPanel && !ui.settingsPanel.classList.contains("hidden");
+  const uiMode = world.mode !== "playing" || settingsOpen;
+  if (!uiMode) {
+    return;
+  }
+
+  if (gamepadState.justPressed.has(12) || gamepadState.justPressed.has(14)) {
+    moveUiFocus(-1);
+  }
+  if (gamepadState.justPressed.has(13) || gamepadState.justPressed.has(15)) {
+    moveUiFocus(1);
+  }
+  if (gamepadState.justPressed.has(0)) {
+    const storyOpen = ui.storyPanel && !ui.storyPanel.classList.contains("hidden");
+    const hasStoryChoices = ui.storyChoices?.querySelector("button:not([disabled])");
+    if (storyOpen && !hasStoryChoices) {
+      advanceStory();
+      return;
+    }
+    const active = document.activeElement;
+    if (active?.matches?.("button:not([disabled]), input[type='checkbox']")) {
+      active.click();
+    } else {
+      moveUiFocus(1);
+    }
+  }
+}
+
+function moveUiFocus(direction) {
+  const controls = Array.from(document.querySelectorAll("button:not([disabled]), input[type='checkbox']"))
+    .filter((element) => element.offsetParent !== null);
+  if (!controls.length) {
+    return;
+  }
+  const currentIndex = controls.indexOf(document.activeElement);
+  const nextIndex = currentIndex >= 0
+    ? (currentIndex + direction + controls.length) % controls.length
+    : direction > 0 ? 0 : controls.length - 1;
+  controls[nextIndex]?.focus();
 }
 
 function updatePlaying(dt) {
@@ -2042,13 +2345,24 @@ function updatePlaying(dt) {
   }
 }
 
-function movePlayer(dt) {
+function getMoveInput() {
   let dx = 0;
   let dy = 0;
   if (keys.has("arrowleft") || keys.has("a")) dx -= 1;
   if (keys.has("arrowright") || keys.has("d")) dx += 1;
   if (keys.has("arrowup") || keys.has("w")) dy -= 1;
   if (keys.has("arrowdown") || keys.has("s")) dy += 1;
+
+  if (!dx && !dy && gameSettings?.gamepadEnabled !== false && gamepadState?.active) {
+    dx = gamepadState.moveX;
+    dy = gamepadState.moveY;
+  }
+
+  return { dx, dy };
+}
+
+function movePlayer(dt) {
+  const { dx, dy } = getMoveInput();
 
   if (dx || dy) {
     const len = Math.hypot(dx, dy);
@@ -2064,11 +2378,13 @@ function movePlayer(dt) {
 }
 
 function handleActions() {
-  if ((keys.has(" ") || keys.has("space")) && world.dashCooldown <= 0 && player.bugPoints >= 1) {
+  const gamepadDash = gamepadState?.justPressed?.has(1);
+  const gamepadPulse = gamepadState?.justPressed?.has(0);
+  if ((keys.has(" ") || keys.has("space") || gamepadDash) && world.dashCooldown <= 0 && player.bugPoints >= 1) {
     dash();
   }
 
-  if ((keys.has("j") || keys.has("enter")) && world.pulseCooldown <= 0 && player.bugPoints >= player.pulseCost) {
+  if ((keys.has("j") || keys.has("enter") || gamepadPulse) && world.pulseCooldown <= 0 && player.bugPoints >= player.pulseCost) {
     repairPulse();
   }
 }
@@ -2276,12 +2592,7 @@ function applyEnemyDamage(enemy, amount, source = "weapon") {
 }
 
 function dash() {
-  let dx = 0;
-  let dy = 0;
-  if (keys.has("arrowleft") || keys.has("a")) dx -= 1;
-  if (keys.has("arrowright") || keys.has("d")) dx += 1;
-  if (keys.has("arrowup") || keys.has("w")) dy -= 1;
-  if (keys.has("arrowdown") || keys.has("s")) dy += 1;
+  let { dx, dy } = getMoveInput();
   if (!dx && !dy) {
     dy = -1;
   }
@@ -3835,8 +4146,9 @@ function endGame(victory) {
 }
 
 function draw(dt) {
-  const shakeX = world.cameraShake > 0 ? random(-5, 5) : 0;
-  const shakeY = world.cameraShake > 0 ? random(-5, 5) : 0;
+  const shakeEnabled = gameSettings?.screenShake !== false;
+  const shakeX = shakeEnabled && world.cameraShake > 0 ? random(-5, 5) : 0;
+  const shakeY = shakeEnabled && world.cameraShake > 0 ? random(-5, 5) : 0;
   updateCamera();
   const camera = { x: world.cameraX, y: world.cameraY, w: world.viewWidth, h: world.viewHeight };
   ctx.save();
@@ -6664,6 +6976,27 @@ function random(min, max) {
 
 window.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
+  lastInputMethod = "keyboard";
+  if (key === "escape") {
+    event.preventDefault();
+    if (!ui.settingsPanel?.classList.contains("hidden")) {
+      closeSettingsPanel();
+    } else {
+      togglePause();
+    }
+    syncSystemControls();
+    return;
+  }
+  if (key === "p") {
+    event.preventDefault();
+    togglePause();
+    return;
+  }
+  if (key === "f") {
+    event.preventDefault();
+    toggleFullscreen();
+    return;
+  }
   keys.add(key);
   if ([" ", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(event.key.toLowerCase())) {
     event.preventDefault();
@@ -6676,6 +7009,32 @@ window.addEventListener("keyup", (event) => {
 
 window.addEventListener("beforeunload", () => {
   saveRunCheckpoint("beforeunload");
+});
+
+document.addEventListener("fullscreenchange", syncSystemControls);
+ui.pauseButton?.addEventListener("click", togglePause);
+ui.settingsButton?.addEventListener("click", openSettingsPanel);
+ui.fullscreenButton?.addEventListener("click", toggleFullscreen);
+ui.resumeButton?.addEventListener("click", resumeGame);
+ui.pauseSettingsButton?.addEventListener("click", openSettingsPanel);
+ui.returnMenuButton?.addEventListener("click", returnToStartMenuFromPause);
+ui.settingsFullscreenButton?.addEventListener("click", toggleFullscreen);
+ui.settingsCloseButton?.addEventListener("click", closeSettingsPanel);
+ui.shakeToggle?.addEventListener("change", () => {
+  gameSettings.screenShake = ui.shakeToggle.checked;
+  saveGameSettings();
+});
+ui.gamepadToggle?.addEventListener("change", () => {
+  gameSettings.gamepadEnabled = ui.gamepadToggle.checked;
+  saveGameSettings();
+});
+ui.inputHintToggle?.addEventListener("change", () => {
+  gameSettings.showInputHints = ui.inputHintToggle.checked;
+  saveGameSettings();
+});
+ui.fullscreenPrefToggle?.addEventListener("change", () => {
+  gameSettings.fullscreenOnStart = ui.fullscreenPrefToggle.checked;
+  saveGameSettings();
 });
 
 ui.restartButton.addEventListener("click", resetGame);

@@ -22,6 +22,12 @@
           <span>反噬 <strong id="backlashValue">0%</strong></span>
           <span>已处理 <strong id="fixedValue">0/7</strong></span>
         </div>
+        <div class="system-actions" aria-label="系统操作">
+          <button id="pauseButton" class="system-button" type="button">暂停</button>
+          <button id="settingsButton" class="system-button" type="button">设置</button>
+          <button id="fullscreenButton" class="system-button" type="button">全屏</button>
+          <span id="inputHint" class="input-hint">键鼠</span>
+        </div>
       </header>
 
       <section class="stage">
@@ -93,6 +99,70 @@
           <div id="resultStats" class="result-stats"></div>
           <button id="restartButton" class="choice-button primary">重开夜巡</button>
         </aside>
+        <aside id="pausePanel" class="system-panel hidden" aria-modal="true">
+          <p class="event-kicker">系统暂停</p>
+          <h2>夜巡已暂停</h2>
+          <p id="pauseSummary"></p>
+          <div class="system-choice-grid">
+            <button id="resumeButton" class="choice-button primary" type="button">
+              <span class="choice-title">继续夜巡</span>
+              <span class="choice-effect">回到当前战斗和探索</span>
+            </button>
+            <button id="pauseSettingsButton" class="choice-button" type="button">
+              <span class="choice-title">打开设置</span>
+              <span class="choice-effect">调整全屏、震动和手柄输入</span>
+            </button>
+            <button id="returnMenuButton" class="choice-button danger" type="button">
+              <span class="choice-title">回到档案柜</span>
+              <span class="choice-effect">保存当前跑局并返回开始界面</span>
+            </button>
+          </div>
+        </aside>
+
+        <aside id="settingsPanel" class="system-panel hidden" aria-modal="true">
+          <p class="event-kicker">Steam 准备项</p>
+          <h2>系统设置</h2>
+          <div class="settings-grid">
+            <label class="setting-row">
+              <span>
+                <strong>屏幕震动</strong>
+                <small>关闭后保留战斗反馈，但不再抖动画面</small>
+              </span>
+              <input id="shakeToggle" type="checkbox" />
+            </label>
+            <label class="setting-row">
+              <span>
+                <strong>手柄输入</strong>
+                <small>左摇杆移动、A 修复、B 闪避、Start 暂停</small>
+              </span>
+              <input id="gamepadToggle" type="checkbox" />
+            </label>
+            <label class="setting-row">
+              <span>
+                <strong>输入提示</strong>
+                <small>在 HUD 显示当前使用键鼠或手柄</small>
+              </span>
+              <input id="inputHintToggle" type="checkbox" />
+            </label>
+            <label class="setting-row">
+              <span>
+                <strong>全屏启动偏好</strong>
+                <small>网页版需点击全屏按钮，桌面版后续会自动应用</small>
+              </span>
+              <input id="fullscreenPrefToggle" type="checkbox" />
+            </label>
+          </div>
+          <div class="system-choice-grid compact">
+            <button id="settingsFullscreenButton" class="choice-button" type="button">
+              <span class="choice-title">切换全屏</span>
+              <span class="choice-effect">适配 Steam Deck / 客厅模式</span>
+            </button>
+            <button id="settingsCloseButton" class="choice-button primary" type="button">
+              <span class="choice-title">完成</span>
+              <span class="choice-effect">保存设置并返回</span>
+            </button>
+          </div>
+        </aside>
       </section>
 
       <footer class="ticker">
@@ -100,6 +170,7 @@
       </footer>
     </main>
 
+    <script defer src="./src/platform/web-platform.js"></script>
     <script defer src="./src/data/game-data.js"></script>
     <script defer src="./src/main.js"></script>
   </body>
