@@ -1473,6 +1473,7 @@ window.GameData.chapterOne.enemyPools = {
 };
 window.GameData.chapterOne.boss = {
   id: "delivery-rider",
+  archetype: "delivery",
   name: "协议骑手·周行",
   objective: "打断错误配送协议，救回外卖小哥周行",
   startLog: "Boss 战开始：订单被误识别成网络数据包。躲开路线，打掉大件包。",
@@ -1639,6 +1640,7 @@ const chapterTwo = {
   ],
   boss: {
     id: "timetable-admin",
+    archetype: "timetable",
     name: "时刻表管理员",
     objective: "打断环线校准，保住被擦成影子的旧安渡",
     startLog: "Boss 战开始：它会用发车路线冲刺，并把旧路线延迟重放。",
@@ -1846,6 +1848,7 @@ const chapterThree = {
   ],
   boss: {
     id: "index-vendor",
+    archetype: "index",
     name: "索引摊主·老梁备份",
     objective: "打散过度索引，守住夜市缓存",
     startLog: "Boss 战开始：索引摊主会标记路径、撒出冲突键，并上传整批名单。",
@@ -2047,6 +2050,7 @@ const chapterFour = {
   ],
   boss: {
     id: "pledge-root",
+    archetype: "pledge",
     name: "承诺塔根节点",
     objective: "改写根承诺，让保护不再变成债务",
     startLog: "Boss 战开始：根节点会用承诺路径冲刺，并投下未兑现债务。",
@@ -2259,6 +2263,7 @@ const chapterFive = {
   ],
   boss: {
     id: "public-rule-engine",
+    archetype: "rule",
     name: "公共规则引擎·零号白箱",
     objective: "打断全城清零校准，让规则学会保留差异",
     startLog: "最终 Boss 战开始：核心会用预测路线、清零包和错误坐标压缩战场。",

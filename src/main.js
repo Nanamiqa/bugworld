@@ -1559,6 +1559,7 @@ function startBossFight(bossId = null) {
   world.enemyLogCooldown = 0;
   boss = {
     id: bossId ?? bossConfig.id ?? "delivery-rider",
+    archetype: bossConfig.archetype ?? getBossArchetype(bossId ?? bossConfig.id),
     name: bossConfig.name ?? "协议骑手·周行",
     x: bossConfig.x ?? mapBossSpawn.x ?? 1034,
     y: bossConfig.y ?? mapBossSpawn.y ?? 548,
@@ -1590,6 +1591,17 @@ function startBossFight(bossId = null) {
   setLog(bossConfig.startLog ?? "Boss 战开始：订单被误识别成网络数据包。躲开路线，打掉大件包。");
   world.mode = "playing";
   saveRunCheckpoint("boss-start");
+}
+
+function getBossArchetype(bossId = "delivery-rider") {
+  const archetypes = {
+    "delivery-rider": "delivery",
+    "timetable-admin": "timetable",
+    "index-vendor": "index",
+    "pledge-root": "pledge",
+    "public-rule-engine": "rule",
+  };
+  return archetypes[bossId] ?? "delivery";
 }
 
 function finishCurrentChapter() {
@@ -2497,7 +2509,32 @@ function getBossTuning() {
 
 function chooseBossAttack() {
   const roll = Math.random();
+  const archetype = boss?.archetype ?? "delivery";
 
+  if (archetype === "timetable") {
+    chooseTimetableBossAttack(roll);
+    return;
+  }
+
+  if (archetype === "index") {
+    chooseIndexBossAttack(roll);
+    return;
+  }
+
+  if (archetype === "pledge") {
+    choosePledgeBossAttack(roll);
+    return;
+  }
+
+  if (archetype === "rule") {
+    chooseRuleBossAttack(roll);
+    return;
+  }
+
+  chooseDeliveryBossAttack(roll);
+}
+
+function chooseDeliveryBossAttack(roll) {
   if (boss.phase === 3) {
     if (roll < 0.26) {
       startFtpTransfer();
@@ -2534,6 +2571,359 @@ function chooseBossAttack() {
   }
 
   startTcpHandshake();
+}
+
+function chooseTimetableBossAttack(roll) {
+  if (boss.phase === 3) {
+    if (roll < 0.36) {
+      startTimetableBeat();
+      return;
+    }
+    if (roll < 0.58) {
+      startDnsError();
+      return;
+    }
+    if (roll < 0.8) {
+      startTcpHandshake();
+      return;
+    }
+    startFtpTransfer();
+    return;
+  }
+
+  if (boss.phase === 2) {
+    if (roll < 0.34) {
+      startTimetableBeat();
+      return;
+    }
+    if (roll < 0.64) {
+      startUdpBurst();
+      return;
+    }
+    startTcpHandshake();
+    return;
+  }
+
+  if (roll < 0.34) {
+    startTimetableBeat();
+    return;
+  }
+  if (roll < 0.72) {
+    startTcpHandshake();
+    return;
+  }
+  startUdpBurst();
+}
+
+function chooseIndexBossAttack(roll) {
+  if (boss.phase === 3) {
+    if (roll < 0.34) {
+      startIndexLock();
+      return;
+    }
+    if (roll < 0.52) {
+      startFtpTransfer();
+      return;
+    }
+    if (roll < 0.76) {
+      startUdpBurst();
+      return;
+    }
+    startTcpHandshake();
+    return;
+  }
+
+  if (boss.phase === 2) {
+    if (roll < 0.42) {
+      startIndexLock();
+      return;
+    }
+    if (roll < 0.64) {
+      startDnsError();
+      return;
+    }
+    if (roll < 0.84) {
+      startTcpHandshake();
+      return;
+    }
+    startUdpBurst();
+    return;
+  }
+
+  if (roll < 0.4) {
+    startIndexLock();
+    return;
+  }
+  if (roll < 0.74) {
+    startTcpHandshake();
+    return;
+  }
+  startUdpBurst();
+}
+
+function choosePledgeBossAttack(roll) {
+  if (boss.phase === 3) {
+    if (roll < 0.36) {
+      startPledgeAnchor();
+      return;
+    }
+    if (roll < 0.58) {
+      startFtpTransfer();
+      return;
+    }
+    if (roll < 0.8) {
+      startTcpHandshake();
+      return;
+    }
+    startDnsError();
+    return;
+  }
+
+  if (boss.phase === 2) {
+    if (roll < 0.38) {
+      startPledgeAnchor();
+      return;
+    }
+    if (roll < 0.7) {
+      startTcpHandshake();
+      return;
+    }
+    startUdpBurst();
+    return;
+  }
+
+  if (roll < 0.34) {
+    startPledgeAnchor();
+    return;
+  }
+  if (roll < 0.72) {
+    startTcpHandshake();
+    return;
+  }
+  startUdpBurst();
+}
+
+function chooseRuleBossAttack(roll) {
+  if (boss.phase === 3) {
+    if (roll < 0.34) {
+      startRuleScan();
+      return;
+    }
+    if (roll < 0.54) {
+      startRuleAppeal();
+      return;
+    }
+    if (roll < 0.72) {
+      startDnsError();
+      return;
+    }
+    if (roll < 0.9) {
+      startTcpHandshake();
+      return;
+    }
+    startUdpBurst();
+    return;
+  }
+
+  if (boss.phase === 2) {
+    if (roll < 0.32) {
+      startRuleScan();
+      return;
+    }
+    if (roll < 0.52) {
+      startRuleAppeal();
+      return;
+    }
+    if (roll < 0.78) {
+      startTcpHandshake();
+      return;
+    }
+    startFtpTransfer();
+    return;
+  }
+
+  if (roll < 0.36) {
+    startRuleScan();
+    return;
+  }
+  if (roll < 0.72) {
+    startTcpHandshake();
+    return;
+  }
+  startUdpBurst();
+}
+
+function setBossAttackLog(message, cooldown = 3.2) {
+  if (!message || boss.logTimer > 0) {
+    return;
+  }
+  setLog(message);
+  boss.logTimer = cooldown;
+}
+
+function startTimetableBeat() {
+  const difficulty = boss?.difficulty ?? 1;
+  const phase = boss?.phase ?? 1;
+  const count = phase + 2;
+  for (let index = 0; index < count; index += 1) {
+    const angle = index === 0 ? random(0, Math.PI * 2) : (Math.PI * 2 * index) / count + random(-0.28, 0.28);
+    const offset = index === 0 ? random(10, 42) : random(84, 186);
+    const point = findNearestFreePoint(
+      clamp(player.x + Math.cos(angle) * offset, 70, world.width - 70),
+      clamp(player.y + Math.sin(angle) * offset, 98, world.height - 70),
+      26
+    );
+    const timer = 0.88 + index * 0.13;
+    protocolHazards.push({
+      type: "timetableBeat",
+      x: point.x,
+      y: point.y,
+      radius: 50 + phase * 6,
+      timer,
+      maxTimer: timer,
+      damage: Math.ceil((12 + phase * 4) * difficulty),
+      color: boss.themeColor ?? "#72a5ff",
+      triggered: false,
+    });
+  }
+  boss.attackCooldown = phase === 3 ? 0.7 : 0.92;
+  setBossAttackLog("时刻表开始打拍：红圈会按第二拍落下，离开圈外就能反制。");
+}
+
+function startIndexLock() {
+  const difficulty = boss?.difficulty ?? 1;
+  const phase = boss?.phase ?? 1;
+  const count = phase >= 3 ? 2 : 1;
+  for (let index = 0; index < count; index += 1) {
+    const angle = random(0, Math.PI * 2);
+    const point = findNearestFreePoint(
+      clamp(player.x + Math.cos(angle) * random(24, 128), 76, world.width - 76),
+      clamp(player.y + Math.sin(angle) * random(24, 128), 104, world.height - 76),
+      30
+    );
+    const timer = 1.18 + index * 0.18;
+    const hp = Math.ceil((62 + phase * 30) * difficulty);
+    protocolHazards.push({
+      type: "indexLock",
+      x: point.x,
+      y: point.y,
+      radius: 46 + phase * 5,
+      timer,
+      maxTimer: timer,
+      hp,
+      maxHp: hp,
+      damage: Math.ceil((13 + phase * 4) * difficulty),
+      destructible: true,
+      hitFlash: 0,
+      color: boss.themeColor ?? "#96e072",
+      triggered: false,
+    });
+  }
+  boss.attackCooldown = phase === 3 ? 0.78 : 0.98;
+  setBossAttackLog("索引锁正在给你的位置建表：打掉锁芯可以让 Boss 短暂暴露。");
+}
+
+function startPledgeAnchor() {
+  if (protocolHazards.some((hazard) => hazard.type === "pledgeAnchor")) {
+    startTcpHandshake();
+    return;
+  }
+
+  const difficulty = boss?.difficulty ?? 1;
+  const phase = boss?.phase ?? 1;
+  const angle = random(0, Math.PI * 2);
+  const point = findNearestFreePoint(
+    clamp(player.x + Math.cos(angle) * random(72, 184), 78, world.width - 78),
+    clamp(player.y + Math.sin(angle) * random(72, 184), 106, world.height - 78),
+    34
+  );
+  const hp = Math.ceil((120 + phase * 42) * difficulty);
+  protocolHazards.push({
+    type: "pledgeAnchor",
+    x: point.x,
+    y: point.y,
+    radius: 54 + phase * 6,
+    timer: 4.2,
+    maxTimer: 4.2,
+    hp,
+    maxHp: hp,
+    blastDamage: Math.ceil((17 + phase * 5) * difficulty),
+    destructible: true,
+    hitFlash: 0,
+    color: boss.themeColor ?? "#96e072",
+  });
+  boss.attackCooldown = 1.05;
+  setBossAttackLog("根承诺钉下责任锚：尽快打掉，破锚会打开 Boss 克制窗口。");
+}
+
+function startRuleScan() {
+  const difficulty = boss?.difficulty ?? 1;
+  const phase = boss?.phase ?? 1;
+  const count = phase >= 3 ? 3 : phase >= 2 ? 2 : 1;
+  for (let index = 0; index < count; index += 1) {
+    const horizontal = index % 2 === 0 ? Math.random() < 0.68 : Math.random() < 0.32;
+    const thickness = 84 + phase * 12;
+    const timer = 0.82 + index * 0.14;
+    const scan = horizontal
+      ? {
+          x: 0,
+          y: clamp(player.y + random(-150, 150), 88, world.height - thickness - 24),
+          w: world.width,
+          h: thickness,
+        }
+      : {
+          x: clamp(player.x + random(-180, 180), 32, world.width - thickness - 32),
+          y: 76,
+          w: thickness,
+          h: world.height - 88,
+        };
+    protocolHazards.push({
+      type: "ruleScan",
+      ...scan,
+      timer,
+      maxTimer: timer,
+      activeTime: 0.28 + phase * 0.06,
+      maxActiveTime: 0.28 + phase * 0.06,
+      damage: Math.ceil((14 + phase * 4) * difficulty),
+      color: boss.packageColor ?? "#ef6a70",
+      damaged: false,
+    });
+  }
+  boss.attackCooldown = phase === 3 ? 0.66 : 0.86;
+  setBossAttackLog("公共规则引擎开始清零扫描：红色扫描带亮起后只判定一次，横向走位能躲。");
+}
+
+function startRuleAppeal() {
+  if (protocolHazards.some((hazard) => hazard.type === "ruleAppeal")) {
+    startRuleScan();
+    return;
+  }
+
+  const difficulty = boss?.difficulty ?? 1;
+  const phase = boss?.phase ?? 1;
+  const payloadPoint = currentMap().bossPayload ?? { x: boss.x, y: boss.y };
+  const point = findNearestFreePoint(
+    clamp((payloadPoint.x + player.x) / 2 + random(-120, 120), 78, world.width - 78),
+    clamp((payloadPoint.y + player.y) / 2 + random(-90, 90), 106, world.height - 78),
+    34
+  );
+  const hp = Math.ceil((140 + phase * 48) * difficulty);
+  protocolHazards.push({
+    type: "ruleAppeal",
+    x: point.x,
+    y: point.y,
+    radius: 56 + phase * 4,
+    timer: 3.7,
+    maxTimer: 3.7,
+    hp,
+    maxHp: hp,
+    blastDamage: Math.ceil((18 + phase * 5) * difficulty),
+    destructible: true,
+    hitFlash: 0,
+    color: "#d8e0e8",
+  });
+  boss.attackCooldown = 0.94;
+  setBossAttackLog("申诉窗口短暂开放：击碎窗口会清掉扫描带，并让最终 Boss 进入弱化。");
 }
 
 function startTcpHandshake() {
@@ -2719,6 +3109,85 @@ function updateProtocolHazards(dt) {
         }
       }
     }
+
+    if (hazard.type === "timetableBeat") {
+      hazard.timer -= dt;
+      if (hazard.timer <= 0 && !hazard.triggered) {
+        hazard.triggered = true;
+        hazard.remove = true;
+        world.cameraShake = 0.14;
+        burst(hazard.x, hazard.y, hazard.color ?? "#72a5ff", 18);
+        if (distance(hazard, player) < hazard.radius + player.radius) {
+          damagePlayer(hazard.damage, "第二拍准点落下，你被时刻表钉在错误班次上。");
+        }
+      }
+    }
+
+    if (hazard.type === "indexLock") {
+      hazard.timer -= dt;
+      hazard.hitFlash = Math.max(0, hazard.hitFlash - dt);
+      if (hazard.timer <= 0 && !hazard.triggered) {
+        hazard.triggered = true;
+        hazard.remove = true;
+        burst(hazard.x, hazard.y, hazard.color ?? "#96e072", 20);
+        if (distance(hazard, player) < hazard.radius + player.radius) {
+          damagePlayer(hazard.damage, "索引锁命中，当前位置被强制写进夜市短码表。");
+        }
+        if ((boss?.phase ?? 1) >= 3 && enemies.length + cleaners.length < 11) {
+          spawnEnemyNear(hazard.x, hazard.y, "inspectionProbe", { hpMultiplier: 0.72, speedMultiplier: 1.08 });
+        }
+      }
+    }
+
+    if (hazard.type === "pledgeAnchor") {
+      hazard.timer -= dt;
+      hazard.hitFlash = Math.max(0, hazard.hitFlash - dt);
+      if (hazard.timer <= 0) {
+        hazard.remove = true;
+        world.cameraShake = 0.22;
+        burst(hazard.x, hazard.y, hazard.color ?? "#96e072", 28);
+        spawnEnemyNear(hazard.x - 36, hazard.y + 24, "promise", { hpMultiplier: 0.76 });
+        if ((boss?.phase ?? 1) >= 2) {
+          spawnEnemyNear(hazard.x + 42, hazard.y - 16, "stackPile", { hpMultiplier: 0.7 });
+        }
+        if (distance(hazard, player) < hazard.radius + player.radius + 58) {
+          damagePlayer(hazard.blastDamage ?? 22, "责任锚兑现失败，未完成承诺在脚下炸开。");
+        } else {
+          setBossAttackLog("责任锚没有被打掉，新的承诺实体从锚点里挤了出来。", 2.6);
+        }
+      }
+    }
+
+    if (hazard.type === "ruleScan") {
+      if (hazard.timer > 0) {
+        hazard.timer -= dt;
+      } else {
+        hazard.activeTime -= dt;
+        if (!hazard.damaged && circleOverlapsRect(player.x, player.y, player.radius, hazard)) {
+          hazard.damaged = true;
+          damagePlayer(hazard.damage ?? 20, "清零扫描带命中，公共规则试图把差异压成同一个值。");
+        }
+        if (hazard.activeTime <= 0) {
+          hazard.remove = true;
+        }
+      }
+    }
+
+    if (hazard.type === "ruleAppeal") {
+      hazard.timer -= dt;
+      hazard.hitFlash = Math.max(0, hazard.hitFlash - dt);
+      if (hazard.timer <= 0) {
+        hazard.remove = true;
+        world.cameraShake = 0.24;
+        burst(hazard.x, hazard.y, "#d8e0e8", 30);
+        spawnEnemyNear(hazard.x, hazard.y, "inspectionProbe", { hpMultiplier: 0.86, speedMultiplier: 1.12 });
+        if (distance(hazard, player) < hazard.radius + player.radius + 76) {
+          damagePlayer(hazard.blastDamage ?? 24, "申诉窗口关闭，未提交的反例被清零流程反噬。");
+        } else {
+          setBossAttackLog("申诉窗口关闭，新的巡检探针开始复核战场。", 2.6);
+        }
+      }
+    }
   }
 
   clearResolvedProtocolHazards();
@@ -2741,8 +3210,46 @@ function clearResolvedProtocolHazards() {
       return false;
     }
 
+    if (hazard.type === "indexLock" && hazard.hp <= 0 && !hazard.triggered) {
+      burst(hazard.x, hazard.y, hazard.color ?? "#96e072", 26);
+      spawnBugPickup(hazard.x, hazard.y, 1, 3);
+      openBossWeakWindow(1.55, 0.58, "索引锁芯被打碎，Boss 的最短路径临时失准。", hazard.color ?? "#96e072");
+      return false;
+    }
+
+    if (hazard.type === "pledgeAnchor" && hazard.hp <= 0) {
+      burst(hazard.x, hazard.y, hazard.color ?? "#96e072", 34);
+      spawnBugPickup(hazard.x, hazard.y, 2, 4);
+      openBossWeakWindow(2.25, 0.46, "责任锚被拆掉，根承诺短暂失去追责坐标。", hazard.color ?? "#96e072");
+      return false;
+    }
+
+    if (hazard.type === "ruleAppeal" && hazard.hp <= 0) {
+      for (const scan of protocolHazards) {
+        if (scan.type === "ruleScan") {
+          scan.remove = true;
+        }
+      }
+      burst(hazard.x, hazard.y, "#d8e0e8", 36);
+      spawnBugPickup(hazard.x, hazard.y, 2, 5);
+      openBossWeakWindow(2.35, 0.42, "申诉窗口被击碎，扫描带失效，公共规则进入复核迟疑。", "#d8e0e8");
+      return false;
+    }
+
     return !hazard.remove;
   });
+}
+
+function openBossWeakWindow(duration, slowFactor, message, color) {
+  if (!boss || boss.hp <= 0) {
+    return;
+  }
+  boss.slowTimer = Math.max(boss.slowTimer ?? 0, duration);
+  boss.slowFactor = Math.min(boss.slowFactor ?? 1, slowFactor);
+  boss.attackCooldown = Math.max(boss.attackCooldown, Math.min(duration, 1.2));
+  world.cameraShake = Math.max(world.cameraShake, 0.16);
+  burst(boss.x, boss.y, color ?? boss.themeColor ?? "#5de2d1", 24);
+  setLog(message);
 }
 
 function checkBossDefeat() {
@@ -4851,6 +5358,26 @@ function drawProtocolHazards() {
     if (hazard.type === "dns") {
       drawDnsMarker(hazard);
     }
+
+    if (hazard.type === "timetableBeat") {
+      drawTimetableBeat(hazard);
+    }
+
+    if (hazard.type === "indexLock") {
+      drawIndexLock(hazard);
+    }
+
+    if (hazard.type === "pledgeAnchor") {
+      drawPledgeAnchor(hazard);
+    }
+
+    if (hazard.type === "ruleScan") {
+      drawRuleScan(hazard);
+    }
+
+    if (hazard.type === "ruleAppeal") {
+      drawRuleAppeal(hazard);
+    }
   }
 }
 
@@ -5025,6 +5552,123 @@ function drawDnsMarker(hazard) {
   ctx.restore();
 }
 
+function drawTimetableBeat(hazard) {
+  const progress = clamp(hazard.timer / (hazard.maxTimer || 1), 0, 1);
+  const color = hazard.color ?? "#72a5ff";
+  ctx.save();
+  ctx.globalAlpha = 0.12 + (1 - progress) * 0.32;
+  fillCircle(hazard.x, hazard.y, hazard.radius, color);
+  ctx.globalAlpha = 0.72;
+  ctx.strokeStyle = progress < 0.24 ? "#ef6a70" : color;
+  ctx.lineWidth = progress < 0.24 ? 5 : 3;
+  ctx.setLineDash(progress < 0.36 ? [] : [12, 8]);
+  ctx.beginPath();
+  ctx.arc(hazard.x, hazard.y, hazard.radius * (0.72 + progress * 0.34), 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 0.82;
+  drawSmallText("2nd", hazard.x - 12, hazard.y + 4, "#f7fbff", 11);
+  ctx.restore();
+}
+
+function drawIndexLock(hazard) {
+  const progress = clamp(hazard.timer / (hazard.maxTimer || 1), 0, 1);
+  const color = hazard.hitFlash > 0 ? "#ffffff" : hazard.color ?? "#96e072";
+  const size = hazard.radius * 1.72;
+  ctx.save();
+  ctx.translate(hazard.x, hazard.y);
+  ctx.globalAlpha = 0.12 + (1 - progress) * 0.28;
+  rect(-size / 2, -size / 2, size, size, color);
+  ctx.globalAlpha = 0.84;
+  ctx.strokeStyle = progress < 0.22 ? "#ef6a70" : color;
+  ctx.lineWidth = 3;
+  ctx.setLineDash(progress < 0.34 ? [] : [9, 7]);
+  ctx.strokeRect(-size / 2, -size / 2, size, size);
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(-size / 2 - 12, 0);
+  ctx.lineTo(size / 2 + 12, 0);
+  ctx.moveTo(0, -size / 2 - 12);
+  ctx.lineTo(0, size / 2 + 12);
+  ctx.stroke();
+  drawHazardHealthBar(hazard, 74, -hazard.radius - 18, color);
+  ctx.restore();
+}
+
+function drawPledgeAnchor(hazard) {
+  const progress = clamp(hazard.timer / (hazard.maxTimer || 1), 0, 1);
+  const color = hazard.hitFlash > 0 ? "#ffffff" : hazard.color ?? "#96e072";
+  ctx.save();
+  ctx.translate(hazard.x, hazard.y);
+  ctx.globalAlpha = 0.14 + (1 - progress) * 0.24;
+  fillCircle(0, 0, hazard.radius, color);
+  ctx.globalAlpha = 0.86;
+  strokeCircle(0, 0, hazard.radius, progress < 0.22 ? "#ef6a70" : color, 4);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(0, -hazard.radius * 0.7);
+  ctx.lineTo(0, hazard.radius * 0.72);
+  ctx.moveTo(-hazard.radius * 0.45, -hazard.radius * 0.18);
+  ctx.lineTo(hazard.radius * 0.45, -hazard.radius * 0.18);
+  ctx.stroke();
+  drawHazardHealthBar(hazard, 82, -hazard.radius - 20, color);
+  ctx.restore();
+}
+
+function drawRuleScan(hazard) {
+  const warning = hazard.timer > 0;
+  const progress = warning
+    ? clamp(1 - hazard.timer / (hazard.maxTimer || 1), 0, 1)
+    : clamp(hazard.activeTime / (hazard.maxActiveTime || 1), 0, 1);
+  const color = warning ? "#d8e0e8" : hazard.color ?? "#ef6a70";
+  ctx.save();
+  ctx.globalAlpha = warning ? 0.08 + progress * 0.18 : 0.24 + progress * 0.22;
+  rect(hazard.x, hazard.y, hazard.w, hazard.h, color);
+  ctx.globalAlpha = warning ? 0.64 : 0.9;
+  ctx.strokeStyle = warning ? "#d8e0e8" : "#ef6a70";
+  ctx.lineWidth = warning ? 3 : 5;
+  if (warning) {
+    ctx.setLineDash([18, 12]);
+  }
+  ctx.strokeRect(hazard.x, hazard.y, hazard.w, hazard.h);
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawRuleAppeal(hazard) {
+  const progress = clamp(hazard.timer / (hazard.maxTimer || 1), 0, 1);
+  const color = hazard.hitFlash > 0 ? "#ffffff" : hazard.color ?? "#d8e0e8";
+  const w = hazard.radius * 2.15;
+  const h = hazard.radius * 1.48;
+  ctx.save();
+  ctx.translate(hazard.x, hazard.y);
+  ctx.globalAlpha = 0.16 + (1 - progress) * 0.2;
+  rect(-w / 2, -h / 2, w, h, color);
+  ctx.globalAlpha = 0.9;
+  ctx.strokeStyle = progress < 0.22 ? "#ef6a70" : color;
+  ctx.lineWidth = 4;
+  ctx.strokeRect(-w / 2, -h / 2, w, h);
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.32, -h * 0.12);
+  ctx.lineTo(w * 0.32, -h * 0.12);
+  ctx.moveTo(-w * 0.32, h * 0.12);
+  ctx.lineTo(w * 0.24, h * 0.12);
+  ctx.stroke();
+  drawSmallText("APPEAL", -27, 4, "#26364d", 10);
+  drawHazardHealthBar(hazard, 86, -hazard.radius - 18, color);
+  ctx.restore();
+}
+
+function drawHazardHealthBar(hazard, width, yOffset, color) {
+  const hpRatio = clamp((hazard.hp ?? 0) / (hazard.maxHp || 1), 0, 1);
+  ctx.fillStyle = "#26364d";
+  ctx.fillRect(-width / 2, yOffset, width, 7);
+  ctx.fillStyle = color;
+  ctx.fillRect(-width / 2, yOffset, width * hpRatio, 7);
+}
+
 function drawEnemyMechanicUnderlay(enemy) {
   if (enemy.mechanicState === "telegraph") {
     const targetX = enemy.telegraphX ?? player.x;
@@ -5141,8 +5785,11 @@ function drawBoss() {
   });
   if (!drawn) {
     drawDeliveryRiderBoss(boss.x, boss.y, 1, boss.hitFlash > 0);
+    drawBossArchetypeAura(spriteSize);
     return;
   }
+
+  drawBossArchetypeAura(spriteSize);
 
   if (boss.hitFlash > 0) {
     ctx.save();
@@ -5150,6 +5797,59 @@ function drawBoss() {
     fillCircle(boss.x, boss.y - spriteSize * 0.24, spriteSize * 0.36, "#ffffff");
     ctx.restore();
   }
+}
+
+function drawBossArchetypeAura(spriteSize) {
+  const archetype = boss?.archetype ?? "delivery";
+  if (archetype === "delivery") {
+    return;
+  }
+
+  const pulse = 0.5 + Math.sin(world.animTime * 4.6 + boss.animPhase) * 0.18;
+  const radius = spriteSize * 0.38;
+  ctx.save();
+  ctx.translate(boss.x, boss.y - spriteSize * 0.1);
+  ctx.globalAlpha = 0.38 + pulse * 0.18;
+  ctx.strokeStyle = boss.themeColor ?? "#5de2d1";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius + pulse * 8, 0, Math.PI * 2);
+  ctx.stroke();
+
+  if (archetype === "timetable") {
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(world.animTime * 2.4) * radius * 0.78, Math.sin(world.animTime * 2.4) * radius * 0.78);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(world.animTime * 0.82) * radius * 0.55, Math.sin(world.animTime * 0.82) * radius * 0.55);
+    ctx.stroke();
+  } else if (archetype === "index") {
+    const grid = radius * 0.58;
+    for (let line = -1; line <= 1; line += 1) {
+      ctx.beginPath();
+      ctx.moveTo(-grid, line * grid * 0.5);
+      ctx.lineTo(grid, line * grid * 0.5);
+      ctx.moveTo(line * grid * 0.5, -grid);
+      ctx.lineTo(line * grid * 0.5, grid);
+      ctx.stroke();
+    }
+  } else if (archetype === "pledge") {
+    ctx.beginPath();
+    ctx.moveTo(0, -radius * 0.72);
+    ctx.lineTo(0, radius * 0.72);
+    ctx.moveTo(-radius * 0.42, -radius * 0.16);
+    ctx.lineTo(radius * 0.42, -radius * 0.16);
+    ctx.stroke();
+  } else if (archetype === "rule") {
+    ctx.strokeRect(-radius * 0.62, -radius * 0.42, radius * 1.24, radius * 0.84);
+    ctx.beginPath();
+    ctx.moveTo(-radius * 0.45, -radius * 0.12);
+    ctx.lineTo(radius * 0.45, -radius * 0.12);
+    ctx.moveTo(-radius * 0.45, radius * 0.14);
+    ctx.lineTo(radius * 0.28, radius * 0.14);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function getBossPhaseAssetKey(phase) {
