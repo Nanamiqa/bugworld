@@ -33,6 +33,11 @@ const ui = {
   storyProgress: document.querySelector("#storyProgress"),
   storyContinue: document.querySelector("#storyContinue"),
   storyChoices: document.querySelector("#storyChoices"),
+  startPanel: document.querySelector("#startPanel"),
+  startSummary: document.querySelector("#startSummary"),
+  startStats: document.querySelector("#startStats"),
+  startActions: document.querySelector("#startActions"),
+  chapterSelect: document.querySelector("#chapterSelect"),
   upgradePanel: document.querySelector("#upgradePanel"),
   upgradeKicker: document.querySelector("#upgradeKicker"),
   upgradeTitle: document.querySelector("#upgradeTitle"),
@@ -46,6 +51,9 @@ const ui = {
 };
 
 const keys = new Set();
+const ARCHIVE_STORAGE_KEY = "variableCityArchive";
+const RUN_SAVE_STORAGE_KEY = "variableCityRunSave";
+const RUN_SAVE_VERSION = 2;
 const world = {
   width: 1280,
   height: 720,
@@ -63,6 +71,7 @@ const world = {
   mapHazardCooldown: 0,
   enemyLogCooldown: 0,
   cameraShake: 0,
+  saveCooldown: 0,
 };
 
 const playerBase = {
@@ -765,8 +774,8 @@ function createRunStats() {
   };
 }
 
-function loadArchive() {
-  const fallback = {
+function createArchiveFallback() {
+  return {
     bestChapter: 1,
     wins: 0,
     runs: 0,
@@ -775,9 +784,12 @@ function loadArchive() {
     unlockedChapters: [0],
     lastBuild: "未记录",
   };
+}
 
+function loadArchive() {
+  const fallback = createArchiveFallback();
   try {
-    const saved = JSON.parse(localStorage.getItem("variableCityArchive") ?? "null");
+    const saved = JSON.parse(localStorage.getItem(ARCHIVE_STORAGE_KEY) ?? "null");
     if (!saved || typeof saved !== "object") {
       return fallback;
     }
@@ -798,10 +810,202 @@ function loadArchive() {
 
 function saveArchive() {
   try {
-    localStorage.setItem("variableCityArchive", JSON.stringify(archiveState));
+    localStorage.setItem(ARCHIVE_STORAGE_KEY, JSON.stringify(archiveState));
   } catch {
     // Local storage can be unavailable in some embedded previews.
   }
+}
+
+function cloneForSave(value, fallback = null) {
+  try {
+    return JSON.parse(JSON.stringify(value ?? fallback));
+  } catch {
+    return fallback;
+  }
+}
+
+function serializeBugNode(node) {
+  return {
+    x: node.x,
+    y: node.y,
+    radius: node.radius,
+    interactRadius: node.interactRadius,
+    pulse: node.pulse,
+    animPhase: node.animPhase,
+    eventId: node.event?.id,
+    chapterStep: node.chapterStep,
+  };
+}
+
+function restoreBugNode(node) {
+  const event = node.eventId ? getEventById(node.eventId) : bugEvents[0];
+  const safePoint = findNearestFreePoint(node.x ?? 160, node.y ?? 160, node.interactRadius ?? 42);
+  return {
+    x: safePoint.x,
+    y: safePoint.y,
+    radius: node.radius ?? 17,
+    interactRadius: node.interactRadius ?? 54,
+    pulse: node.pulse ?? random(0, Math.PI * 2),
+    animPhase: node.animPhase ?? random(0, Math.PI * 2),
+    event,
+    chapterStep: node.chapterStep ?? chapterState?.stepIndex ?? -1,
+  };
+}
+
+function loadRunSave() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(RUN_SAVE_STORAGE_KEY) ?? "null");
+    if (!saved || saved.version !== RUN_SAVE_VERSION || !saved.player || !saved.chapterState) {
+      return null;
+    }
+    const chapterIndex = clamp(Number(saved.currentChapterIndex) || 0, 0, chapters.length - 1);
+    return { ...saved, currentChapterIndex: chapterIndex };
+  } catch {
+    return null;
+  }
+}
+
+function saveRunCheckpoint(reason = "auto") {
+  if (!player || !chapterState || !runStats || world.mode === "menu" || world.mode === "result") {
+    return;
+  }
+
+  const save = {
+    version: RUN_SAVE_VERSION,
+    savedAt: Date.now(),
+    reason,
+    currentChapterIndex,
+    nextUpgradeAt,
+    objective: getCurrentObjectiveText(),
+    player: cloneForSave(player, {}),
+    chapterState: cloneForSave(chapterState, {}),
+    runStats: cloneForSave(runStats, {}),
+    bugNodes: bugNodes.map(serializeBugNode),
+    bugPickups: cloneForSave(bugPickups, []),
+    enemies: cloneForSave(enemies, []),
+    cleaners: cloneForSave(cleaners, []),
+    boss: cloneForSave(boss, null),
+    protocolHazards: cloneForSave(protocolHazards, []),
+    enemyHazards: cloneForSave(enemyHazards, []),
+    world: {
+      spawnTimer: world.spawnTimer,
+      pulseCooldown: world.pulseCooldown,
+      dashCooldown: world.dashCooldown,
+      allyAssistCooldown: world.allyAssistCooldown,
+      mapHazardCooldown: world.mapHazardCooldown,
+      enemyLogCooldown: world.enemyLogCooldown,
+    },
+  };
+
+  try {
+    localStorage.setItem(RUN_SAVE_STORAGE_KEY, JSON.stringify(save));
+  } catch {
+    // A full storage quota should never break the run itself.
+  }
+}
+
+function deleteRunSave() {
+  try {
+    localStorage.removeItem(RUN_SAVE_STORAGE_KEY);
+  } catch {
+    // Ignore unavailable local storage.
+  }
+}
+
+function getCurrentObjectiveText() {
+  if (boss && boss.hp > 0) {
+    return currentChapter().boss?.objective ?? "击败本章 Boss";
+  }
+  const step = currentChapter().steps?.[chapterState?.stepIndex ?? -1];
+  return step?.objective ?? currentChapter().initialObjective ?? "继续夜巡";
+}
+
+function restoreRunSave(save) {
+  if (!save) {
+    setLog("没有找到可继续的跑局存档。");
+    openStartMenu();
+    return;
+  }
+
+  archiveState = loadArchive();
+  currentChapterIndex = save.currentChapterIndex;
+  runStats = {
+    ...createRunStats(),
+    ...cloneForSave(save.runStats, {}),
+    upgradesChosen: cloneForSave(save.runStats?.upgradesChosen, []),
+    relicsChosen: cloneForSave(save.runStats?.relicsChosen, []),
+    conceptsChosen: cloneForSave(save.runStats?.conceptsChosen, []),
+    synergiesUnlocked: cloneForSave(save.runStats?.synergiesUnlocked, []),
+  };
+  player = {
+    ...playerBase,
+    ...cloneForSave(save.player, {}),
+    relics: cloneForSave(save.player?.relics, []),
+    concepts: cloneForSave(save.player?.concepts, {}),
+    unlockedSynergies: cloneForSave(save.player?.unlockedSynergies, []),
+  };
+  player.hp = clamp(player.hp, 1, player.maxHp);
+  chapterState = {
+    ...createChapterState(),
+    ...cloneForSave(save.chapterState, {}),
+    allies: cloneForSave(save.chapterState?.allies, []),
+  };
+  chapterState.chapterIndex = currentChapterIndex;
+  nextUpgradeAt = Math.max(2, Number(save.nextUpgradeAt) || 2);
+  runPanelSignature = "";
+  syncWorldToCurrentMap();
+  const safePlayer = findNearestFreePoint(player.x, player.y, player.radius ?? playerBase.radius);
+  player.x = safePlayer.x;
+  player.y = safePlayer.y;
+  bugNodes = cloneForSave(save.bugNodes, []).map(restoreBugNode);
+  enemies = cloneForSave(save.enemies, []);
+  cleaners = cloneForSave(save.cleaners, []);
+  boss = cloneForSave(save.boss, null);
+  if (boss && boss.hp <= 0) {
+    boss = null;
+  }
+  protocolHazards = cloneForSave(save.protocolHazards, []);
+  enemyHazards = cloneForSave(save.enemyHazards, []);
+  bugPickups = cloneForSave(save.bugPickups, []);
+  bullets = [];
+  particles = [];
+  activeEvent = null;
+  storyState = null;
+  world.mode = "playing";
+  world.spawnTimer = save.world?.spawnTimer ?? 0;
+  world.pulseCooldown = save.world?.pulseCooldown ?? 0;
+  world.dashCooldown = save.world?.dashCooldown ?? 0;
+  world.allyAssistCooldown = save.world?.allyAssistCooldown ?? 0;
+  world.mapHazardCooldown = save.world?.mapHazardCooldown ?? 0;
+  world.enemyLogCooldown = save.world?.enemyLogCooldown ?? 0;
+  world.cameraShake = 0;
+  world.saveCooldown = 6;
+  centerCameraOnPlayer();
+  hidePanels();
+
+  if (!player.weapon) {
+    setLog("跑局存档缺少武器信息，已回到武器选择。");
+    openWeaponSelect();
+    return;
+  }
+
+  if (chapterState.stepIndex < 0 && currentChapter().opening) {
+    setChapterObjective(currentChapter().initialObjective ?? "继续夜巡");
+    setLog(`已继续存档：${currentChapter().title}。`);
+    syncHud();
+    openStory(currentChapter().opening);
+    saveRunCheckpoint("resume-opening");
+    return;
+  }
+
+  if (!bugNodes.length && !boss && !chapterState.finished && chapterState.stepIndex >= 0) {
+    resumeChapterStep();
+  }
+
+  setChapterObjective(getCurrentObjectiveText());
+  setLog(`已继续存档：${currentChapter().title}。`);
+  syncHud();
+  saveRunCheckpoint("resume");
 }
 
 function recordChapterProgress(clearedChapterIndex) {
@@ -815,6 +1019,7 @@ function recordChapterProgress(clearedChapterIndex) {
 }
 
 function recordRunEnd(victory) {
+  deleteRunSave();
   archiveState.runs = (archiveState.runs ?? 0) + 1;
   archiveState.wins = (archiveState.wins ?? 0) + (victory ? 1 : 0);
   archiveState.bestChapter = Math.max(archiveState.bestChapter ?? 1, currentChapterIndex + 1);
@@ -836,14 +1041,19 @@ function createChapterState(allies = []) {
   };
 }
 
-function resetGame() {
+function resetGame(chapterIndex = 0) {
+  startNewRun(Number.isFinite(chapterIndex) ? chapterIndex : 0);
+}
+
+function startNewRun(chapterIndex = 0) {
+  deleteRunSave();
   archiveState = loadArchive();
   runStats = createRunStats();
   player = { ...playerBase };
   player.relics = [];
   player.concepts = {};
   player.unlockedSynergies = [];
-  currentChapterIndex = 0;
+  currentChapterIndex = clamp(chapterIndex, 0, chapters.length - 1);
   positionPlayerAtMapStart();
   bugNodes = [];
   enemies = [];
@@ -867,6 +1077,7 @@ function resetGame() {
   world.mapHazardCooldown = 0;
   world.enemyLogCooldown = 0;
   world.cameraShake = 0;
+  world.saveCooldown = 6;
   hidePanels();
   storyState = null;
   seedOfficeBugPickups();
@@ -874,6 +1085,44 @@ function resetGame() {
   setLog(currentChapter().startLog ?? "凌晨 03:32，安渡从键盘上醒来。手机显示：外卖订单已超时 999 分钟。");
   syncHud();
   openWeaponSelect();
+}
+
+function bootGame() {
+  archiveState = loadArchive();
+  runStats = createRunStats();
+  player = { ...playerBase };
+  player.relics = [];
+  player.concepts = {};
+  player.unlockedSynergies = [];
+  currentChapterIndex = 0;
+  bugNodes = [];
+  enemies = [];
+  particles = [];
+  bullets = [];
+  bugPickups = [];
+  cleaners = [];
+  boss = null;
+  protocolHazards = [];
+  enemyHazards = [];
+  activeEvent = null;
+  nextUpgradeAt = 2;
+  runPanelSignature = "";
+  chapterState = createChapterState();
+  world.mode = "menu";
+  world.animTime = 0;
+  world.spawnTimer = 0;
+  world.pulseCooldown = 0;
+  world.dashCooldown = 0;
+  world.allyAssistCooldown = 0;
+  world.mapHazardCooldown = 0;
+  world.enemyLogCooldown = 0;
+  world.cameraShake = 0;
+  world.saveCooldown = 6;
+  positionPlayerAtMapStart();
+  storyState = null;
+  setChapterObjective("选择夜巡档案");
+  syncHud();
+  openStartMenu();
 }
 
 function createBugNode(x = random(90, world.width - 90), y = random(96, world.height - 86), eventId = null) {
@@ -1059,6 +1308,7 @@ function openWeaponSelect() {
     button.innerHTML = `${icon}<span class="choice-copy"><span class="choice-title">${weapon.name} · ${weapon.role}</span><span class="choice-effect">${weapon.desc}<br>${weapon.traitText}</span></span>`;
     button.addEventListener("click", () => {
       equipWeapon(weapon);
+      saveRunCheckpoint("weapon-selected");
       ui.storyPanel.classList.add("hidden");
       openStory(currentChapter().opening);
     });
@@ -1123,16 +1373,24 @@ function addExperience(amount) {
 }
 
 function seedOfficeBugPickups() {
-  const seeds = [
-    { x: 170, y: 510, xp: 2 },
-    { x: 610, y: 126, xp: 2 },
-    { x: 704, y: 360, xp: 3 },
-    { x: 1160, y: 360, xp: 3 },
-    { x: 430, y: 598, xp: 2 },
-    { x: 1188, y: 820, xp: 3 },
-    { x: 1608, y: 594, xp: 3 },
-    { x: 1904, y: 732, xp: 4 },
-  ];
+  const map = currentMap();
+  const start = map.start ?? { x: 170, y: 560 };
+  const seeds = currentChapterIndex === 0
+    ? [
+        { x: 170, y: 510, xp: 2 },
+        { x: 610, y: 126, xp: 2 },
+        { x: 704, y: 360, xp: 3 },
+        { x: 1160, y: 360, xp: 3 },
+        { x: 430, y: 598, xp: 2 },
+        { x: 1188, y: 820, xp: 3 },
+        { x: 1608, y: 594, xp: 3 },
+        { x: 1904, y: 732, xp: 4 },
+      ]
+    : [
+        { x: start.x + 64, y: start.y - 42, xp: 3 },
+        { x: start.x + 210, y: start.y - 120, xp: 3 },
+        ...(map.spawnPoints ?? []).slice(0, 3).map((point, index) => ({ x: point.x, y: point.y, xp: 2 + index })),
+      ];
 
   for (const seed of seeds) {
     spawnBugPickup(seed.x, seed.y, 1, seed.xp);
@@ -1286,6 +1544,7 @@ function spawnChapterNodes(step) {
   if (hint) {
     setLog(hint);
   }
+  saveRunCheckpoint("chapter-step");
 }
 
 function startBossFight(bossId = null) {
@@ -1330,6 +1589,7 @@ function startBossFight(bossId = null) {
   setChapterObjective(bossConfig.objective ?? "打断错误配送协议，救回外卖小哥周行");
   setLog(bossConfig.startLog ?? "Boss 战开始：订单被误识别成网络数据包。躲开路线，打掉大件包。");
   world.mode = "playing";
+  saveRunCheckpoint("boss-start");
 }
 
 function finishCurrentChapter() {
@@ -1372,6 +1632,7 @@ function beginNextChapter(allies) {
   setChapterObjective(currentChapter().initialObjective ?? "继续夜巡");
   setLog(currentChapter().startLog ?? `${currentChapter().title}开始。`);
   openStory(currentChapter().opening);
+  saveRunCheckpoint("next-chapter");
 }
 
 function openChapterRelicReward(allies) {
@@ -1438,6 +1699,7 @@ function handleChapterEventResolved(removedNode) {
 }
 
 function hidePanels() {
+  ui.startPanel?.classList.add("hidden");
   ui.storyPanel.classList.add("hidden");
   ui.storyPanel.classList.remove("has-choices");
   ui.eventPanel.classList.add("hidden");
@@ -1555,6 +1817,108 @@ function getResonanceSummary() {
     .join(" / ");
 }
 
+function formatSaveTime(timestamp) {
+  if (!timestamp) {
+    return "未知时间";
+  }
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return "未知时间";
+  }
+  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function createMenuButton(title, effect, className, onClick, disabled = false) {
+  const button = document.createElement("button");
+  button.className = `choice-button ${className ?? ""}`.trim();
+  button.disabled = disabled;
+  button.innerHTML = `<span class="choice-title">${title}</span><span class="choice-effect">${effect}</span>`;
+  if (onClick && !disabled) {
+    button.addEventListener("click", onClick);
+  }
+  return button;
+}
+
+function renderStartMenu() {
+  if (!ui.startPanel) {
+    return;
+  }
+
+  archiveState = loadArchive();
+  const runSave = loadRunSave();
+  const bestChapter = Math.min(archiveState.bestChapter ?? 1, chapters.length);
+  ui.startSummary.textContent = runSave
+    ? `检测到 ${formatSaveTime(runSave.savedAt)} 的跑局存档：${chapters[runSave.currentChapterIndex]?.title ?? "未知章节"}，${runSave.objective ?? "继续夜巡"}。`
+    : "档案已就绪。可以从第一章重新出发，也可以进入已解锁章节练习。";
+
+  const stats = [
+    ["最远章节", `${bestChapter}/${chapters.length}`],
+    ["通关次数", `${archiveState.wins ?? 0}`],
+    ["夜巡次数", `${archiveState.runs ?? 0}`],
+    ["累计击破", `${archiveState.totalEnemiesDefeated ?? 0}`],
+  ];
+  ui.startStats.innerHTML = "";
+  for (const [label, value] of stats) {
+    const item = document.createElement("div");
+    item.className = "start-stat";
+    item.innerHTML = `${label}<strong>${value}</strong>`;
+    ui.startStats.appendChild(item);
+  }
+
+  ui.startActions.innerHTML = "";
+  ui.startActions.appendChild(createMenuButton(
+    "继续夜巡",
+    runSave ? `${chapters[runSave.currentChapterIndex]?.title ?? "当前章节"} · ${formatSaveTime(runSave.savedAt)}` : "暂无可继续的跑局",
+    "primary",
+    () => restoreRunSave(loadRunSave()),
+    !runSave,
+  ));
+  ui.startActions.appendChild(createMenuButton(
+    "新开夜巡",
+    "从第一章开始一轮完整五章流程",
+    "",
+    () => startNewRun(0),
+  ));
+  const clearButton = createMenuButton("清除档案", "再次点击确认：清除章节解锁和当前跑局", "danger", null);
+  clearButton.addEventListener("click", () => {
+    if (clearButton.dataset.confirmed === "true") {
+      deleteRunSave();
+      archiveState = createArchiveFallback();
+      try {
+        localStorage.setItem(ARCHIVE_STORAGE_KEY, JSON.stringify(archiveState));
+      } catch {
+        // Ignore unavailable local storage.
+      }
+      setLog("档案已清除。变量城把柜台擦干净，等下一次夜巡。");
+      renderStartMenu();
+      syncHud();
+      return;
+    }
+    clearButton.dataset.confirmed = "true";
+    clearButton.querySelector(".choice-title").textContent = "确认清除";
+  });
+  ui.startActions.appendChild(clearButton);
+
+  ui.chapterSelect.innerHTML = "";
+  for (let index = 0; index < chapters.length; index += 1) {
+    const unlocked = index === 0 || archiveState.unlockedChapters?.includes(index);
+    const title = chapters[index]?.title ?? `第 ${index + 1} 章`;
+    const effect = unlocked ? "从本章开局练习地图、敌人与 Boss" : "通关前一章后解锁";
+    const button = createMenuButton(title, effect, `chapter-button${unlocked ? "" : " is-locked"}`, () => startNewRun(index), !unlocked);
+    ui.chapterSelect.appendChild(button);
+  }
+}
+
+function openStartMenu() {
+  world.mode = "menu";
+  hidePanels();
+  renderStartMenu();
+  ui.startPanel.classList.remove("hidden");
+  setChapterObjective("选择夜巡档案");
+  setLog("档案柜已打开：选择继续、重开，或进入已解锁章节练习。");
+  syncHud();
+}
+
 function renderRunPanel() {
   if (!ui.chapterPips) {
     return;
@@ -1624,6 +1988,7 @@ function updatePlaying(dt) {
   world.allyAssistCooldown = Math.max(0, world.allyAssistCooldown - dt);
   world.mapHazardCooldown = Math.max(0, world.mapHazardCooldown - dt);
   world.enemyLogCooldown = Math.max(0, world.enemyLogCooldown - dt);
+  world.saveCooldown = Math.max(0, world.saveCooldown - dt);
   player.invulnerable = Math.max(0, player.invulnerable - dt);
   world.cameraShake = Math.max(0, world.cameraShake - dt);
 
@@ -1657,6 +2022,11 @@ function updatePlaying(dt) {
 
   if (player.hp <= 0) {
     endGame(false);
+  }
+
+  if (world.mode === "playing" && world.saveCooldown <= 0) {
+    saveRunCheckpoint("autosave");
+    world.saveCooldown = 6;
   }
 }
 
@@ -2848,6 +3218,7 @@ function openUpgrade() {
       runStats.upgradesChosen.push(upgrade.title);
       ui.upgradePanel.classList.add("hidden");
       setLog(`选择了${upgrade.rarity.name}强化：${upgrade.title}。`);
+      saveRunCheckpoint("upgrade");
       if (player.pendingLevelUps > 0) {
         openUpgrade();
       } else {
@@ -5603,6 +5974,10 @@ window.addEventListener("keyup", (event) => {
   keys.delete(event.key.toLowerCase());
 });
 
+window.addEventListener("beforeunload", () => {
+  saveRunCheckpoint("beforeunload");
+});
+
 ui.restartButton.addEventListener("click", resetGame);
 ui.storyPanel.addEventListener("click", (event) => {
   if (event.target.closest("button")) {
@@ -5611,5 +5986,5 @@ ui.storyPanel.addEventListener("click", (event) => {
   advanceStory();
 });
 
-resetGame();
+bootGame();
 requestAnimationFrame(update);
