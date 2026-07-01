@@ -1,8 +1,27 @@
 const path = require("node:path");
+const fs = require("node:fs");
 const { app, BrowserWindow, ipcMain, shell } = require("electron");
 
 const rootDir = path.resolve(__dirname, "..", "..");
 let mainWindow = null;
+
+function loadSaveLayout() {
+  try {
+    const layoutPath = path.join(rootDir, "desktop", "steam", "save-layout.json");
+    return JSON.parse(fs.readFileSync(layoutPath, "utf8"));
+  } catch {
+    return {
+      appDataDirectory: "variable-city-nightwatch",
+    };
+  }
+}
+
+const saveLayout = loadSaveLayout();
+
+function getGameSaveRoot() {
+  const directory = saveLayout.appDataDirectory ?? "variable-city-nightwatch";
+  return path.join(app.getPath("appData"), directory);
+}
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -42,7 +61,7 @@ function createMainWindow() {
 
 app.whenReady().then(() => {
   ipcMain.on("variable-city:get-user-data-path", (event) => {
-    event.returnValue = app.getPath("userData");
+    event.returnValue = getGameSaveRoot();
   });
 
   createMainWindow();

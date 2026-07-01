@@ -5,7 +5,8 @@
   "description": "A static Canvas roguelike demo with a GitHub Pages web build and a Steam-ready desktop shell.",
   "main": "desktop/electron/main.cjs",
   "scripts": {
-    "check": "node --check src/main.js && node --check src/data/game-data.js && node --check src/platform/web-platform.js && node --check desktop/electron/main.cjs && node --check desktop/electron/preload.cjs",
+    "check": "node --check src/main.js && node --check src/data/game-data.js && node --check src/platform/web-platform.js && node --check desktop/electron/main.cjs && node --check desktop/electron/preload.cjs && node desktop/tools/check-steam-cloud-layout.cjs",
+    "check:cloud": "node desktop/tools/check-steam-cloud-layout.cjs",
     "desktop": "electron .",
     "dist:win": "electron-builder --win dir"
   },
@@ -25,6 +26,7 @@
       "index.html",
       "src/**/*",
       "desktop/electron/**/*",
+      "desktop/steam/**/*",
       "README.md",
       "docs/steam-release-plan.md",
       "docs/world-bible.md",

@@ -797,6 +797,47 @@ function removePlatformJson(key) {
   platform.storage?.remove?.(key);
 }
 
+function describePlatformStorage() {
+  try {
+    return platform.storage?.describe?.() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function getPlatformDisplayLabel() {
+  if (platform.isDesktop) {
+    return platform.label ?? "Desktop";
+  }
+  return platform.label ?? platform.id ?? "Web";
+}
+
+function getStorageDisplayLabel() {
+  const info = describePlatformStorage();
+  if (info?.mode === "file") {
+    return info.cloudPattern ? "JSON 云存档" : "JSON 文件";
+  }
+  if (info?.mode === "browser") {
+    return "浏览器存档";
+  }
+  return "本地存档";
+}
+
+async function applyStartupFullscreenPreference() {
+  if (!gameSettings?.fullscreenOnStart || !platform.isDesktop || platform.isFullscreen?.()) {
+    return;
+  }
+
+  try {
+    const enteredFullscreen = await platform.requestFullscreen?.(document.documentElement);
+    if (enteredFullscreen) {
+      syncSystemControls();
+    }
+  } catch {
+    syncSystemControls();
+  }
+}
+
 function createDefaultSettings() {
   return {
     screenShake: true,
@@ -1236,6 +1277,7 @@ function bootGame() {
   syncHud();
   syncSystemControls();
   openStartMenu();
+  applyStartupFullscreenPreference();
 }
 
 function createBugNode(x = random(90, world.width - 90), y = random(96, world.height - 86), eventId = null) {
@@ -2077,6 +2119,8 @@ function renderStartMenu() {
     ["通关次数", `${archiveState.wins ?? 0}`],
     ["夜巡次数", `${archiveState.runs ?? 0}`],
     ["累计击破", `${archiveState.totalEnemiesDefeated ?? 0}`],
+    ["平台", getPlatformDisplayLabel()],
+    ["存档", getStorageDisplayLabel()],
   ];
   ui.startStats.innerHTML = "";
   for (const [label, value] of stats) {

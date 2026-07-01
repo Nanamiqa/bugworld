@@ -2,7 +2,40 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { contextBridge, ipcRenderer } = require("electron");
 
-const saveFilePrefix = "variable-city-";
+const fallbackSaveLayout = {
+  appDataDirectory: "variable-city-nightwatch",
+  saveSubdirectory: "saves",
+  filePrefix: "variable-city-",
+  cloudPattern: "variable-city-*.json",
+  steamAutoCloud: {
+    windowsRoot: "WinAppDataRoaming",
+    windowsSubdirectory: "variable-city-nightwatch/saves",
+    recursive: false,
+    pattern: "variable-city-*.json",
+  },
+  slots: [
+    { key: "variableCityArchive", file: "variable-city-variableCityArchive.json", label: "Archive", cloud: true },
+    { key: "variableCityRunSave", file: "variable-city-variableCityRunSave.json", label: "Run checkpoint", cloud: true },
+    { key: "variableCitySettings", file: "variable-city-variableCitySettings.json", label: "Settings", cloud: true },
+    { key: "variableCityAchievements", file: "variable-city-variableCityAchievements.json", label: "Local achievements", cloud: true },
+  ],
+};
+
+function loadSaveLayout() {
+  try {
+    const layoutPath = path.resolve(__dirname, "..", "steam", "save-layout.json");
+    return {
+      ...fallbackSaveLayout,
+      ...JSON.parse(fs.readFileSync(layoutPath, "utf8")),
+    };
+  } catch {
+    return fallbackSaveLayout;
+  }
+}
+
+const saveLayout = loadSaveLayout();
+const saveFilePrefix = saveLayout.filePrefix ?? fallbackSaveLayout.filePrefix;
+const slotByKey = new Map((saveLayout.slots ?? []).map((slot) => [slot.key, slot]));
 
 function getUserDataPath() {
   try {
@@ -17,7 +50,7 @@ function getUserDataPath() {
 }
 
 const userDataPath = getUserDataPath();
-const saveDir = path.join(userDataPath, "saves");
+const saveDir = path.join(userDataPath, saveLayout.saveSubdirectory ?? "saves");
 
 function sanitizeKey(key) {
   return String(key ?? "save")
@@ -27,7 +60,9 @@ function sanitizeKey(key) {
 }
 
 function savePathFor(key) {
-  return path.join(saveDir, `${saveFilePrefix}${sanitizeKey(key)}.json`);
+  const slot = slotByKey.get(String(key));
+  const fileName = slot?.file ?? `${saveFilePrefix}${sanitizeKey(key)}.json`;
+  return path.join(saveDir, fileName);
 }
 
 function ensureSaveDir() {
@@ -69,6 +104,45 @@ function remove(key) {
   } catch {
     return false;
   }
+}
+
+function listFiles() {
+  try {
+    if (!fs.existsSync(saveDir)) {
+      return [];
+    }
+    return fs.readdirSync(saveDir)
+      .filter((fileName) => fileName.startsWith(saveFilePrefix) && fileName.endsWith(".json"))
+      .map((fileName) => {
+        const filePath = path.join(saveDir, fileName);
+        const stats = fs.statSync(filePath);
+        return {
+          file: fileName,
+          size: stats.size,
+          updatedAt: stats.mtime.toISOString(),
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+
+function describeStorage() {
+  return {
+    mode: "file",
+    label: "JSON files",
+    userDataPath,
+    saveDir,
+    cloudPattern: saveLayout.cloudPattern ?? `${saveFilePrefix}*.json`,
+    steamAutoCloud: saveLayout.steamAutoCloud ?? fallbackSaveLayout.steamAutoCloud,
+    slots: (saveLayout.slots ?? []).map((slot) => ({
+      key: slot.key,
+      file: slot.file,
+      label: slot.label,
+      cloud: Boolean(slot.cloud),
+    })),
+    files: listFiles(),
+  };
 }
 
 function getGamepads() {
@@ -117,6 +191,8 @@ contextBridge.exposeInMainWorld("VariableCityPlatform", {
     readJson,
     writeJson,
     remove,
+    listFiles,
+    describe: describeStorage,
   },
   requestFullscreen: async () => {
     if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
@@ -135,4 +211,5 @@ contextBridge.exposeInMainWorld("VariableCityPlatform", {
   isFullscreen: () => Boolean(document.fullscreenElement),
   getGamepads,
   unlockAchievement,
+  steamCloud: describeStorage().steamAutoCloud,
 });

@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "appDataDirectory": "variable-city-nightwatch",
+  "saveSubdirectory": "saves",
+  "filePrefix": "variable-city-",
+  "cloudPattern": "variable-city-*.json",
+  "steamAutoCloud": {
+    "windowsRoot": "WinAppDataRoaming",
+    "windowsSubdirectory": "variable-city-nightwatch/saves",
+    "recursive": false,
+    "pattern": "variable-city-*.json"
+  },
+  "slots": [
+    {
+      "key": "variableCityArchive",
+      "file": "variable-city-variableCityArchive.json",
+      "label": "Archive",
+      "cloud": true
+    },
+    {
+      "key": "variableCityRunSave",
+      "file": "variable-city-variableCityRunSave.json",
+      "label": "Run checkpoint",
+      "cloud": true
+    },
+    {
+      "key": "variableCitySettings",
+      "file": "variable-city-variableCitySettings.json",
+      "label": "Settings",
+      "cloud": true
+    },
+    {
+      "key": "variableCityAchievements",
+      "file": "variable-city-variableCityAchievements.json",
+      "label": "Local achievements",
+      "cloud": true
+    }
+  ]
+}

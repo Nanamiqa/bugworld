@@ -28,6 +28,34 @@
     }
   }
 
+  function listStorageKeys() {
+    try {
+      return Object.keys(localStorage)
+        .filter((key) => key.startsWith("variableCity"))
+        .sort();
+    } catch {
+      return Array.from(storageFallback.keys()).sort();
+    }
+  }
+
+  function describeStorage() {
+    return {
+      mode: "browser",
+      label: "localStorage",
+      userDataPath: null,
+      saveDir: null,
+      cloudPattern: null,
+      steamAutoCloud: null,
+      slots: [
+        { key: "variableCityArchive", file: null, label: "Archive", cloud: false },
+        { key: "variableCityRunSave", file: null, label: "Run checkpoint", cloud: false },
+        { key: "variableCitySettings", file: null, label: "Settings", cloud: false },
+        { key: "variableCityAchievements", file: null, label: "Local achievements", cloud: false },
+      ],
+      files: listStorageKeys().map((key) => ({ key })),
+    };
+  }
+
   async function requestFullscreen(target = document.documentElement) {
     if (!target?.requestFullscreen) {
       return false;
@@ -68,7 +96,7 @@
     isDesktop: false,
     supportsFullscreen: Boolean(document.documentElement?.requestFullscreen),
     supportsGamepad: Boolean(navigator.getGamepads),
-    storage: { readJson, writeJson, remove },
+    storage: { readJson, writeJson, remove, describe: describeStorage, listFiles: () => describeStorage().files },
     requestFullscreen,
     exitFullscreen,
     isFullscreen: () => Boolean(document.fullscreenElement),

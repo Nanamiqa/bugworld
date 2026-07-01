@@ -1,0 +1,10 @@
+"AutoCloud"
+{
+  "1"
+  {
+    "Root" "WinAppDataRoaming"
+    "Subdirectory" "variable-city-nightwatch/saves"
+    "Pattern" "variable-city-*.json"
+    "Recursive" "0"
+  }
+}
