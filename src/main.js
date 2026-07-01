@@ -116,7 +116,9 @@ const platform = window.VariableCityPlatform ?? {
 const ARCHIVE_STORAGE_KEY = "variableCityArchive";
 const RUN_SAVE_STORAGE_KEY = "variableCityRunSave";
 const SETTINGS_STORAGE_KEY = "variableCitySettings";
+const ACHIEVEMENT_STORAGE_KEY = "variableCityAchievements";
 const RUN_SAVE_VERSION = 2;
+const achievements = window.variableCityAchievementCatalog ?? [];
 const world = {
   width: 1280,
   height: 720,
@@ -802,6 +804,53 @@ function removePlatformJson(key) {
   platform.storage?.remove?.(key);
 }
 
+function readUnlockedAchievements() {
+  const unlocked = readPlatformJson(ACHIEVEMENT_STORAGE_KEY, []);
+  return Array.isArray(unlocked) ? unlocked : [];
+}
+
+function achievementById(id) {
+  return achievements.find((achievement) => achievement.id === id);
+}
+
+function unlockLocalAchievement(id) {
+  const achievement = achievementById(id);
+  if (!achievement) {
+    return false;
+  }
+  const unlocked = platform.unlockAchievement?.(achievement.steamApiName ?? achievement.id);
+  if (unlocked) {
+    setLog(`成就解锁：${achievement.title}。`);
+    playAudioCue("upgrade-select");
+    return true;
+  }
+  return false;
+}
+
+function evaluateRunAchievements(eventName = "manual") {
+  if (!runStats) {
+    return;
+  }
+  if (eventName === "run_start") {
+    unlockLocalAchievement("ACH_FIRST_SHIFT");
+  }
+  if ((runStats.eventsResolved ?? 0) >= 1) {
+    unlockLocalAchievement("ACH_FIRST_FIX");
+  }
+  if ((runStats.enemiesDefeated ?? 0) >= 10) {
+    unlockLocalAchievement("ACH_TEN_CLEANUPS");
+  }
+  if ((runStats.bossesDefeated ?? 0) >= 1) {
+    unlockLocalAchievement("ACH_FIRST_BOSS");
+  }
+  if ((runStats.chaptersCleared ?? 0) >= 3) {
+    unlockLocalAchievement("ACH_THREE_CHAPTERS");
+  }
+  if ((runStats.synergiesUnlocked?.length ?? 0) >= 1) {
+    unlockLocalAchievement("ACH_RESONANCE");
+  }
+}
+
 function createAudioSystem() {
   return window.createVariableCityAudio?.({ getSettings: () => gameSettings }) ?? null;
 }
@@ -1204,6 +1253,12 @@ function recordRunEnd(victory) {
   archiveState.totalEnemiesDefeated = (archiveState.totalEnemiesDefeated ?? 0) + (runStats?.enemiesDefeated ?? 0);
   archiveState.totalEventsResolved = (archiveState.totalEventsResolved ?? 0) + (runStats?.eventsResolved ?? 0);
   archiveState.lastBuild = getBuildSummary();
+  if (victory) {
+    unlockLocalAchievement("ACH_FULL_CLEAR");
+    if ((runStats?.damageTaken ?? 0) <= 80) {
+      unlockLocalAchievement("ACH_LOW_DAMAGE_CLEAR");
+    }
+  }
   saveArchive();
 }
 
@@ -1262,6 +1317,7 @@ function startNewRun(chapterIndex = 0) {
   seedOfficeBugPickups();
   setChapterObjective(currentChapter().initialObjective ?? "调查办公室异常");
   setLog(currentChapter().startLog ?? "凌晨 03:32，安渡从键盘上醒来。手机显示：外卖订单已超时 999 分钟。");
+  evaluateRunAchievements("run_start");
   syncHud();
   openWeaponSelect();
 }
@@ -1794,6 +1850,7 @@ function finishCurrentChapter() {
   chapterState.finished = true;
   runStats.chaptersCleared += 1;
   recordChapterProgress(currentChapterIndex);
+  evaluateRunAchievements("chapter_cleared");
   if (currentChapterIndex >= chapters.length - 1) {
     endGame(true);
     return;
@@ -2105,6 +2162,7 @@ function unlockConceptSynergies(concept) {
     player.unlockedSynergies.push(key);
     runStats.synergiesUnlocked.push(`${conceptNames[concept] ?? concept}${threshold}`);
     applyActions(conceptSynergyRewards[concept]?.[threshold] ?? []);
+    evaluateRunAchievements("synergy_unlocked");
     setLog(`${conceptNames[concept] ?? concept}共鸣 ${threshold} 层触发，构筑产生额外校准。`);
   }
 }
@@ -2166,6 +2224,7 @@ function renderStartMenu() {
     ["累计击破", `${archiveState.totalEnemiesDefeated ?? 0}`],
     ["平台", getPlatformDisplayLabel()],
     ["存档", getStorageDisplayLabel()],
+    ["成就", `${readUnlockedAchievements().length}/${achievements.length}`],
   ];
   ui.startStats.innerHTML = "";
   for (const [label, value] of stats) {
@@ -2819,6 +2878,7 @@ function clearDefeatedHostiles() {
 
 function defeatEnemy(enemy, particleCount, deferredSpawns = null) {
   runStats.enemiesDefeated += 1;
+  evaluateRunAchievements("enemy_defeated");
   burst(enemy.x, enemy.y, enemy.deathColor, particleCount);
   playAudioCue("enemy-down");
   applyEnemyDeathMechanic(enemy, deferredSpawns);
@@ -3670,6 +3730,7 @@ function checkBossDefeat() {
   boss.defeated = true;
   chapterState.bossCleared = true;
   runStats.bossesDefeated += 1;
+  evaluateRunAchievements("boss_defeated");
   protocolHazards = [];
   enemyHazards = [];
   enemies = [];
@@ -4104,6 +4165,7 @@ function resolveEvent(choice) {
   playAudioCue("ui-confirm");
   applyActions(choice.actions);
   runStats.eventsResolved += 1;
+  evaluateRunAchievements("event_resolved");
   const removed = bugNodes.splice(activeEvent.index, 1)[0];
   burst(removed.x, removed.y, removed.event.color, 28);
   spawnBugPickup(removed.x, removed.y, 1, 3);

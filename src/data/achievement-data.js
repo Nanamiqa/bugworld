@@ -1,0 +1,60 @@
+(function () {
+  window.variableCityAchievementCatalog = [
+    {
+      id: "ACH_FIRST_SHIFT",
+      title: "第一次夜巡",
+      description: "从档案柜开启任意一轮夜巡。",
+      steamApiName: "ACH_FIRST_SHIFT",
+      trigger: "run_start",
+    },
+    {
+      id: "ACH_FIRST_FIX",
+      title: "第一枚断点",
+      description: "解决任意一个异常事件。",
+      steamApiName: "ACH_FIRST_FIX",
+      trigger: "event_resolved",
+    },
+    {
+      id: "ACH_TEN_CLEANUPS",
+      title: "清扫十处噪声",
+      description: "单轮击破 10 个敌对异常。",
+      steamApiName: "ACH_TEN_CLEANUPS",
+      trigger: "enemy_defeated",
+    },
+    {
+      id: "ACH_FIRST_BOSS",
+      title: "打断第一条协议",
+      description: "击败任意章节 Boss。",
+      steamApiName: "ACH_FIRST_BOSS",
+      trigger: "boss_defeated",
+    },
+    {
+      id: "ACH_THREE_CHAPTERS",
+      title: "穿过三层变量城",
+      description: "同一轮中清理至少 3 个章节。",
+      steamApiName: "ACH_THREE_CHAPTERS",
+      trigger: "chapter_cleared",
+    },
+    {
+      id: "ACH_RESONANCE",
+      title: "构筑共鸣",
+      description: "触发任意概念 2 层或 4 层共鸣。",
+      steamApiName: "ACH_RESONANCE",
+      trigger: "synergy_unlocked",
+    },
+    {
+      id: "ACH_FULL_CLEAR",
+      title: "公共规则校准",
+      description: "完成五章完整流程并通关。",
+      steamApiName: "ACH_FULL_CLEAR",
+      trigger: "victory",
+    },
+    {
+      id: "ACH_LOW_DAMAGE_CLEAR",
+      title: "低噪声通关",
+      description: "以不超过 80 点总受伤完成五章。",
+      steamApiName: "ACH_LOW_DAMAGE_CLEAR",
+      trigger: "victory",
+    },
+  ];
+})();
