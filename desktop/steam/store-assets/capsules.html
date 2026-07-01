@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>变量城夜巡 Steam Store Capsule Board</title>
+    <style>
+      :root {
+        --ink: #101827;
+        --muted: #5a6472;
+        --line: rgba(20, 31, 47, 0.16);
+        --teal: #00b8a9;
+        --gold: #ffd166;
+        --rose: #f06f7c;
+        --paper: #f7f7f2;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #eef2f5;
+        color: var(--ink);
+        font-family:
+          Inter, "Segoe UI", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+      }
+
+      header {
+        padding: 28px 32px 18px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.82);
+      }
+
+      header p,
+      header h1 {
+        margin: 0;
+      }
+
+      header p {
+        margin-top: 6px;
+        color: var(--muted);
+      }
+
+      main {
+        display: grid;
+        gap: 28px;
+        padding: 28px 32px 56px;
+      }
+
+      .asset-row {
+        display: grid;
+        gap: 10px;
+      }
+
+      .asset-meta {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+      }
+
+      .asset-meta h2 {
+        margin: 0;
+        font-size: 1rem;
+      }
+
+      .asset-meta code {
+        color: var(--muted);
+      }
+
+      .asset {
+        position: relative;
+        width: calc(var(--w) * 1px);
+        height: calc(var(--h) * 1px);
+        max-width: none;
+        overflow: hidden;
+        isolation: isolate;
+        background:
+          linear-gradient(115deg, rgba(16, 24, 39, 0.92), rgba(14, 86, 92, 0.66) 44%, rgba(240, 111, 124, 0.3)),
+          #101827;
+        box-shadow: 0 22px 64px rgba(16, 24, 39, 0.18);
+      }
+
+      .asset img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: -2;
+        filter: saturate(1.08) contrast(1.04);
+      }
+
+      .asset::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background:
+          linear-gradient(90deg, rgba(7, 14, 28, 0.84), rgba(7, 14, 28, 0.38) 48%, rgba(7, 14, 28, 0.12)),
+          repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.08) 0 2px, transparent 2px 22px);
+      }
+
+      .asset::after {
+        content: "";
+        position: absolute;
+        inset: 5.4% 4.6%;
+        border: max(2px, calc(var(--w) * 0.0025px)) solid rgba(255, 255, 255, 0.2);
+        pointer-events: none;
+      }
+
+      .lockup {
+        position: absolute;
+        left: 7%;
+        top: 11%;
+        max-width: 54%;
+        color: white;
+        text-shadow: 0 4px 18px rgba(0, 0, 0, 0.42);
+      }
+
+      .mark {
+        display: inline-flex;
+        gap: 0.5em;
+        align-items: center;
+        margin-bottom: 0.6em;
+        color: var(--gold);
+        font-size: max(12px, calc(var(--w) * 0.018px));
+        font-weight: 800;
+        letter-spacing: 0;
+      }
+
+      .mark span {
+        width: 1.1em;
+        height: 1.1em;
+        border-radius: 0.22em;
+        background:
+          linear-gradient(135deg, var(--teal), transparent),
+          linear-gradient(315deg, var(--gold), var(--rose));
+        transform: rotate(45deg);
+      }
+
+      .title {
+        margin: 0;
+        font-size: max(30px, calc(var(--w) * 0.082px));
+        line-height: 0.98;
+        font-weight: 900;
+        letter-spacing: 0;
+      }
+
+      .subtitle {
+        margin: 0.8em 0 0;
+        color: rgba(255, 255, 255, 0.88);
+        font-size: max(14px, calc(var(--w) * 0.025px));
+        line-height: 1.25;
+        font-weight: 650;
+      }
+
+      .chips {
+        position: absolute;
+        left: 7%;
+        bottom: 9%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: max(8px, calc(var(--w) * 0.01px));
+        max-width: 58%;
+      }
+
+      .chip {
+        padding: 0.44em 0.68em;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        background: rgba(255, 255, 255, 0.13);
+        color: rgba(255, 255, 255, 0.9);
+        font-size: max(11px, calc(var(--w) * 0.018px));
+        font-weight: 750;
+      }
+
+      .system-sigil {
+        position: absolute;
+        right: 8%;
+        bottom: 10%;
+        width: 17%;
+        aspect-ratio: 1;
+        border: max(2px, calc(var(--w) * 0.003px)) solid rgba(255, 255, 255, 0.75);
+        background:
+          linear-gradient(135deg, rgba(0, 184, 169, 0.72), transparent),
+          linear-gradient(315deg, rgba(255, 209, 102, 0.78), rgba(240, 111, 124, 0.55));
+        transform: rotate(45deg);
+        box-shadow: 0 0 42px rgba(0, 184, 169, 0.46);
+      }
+
+      .vertical .lockup,
+      .library .lockup {
+        top: 8%;
+        left: 8%;
+        max-width: 76%;
+      }
+
+      .vertical .title,
+      .library .title {
+        font-size: max(42px, calc(var(--w) * 0.15px));
+      }
+
+      .vertical .subtitle,
+      .library .subtitle {
+        font-size: max(16px, calc(var(--w) * 0.036px));
+      }
+
+      .vertical .chips,
+      .library .chips {
+        left: 8%;
+        right: 8%;
+        bottom: 8%;
+        max-width: 84%;
+      }
+
+      .small .lockup {
+        left: 6%;
+        top: 15%;
+        max-width: 76%;
+      }
+
+      .small .mark {
+        display: none;
+      }
+
+      .small .title {
+        font-size: 42px;
+      }
+
+      .small .subtitle {
+        margin-top: 6px;
+        font-size: 15px;
+      }
+
+      .small .chips,
+      .small .system-sigil {
+        display: none;
+      }
+
+      .hero .lockup {
+        left: 5%;
+        top: 17%;
+        max-width: 44%;
+      }
+
+      .hero .title {
+        font-size: 150px;
+      }
+
+      .hero .subtitle {
+        font-size: 38px;
+      }
+
+      .hero .chips {
+        left: 5%;
+        bottom: 13%;
+        max-width: 48%;
+      }
+
+      .icon::before,
+      .icon img,
+      .icon .lockup,
+      .icon .chips {
+        display: none;
+      }
+
+      .icon {
+        display: grid;
+        place-items: center;
+        background:
+          linear-gradient(135deg, #152238, #0a706a 54%, #f06f7c),
+          #101827;
+      }
+
+      .icon .system-sigil {
+        position: static;
+        width: 58%;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>变量城夜巡 Steam Store Capsule Board</h1>
+      <p>Use a local server and export each element at its exact pixel size. Source image: variable-city-key-art.png.</p>
+    </header>
+    <main>
+      <section class="asset-row">
+        <div class="asset-meta">
+          <h2>Header Capsule</h2>
+          <code>920 x 430</code>
+        </div>
+        <div id="header_capsule" class="asset" style="--w: 920; --h: 430">
+          <img src="../../../src/assets/scenes/variable-city-key-art.png" alt="" />
+          <div class="lockup">
+            <div class="mark"><span></span>URBAN ANOMALY ROGUELITE</div>
+            <h3 class="title">变量城夜巡</h3>
+            <p class="subtitle">修 bug，叠祝福，校准一座失眠的规则城市。</p>
+          </div>
+          <div class="chips">
+            <span class="chip">五章夜巡</span>
+            <span class="chip">概念共鸣</span>
+            <span class="chip">Boss 机制战</span>
+          </div>
+          <div class="system-sigil"></div>
+        </div>
+      </section>
+
+      <section class="asset-row">
+        <div class="asset-meta">
+          <h2>Small Capsule</h2>
+          <code>462 x 174</code>
+        </div>
+        <div id="small_capsule" class="asset small" style="--w: 462; --h: 174">
+          <img src="../../../src/assets/scenes/variable-city-key-art.png" alt="" />
+          <div class="lockup">
+            <h3 class="title">变量城夜巡</h3>
+            <p class="subtitle">Variable City Nightwatch</p>
+          </div>
+          <div class="system-sigil"></div>
+        </div>
+      </section>
+
+      <section class="asset-row">
+        <div class="asset-meta">
+          <h2>Main Capsule</h2>
+          <code>1232 x 706</code>
+        </div>
+        <div id="main_capsule" class="asset" style="--w: 1232; --h: 706">
+          <img src="../../../src/assets/scenes/variable-city-key-art.png" alt="" />
+          <div class="lockup">
+            <div class="mark"><span></span>DEBUG THE RULES ENGINE</div>
+            <h3 class="title">变量城夜巡</h3>
+            <p class="subtitle">办公室、地铁、夜市、承诺塔、白箱核心，一路把失控规则调回人间。</p>
+          </div>
+          <div class="chips">
+            <span class="chip">动作肉鸽</span>
+            <span class="chip">剧情反转</span>
+            <span class="chip">Steam Deck Ready</span>
+          </div>
+          <div class="system-sigil"></div>
+        </div>
+      </section>
+
+      <section class="asset-row">
+        <div class="asset-meta">
+          <h2>Vertical Capsule</h2>
+          <code>748 x 896</code>
+        </div>
+        <div id="vertical_capsule" class="asset vertical" style="--w: 748; --h: 896">
+          <img src="../../../src/assets/scenes/variable-city-key-art.png" alt="" />
+          <div class="lockup">
+            <div class="mark"><span></span>VARIABLE CITY</div>
+            <h3 class="title">变量城夜巡</h3>
+            <p class="subtitle">一场关于 bug、承诺与公共规则的夜班冒险。</p>
+          </div>
+          <div class="chips">
+            <span class="chip">五章主线</span>
+            <span class="chip">多构筑路线</span>
+          </div>
+          <div class="system-sigil"></div>
+        </div>
+      </section>
+
+      <section class="asset-row">
+        <div class="asset-meta">
+          <h2>Library Capsule</h2>
+          <code>600 x 900</code>
+        </div>
+        <div id="library_capsule" class="asset library" style="--w: 600; --h: 900">
+          <img src="../../../src/assets/scenes/variable-city-key-art.png" alt="" />
+          <div class="lockup">
+            <div class="mark"><span></span>NIGHTWATCH</div>
+            <h3 class="title">变量城夜巡</h3>
+            <p class="subtitle">Debug anomalies. Stack blessings. Save the city.</p>
+          </div>
+          <div class="chips">
+            <span class="chip">Roguelite</span>
+            <span class="chip">Story</span>
+          </div>
+          <div class="system-sigil"></div>
+        </div>
+      </section>
+
+      <section class="asset-row">
+        <div class="asset-meta">
+          <h2>Library Hero</h2>
+          <code>3840 x 1240</code>
+        </div>
+        <div id="library_hero" class="asset hero" style="--w: 3840; --h: 1240">
+          <img src="../../../src/assets/scenes/variable-city-key-art.png" alt="" />
+          <div class="lockup">
+            <div class="mark"><span></span>PUBLIC RULES ENGINE ONLINE</div>
+            <h3 class="title">变量城夜巡</h3>
+            <p class="subtitle">A compact urban anomaly roguelite about debugging a city that refuses to sleep.</p>
+          </div>
+          <div class="chips">
+            <span class="chip">Five Chapters</span>
+            <span class="chip">Build Synergies</span>
+            <span class="chip">Readable Boss Mechanics</span>
+          </div>
+          <div class="system-sigil"></div>
+        </div>
+      </section>
+
+      <section class="asset-row">
+        <div class="asset-meta">
+          <h2>Community Icon</h2>
+          <code>184 x 184</code>
+        </div>
+        <div id="community_icon" class="asset icon" style="--w: 184; --h: 184">
+          <div class="system-sigil"></div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

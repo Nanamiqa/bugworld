@@ -1,0 +1,227 @@
+{
+  "schemaVersion": 1,
+  "sourceDate": "2026-07-01",
+  "steamworksReferences": [
+    {
+      "label": "Steamworks Graphical Assets",
+      "url": "https://partner.steamgames.com/doc/store/assets"
+    },
+    {
+      "label": "Steamworks Trailers",
+      "url": "https://partner.steamgames.com/doc/store/trailer"
+    }
+  ],
+  "brand": {
+    "zhCN": "变量城夜巡",
+    "enUS": "Variable City Nightwatch",
+    "taglineZhCN": "在公共规则引擎失控前，把一座城市从异常里调试回来。",
+    "taglineEnUS": "Debug an anomalous city before its public rules engine forgets how people work.",
+    "primaryKeyArt": "src/assets/scenes/variable-city-key-art.png"
+  },
+  "sourceImages": [
+    {
+      "id": "variable-city-key-art",
+      "path": "src/assets/scenes/variable-city-key-art.png",
+      "usage": ["capsule-background", "store-header", "press-kit"]
+    },
+    {
+      "id": "boss-delivery-rider",
+      "path": "src/assets/bosses/delivery-rider-boss-portrait-v2.png",
+      "usage": ["chapter-one-screenshot-callout", "trailer-beat"]
+    },
+    {
+      "id": "office-prop-sheet",
+      "path": "src/assets/scenes/office-night-scene-prop-sheet.png",
+      "usage": ["store-capsule-detail", "press-kit"]
+    }
+  ],
+  "capsules": [
+    {
+      "id": "header_capsule",
+      "label": "Header Capsule",
+      "width": 920,
+      "height": 430,
+      "required": true,
+      "status": "source-ready",
+      "source": "desktop/steam/store-assets/capsules.html#header_capsule",
+      "plannedOutput": "desktop/steam/store-assets/export/header_capsule.png",
+      "composition": "Key art crop with Chinese title, English subtitle, and a readable action silhouette."
+    },
+    {
+      "id": "small_capsule",
+      "label": "Small Capsule",
+      "width": 462,
+      "height": 174,
+      "required": true,
+      "status": "source-ready",
+      "source": "desktop/steam/store-assets/capsules.html#small_capsule",
+      "plannedOutput": "desktop/steam/store-assets/export/small_capsule.png",
+      "composition": "High-contrast title mark and compact key art crop for list views."
+    },
+    {
+      "id": "main_capsule",
+      "label": "Main Capsule",
+      "width": 1232,
+      "height": 706,
+      "required": true,
+      "status": "source-ready",
+      "source": "desktop/steam/store-assets/capsules.html#main_capsule",
+      "plannedOutput": "desktop/steam/store-assets/export/main_capsule.png",
+      "composition": "Full hero crop, chapter silhouettes, and roguelite/debugging value proposition."
+    },
+    {
+      "id": "vertical_capsule",
+      "label": "Vertical Capsule",
+      "width": 748,
+      "height": 896,
+      "required": true,
+      "status": "source-ready",
+      "source": "desktop/steam/store-assets/capsules.html#vertical_capsule",
+      "plannedOutput": "desktop/steam/store-assets/export/vertical_capsule.png",
+      "composition": "Poster-like version for discount and discovery surfaces."
+    },
+    {
+      "id": "library_capsule",
+      "label": "Library Capsule",
+      "width": 600,
+      "height": 900,
+      "required": true,
+      "status": "source-ready",
+      "source": "desktop/steam/store-assets/capsules.html#library_capsule",
+      "plannedOutput": "desktop/steam/store-assets/export/library_capsule.png",
+      "composition": "Tall library cover with large title and clean center subject."
+    },
+    {
+      "id": "library_hero",
+      "label": "Library Hero",
+      "width": 3840,
+      "height": 1240,
+      "required": true,
+      "status": "source-ready",
+      "source": "desktop/steam/store-assets/capsules.html#library_hero",
+      "plannedOutput": "desktop/steam/store-assets/export/library_hero.png",
+      "composition": "Wide hero background with title-safe empty area and no dense UI text."
+    },
+    {
+      "id": "community_icon",
+      "label": "Community Icon",
+      "width": 184,
+      "height": 184,
+      "required": true,
+      "status": "source-ready",
+      "source": "desktop/steam/store-assets/capsules.html#community_icon",
+      "plannedOutput": "desktop/steam/store-assets/export/community_icon.png",
+      "composition": "Square debug shard icon using the game's teal/yellow anomaly palette."
+    }
+  ],
+  "screenshots": [
+    {
+      "id": "screenshot_01_start_menu",
+      "title": "档案柜与章节练习入口",
+      "width": 1920,
+      "height": 1080,
+      "status": "planned",
+      "targetFile": "desktop/steam/store-assets/screenshots/01-start-menu.png",
+      "captureUrl": "index.html?storeShot=start-menu",
+      "mustShow": ["开始界面", "章节练习", "存档统计", "成就计数"]
+    },
+    {
+      "id": "screenshot_02_chapter_one_map",
+      "title": "第一章办公室地图与新办公桌椅",
+      "width": 1920,
+      "height": 1080,
+      "status": "planned",
+      "targetFile": "desktop/steam/store-assets/screenshots/02-office-map.png",
+      "captureUrl": "index.html?storeShot=chapter-1",
+      "mustShow": ["办公室障碍层", "可互动任务点", "武器弹幕", "异常实体"]
+    },
+    {
+      "id": "screenshot_03_roguelite_build",
+      "title": "变量祝福与概念共鸣构筑",
+      "width": 1920,
+      "height": 1080,
+      "status": "planned",
+      "targetFile": "desktop/steam/store-assets/screenshots/03-roguelite-build.png",
+      "captureUrl": "index.html?storeShot=upgrade",
+      "mustShow": ["三选一升级", "稀有度", "概念标签", "构筑摘要"]
+    },
+    {
+      "id": "screenshot_04_boss_protocol_rider",
+      "title": "第一章 Boss：协议骑手·周行",
+      "width": 1920,
+      "height": 1080,
+      "status": "planned",
+      "targetFile": "desktop/steam/store-assets/screenshots/04-boss-protocol-rider.png",
+      "captureUrl": "index.html?storeShot=boss-1",
+      "mustShow": ["Boss 阶段", "专属攻击特效", "躲避空间", "战斗日志"]
+    },
+    {
+      "id": "screenshot_05_late_chapter",
+      "title": "后续章节：公共规则引擎核心",
+      "width": 1920,
+      "height": 1080,
+      "status": "planned",
+      "targetFile": "desktop/steam/store-assets/screenshots/05-whitebox-core.png",
+      "captureUrl": "index.html?storeShot=chapter-5",
+      "mustShow": ["章节差异化地图", "规则引擎敌人", "危险区", "终局氛围"]
+    },
+    {
+      "id": "screenshot_06_pc_settings",
+      "title": "PC 设置、全屏、音频与手柄",
+      "width": 1920,
+      "height": 1080,
+      "status": "planned",
+      "targetFile": "desktop/steam/store-assets/screenshots/06-pc-settings.png",
+      "captureUrl": "index.html?storeShot=settings",
+      "mustShow": ["设置界面", "音量", "手柄输入", "全屏偏好"]
+    }
+  ],
+  "trailer": {
+    "id": "announce-trailer-75s",
+    "targetDurationSeconds": 75,
+    "status": "planned",
+    "format": "1080p gameplay-first trailer, no prerendered fake UI",
+    "beats": [
+      {
+        "timecode": "00:00-00:07",
+        "title": "Hook",
+        "shot": "Key art fade into the city rules engine waking up."
+      },
+      {
+        "timecode": "00:07-00:18",
+        "title": "Core Loop",
+        "shot": "Explore the office, kite anomalies, collect bug points, choose a weapon."
+      },
+      {
+        "timecode": "00:18-00:31",
+        "title": "Build Variety",
+        "shot": "Fast cuts of variable blessings, concept resonance, and weapon synergies."
+      },
+      {
+        "timecode": "00:31-00:46",
+        "title": "Chapter Variety",
+        "shot": "Show metro, hash market, promise tower, and whitebox core map mechanics."
+      },
+      {
+        "timecode": "00:46-01:03",
+        "title": "Boss Mechanics",
+        "shot": "Protocol rider phases, delayed bursts, shield windows, and readable counters."
+      },
+      {
+        "timecode": "01:03-01:15",
+        "title": "Close",
+        "shot": "Title lockup, Steam wishlist callout, and the GitHub Pages demo URL for press."
+      }
+    ]
+  },
+  "localization": [
+    {
+      "locale": "zh-CN",
+      "shortDescription": "在失控的公共规则引擎里打怪、修 bug、拿祝福，调试一座不肯睡觉的变量城市。"
+    },
+    {
+      "locale": "en-US",
+      "shortDescription": "A compact urban anomaly roguelite about fixing bugs, stacking strange blessings, and debugging a city that refuses to sleep."
+    }
+  ]
+}

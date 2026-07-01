@@ -46,7 +46,8 @@
 - [ ] 安装 Electron 依赖并验证桌面窗口启动。
 - [x] 接入音频系统的设置项、静音和第一批 UI / 战斗音效。
 - [x] 增加本地成就事件、成就清单与 Steamworks 映射草案。
-- [ ] 准备 Steam 商店截图、capsule 和宣传片素材清单。
+- [x] 准备 Steam 商店截图、capsule 和宣传片素材清单。
+- [ ] 从 capsule source board 导出最终 PNG/JPG，并接入截图自动捕获或人工复核流程。
 
 ## 每小时自动检查模板
 

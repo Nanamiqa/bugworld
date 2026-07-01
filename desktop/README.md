@@ -33,11 +33,23 @@ npm run dist:win
 npm run check:cloud
 ```
 
+检查 Steam 商店素材生产清单：
+
+```powershell
+npm run check:store-assets
+```
+
 当前 Auto-Cloud 草案在 `desktop/steam/steam-autocloud.example.vdf`：
 
 - Root: `WinAppDataRoaming`
 - Subdirectory: `variable-city-nightwatch/saves`
 - Pattern: `variable-city-*.json`
+
+商店素材生产包在 `desktop/steam/store-assets/`：
+
+- `store-assets.json` 记录 capsule、截图、宣传片镜头和中英文短描述。
+- `capsules.html` 用现有 key art 生成第一版 capsule source board。
+- `export/` 和 `screenshots/` 用于后续保存 Steam 可提交 PNG/JPG。
 
 ## 不影响 Pages 的约束
 
