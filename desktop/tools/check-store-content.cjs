@@ -26,6 +26,23 @@ function assertNoForbiddenText(text, label) {
   }
 }
 
+function readPngSize(relativePath) {
+  const absolutePath = path.join(rootDir, relativePath);
+  if (!fs.existsSync(absolutePath)) {
+    fail(`missing PNG artifact ${relativePath}`);
+    return null;
+  }
+  const buffer = fs.readFileSync(absolutePath);
+  if (buffer.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a") {
+    fail(`PNG expected for ${relativePath}`);
+    return null;
+  }
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20)
+  };
+}
+
 if (content.schemaVersion !== 1) {
   fail("schemaVersion must be 1");
 }
@@ -140,6 +157,36 @@ if (!Array.isArray(content.humanReviewChecklist) || content.humanReviewChecklist
   fail("humanReviewChecklist needs at least five review items");
 }
 
+const previews = content.reviewArtifacts?.contentPreviews ?? [];
+if (previews.length !== localizations.length) {
+  fail(`contentPreviews must include one image per localization, got ${previews.length}`);
+}
+const previewLocales = new Set();
+for (const preview of previews) {
+  if (!preview.locale || previewLocales.has(preview.locale)) {
+    fail(`duplicate or missing content preview locale: ${preview.locale ?? "(missing)"}`);
+  }
+  previewLocales.add(preview.locale);
+  if (!locales.has(preview.locale)) {
+    fail(`content preview references unknown locale ${preview.locale}`);
+  }
+  if (preview.status !== "ready") {
+    fail(`content preview ${preview.locale} must be marked ready`);
+  }
+  const size = readPngSize(preview.path);
+  if (size && (size.width !== preview.width || size.height !== preview.height)) {
+    fail(`content preview ${preview.locale} must be ${preview.width}x${preview.height}, got ${size.width}x${size.height}`);
+  }
+  if (preview.width !== 1920 || preview.height !== 1080) {
+    fail(`content preview ${preview.locale} should stay 1920x1080 for review capture`);
+  }
+}
+for (const locale of locales) {
+  if (!previewLocales.has(locale)) {
+    fail(`missing content preview for ${locale}`);
+  }
+}
+
 if (errors.length > 0) {
   console.error(errors.join("\n"));
   process.exit(1);
@@ -147,5 +194,5 @@ if (errors.length > 0) {
 
 console.log(
   `Steam store content ok: ${localizations.length} localizations, ${tags.length} tags, ` +
-    `${content.storeFeatures.length} store features`
+    `${content.storeFeatures.length} store features, ${previews.length} preview images`
 );

@@ -14,6 +14,7 @@
 - `desktop/tools/export-store-capsules.ps1`：使用现有 key art 和 manifest 导出 Steam capsule PNG。
 - `desktop/tools/capture-store-screenshots.ps1`：启动本地静态服务器，用 Edge / Chrome headless 捕获商店截图。
 - `desktop/tools/export-store-contact-sheet.ps1`：把最终截图展示顺序导出为 1920 x 1080 复核图。
+- `desktop/tools/export-store-content-preview.ps1`：把中英文商店页文案导出为人工复核预览图。
 - `desktop/tools/check-store-assets.cjs`：校验必需 capsule 尺寸、截图数量、源素材引用、宣传片镜头结构。
 - `desktop/tools/check-store-page.cjs`：校验 Steam 页面截图顺序、capsule 引用和复核图尺寸。
 - `desktop/tools/check-store-content.cjs`：校验商店页文案、标签、语言支持、功能和配置草案。
@@ -88,6 +89,17 @@ npm run export:store-contact-sheet
 
 - `desktop/steam/store-assets/review/store-screenshot-contact-sheet.png`
 
+生成商店文案预览图：
+
+```powershell
+npm run export:store-content-preview
+```
+
+输出文件：
+
+- `desktop/steam/store-assets/review/store-content-preview-zh-CN.png`
+- `desktop/steam/store-assets/review/store-content-preview-en-US.png`
+
 ## 宣传片结构
 
 首版宣传片目标 75 秒，按以下顺序剪：
@@ -108,6 +120,7 @@ npm run export:store-contact-sheet
 - 语言支持：简体中文和英文界面/字幕，暂不声明完整音频。
 - 商店功能：单人、成就草案、Steam Cloud 草案、基础手柄输入。
 - Windows 最低/推荐配置草案；Electron 打包成功后需要实测并更新。
+- 中英文 1920 x 1080 商店页预览图，用于人工检查标题、短描述、卖点、标签和系统需求顺序。
 
 校验重点包括：描述不含外链、不使用 Steam UI 或价格导向措辞、标签数量在 5 到 20 之间、英文 fallback 存在、系统需求字段完整。
 

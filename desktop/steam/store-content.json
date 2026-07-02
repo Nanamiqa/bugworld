@@ -140,6 +140,24 @@
     "flashing": "Contains projectile and boss warning effects; photosensitivity review is still required.",
     "onlineInteractions": "None in the current scope."
   },
+  "reviewArtifacts": {
+    "contentPreviews": [
+      {
+        "locale": "zh-CN",
+        "path": "desktop/steam/store-assets/review/store-content-preview-zh-CN.png",
+        "width": 1920,
+        "height": 1080,
+        "status": "ready"
+      },
+      {
+        "locale": "en-US",
+        "path": "desktop/steam/store-assets/review/store-content-preview-en-US.png",
+        "width": 1920,
+        "height": 1080,
+        "status": "ready"
+      }
+    ]
+  },
   "humanReviewChecklist": [
     "Confirm final Steam tag ordering in the Steamworks Tag Wizard.",
     "Review Chinese and English descriptions in the visual editor preview.",

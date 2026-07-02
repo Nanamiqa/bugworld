@@ -15,6 +15,7 @@
     "check:electron-shell": "node desktop/tools/check-electron-shell.cjs",
     "export:store-capsules": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tools/export-store-capsules.ps1",
     "export:store-contact-sheet": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tools/export-store-contact-sheet.ps1",
+    "export:store-content-preview": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tools/export-store-content-preview.ps1",
     "desktop": "electron .",
     "desktop:smoke": "node desktop/tools/run-electron-smoke.cjs",
     "dist:win": "electron-builder --win dir"
