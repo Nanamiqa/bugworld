@@ -18,6 +18,7 @@
     "export:store-contact-sheet": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tools/export-store-contact-sheet.ps1",
     "export:store-content-preview": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tools/export-store-content-preview.ps1",
     "export:announcement-assets": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tools/export-steam-announcement-assets.ps1",
+    "export:announcement-richtext": "node desktop/tools/export-steam-announcement-richtext.cjs",
     "desktop": "electron .",
     "desktop:smoke": "node desktop/tools/run-electron-smoke.cjs",
     "dist:win": "electron-builder --win dir"

@@ -40,6 +40,58 @@ function readPngSize(relativePath) {
   };
 }
 
+function requireTextArtifact(relativePath) {
+  const absolutePath = path.join(rootDir, relativePath);
+  if (!fs.existsSync(absolutePath)) {
+    fail(`missing text artifact ${relativePath}`);
+    return "";
+  }
+  return fs.readFileSync(absolutePath, "utf8");
+}
+
+function countMatches(text, pattern) {
+  return (text.match(pattern) ?? []).length;
+}
+
+function validateBbcodeExport(exportEntry, localization) {
+  if (exportEntry.status !== "ready") {
+    fail(`rich text export ${exportEntry.locale} must be marked ready`);
+  }
+  if (exportEntry.format !== "steam_bbcode") {
+    fail(`rich text export ${exportEntry.locale} must use steam_bbcode format`);
+  }
+  if (!exportEntry.path?.endsWith(".bbcode")) {
+    fail(`rich text export ${exportEntry.locale} must use a .bbcode path`);
+  }
+  const text = requireTextArtifact(exportEntry.path);
+  if (!text) {
+    return;
+  }
+  assertNoRawLinks(text, `rich text export ${exportEntry.locale}`);
+  for (const requiredText of [localization.title, localization.summary, localization.opening, localization.closing]) {
+    if (!text.includes(requiredText)) {
+      fail(`rich text export ${exportEntry.locale} is missing text: ${requiredText}`);
+    }
+  }
+  for (const section of localization.sections ?? []) {
+    if (!text.includes(`[h2]${section.heading}[/h2]`) || !text.includes(section.body)) {
+      fail(`rich text export ${exportEntry.locale} is missing section ${section.heading}`);
+    }
+  }
+  for (const item of [...(localization.roadmap ?? []), ...(localization.feedbackChannels ?? [])]) {
+    if (!text.includes(`[*] ${item}`)) {
+      fail(`rich text export ${exportEntry.locale} is missing list item: ${item}`);
+    }
+  }
+  for (const tag of ["h1", "h2", "b", "i", "list"]) {
+    const open = countMatches(text, new RegExp(`\\[${tag}\\]`, "g"));
+    const close = countMatches(text, new RegExp(`\\[/${tag}\\]`, "g"));
+    if (open !== close) {
+      fail(`rich text export ${exportEntry.locale} has unbalanced [${tag}] tags`);
+    }
+  }
+}
+
 if (announcement.schemaVersion !== 1) {
   fail("schemaVersion must be 1");
 }
@@ -121,6 +173,27 @@ for (const requiredLocale of ["zh-CN", "en-US"]) {
   }
 }
 
+const richTextExports = announcement.richTextExports ?? [];
+if (richTextExports.length !== localizations.length) {
+  fail(`richTextExports must include one file per localization, got ${richTextExports.length}`);
+}
+const richTextByLocale = new Map();
+for (const exportEntry of richTextExports) {
+  if (!exportEntry.locale || richTextByLocale.has(exportEntry.locale)) {
+    fail(`duplicate or missing rich text export locale: ${exportEntry.locale ?? "(missing)"}`);
+    continue;
+  }
+  richTextByLocale.set(exportEntry.locale, exportEntry);
+}
+for (const localization of localizations) {
+  const exportEntry = richTextByLocale.get(localization.locale);
+  if (!exportEntry) {
+    fail(`missing rich text export for ${localization.locale}`);
+    continue;
+  }
+  validateBbcodeExport(exportEntry, localization);
+}
+
 const cover = announcement.eventAssets?.cover;
 const header = announcement.eventAssets?.header;
 for (const [label, asset, expectedWidth, expectedHeight] of [
@@ -152,4 +225,7 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log(`Steam announcement ok: ${localizations.length} localizations, cover 800x450, header 1920x622`);
+console.log(
+  `Steam announcement ok: ${localizations.length} localizations, cover 800x450, ` +
+    `header 1920x622, ${richTextExports.length} rich text exports`
+);

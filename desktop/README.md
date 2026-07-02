@@ -80,6 +80,12 @@ npm run export:store-content-preview
 npm run export:announcement-assets
 ```
 
+生成 Steam Demo 公告富文本粘贴版：
+
+```powershell
+npm run export:announcement-richtext
+```
+
 当前 Auto-Cloud 草案在 `desktop/steam/steam-autocloud.example.vdf`：
 
 - Root: `WinAppDataRoaming`
@@ -91,6 +97,7 @@ npm run export:announcement-assets
 - `store-assets.json` 记录 capsule、截图、宣传片镜头和中英文短描述。
 - `../store-content.json` 记录可录入 Steamworks 的文案、标签、语言支持和系统需求草案。
 - `../announcement-draft.json` 记录 Demo 上线前公告草案、路线图、反馈入口和事件图。
+- `../announcements/` 保存可粘贴到 Steam 事件编辑器的 BBCode 草案。
 - `capsules.html` 用现有 key art 生成第一版 capsule source board。
 - `export/` 保存可提交的 capsule PNG，`screenshots/` 保存 headless 浏览器捕获的 Steam 截图，`review/` 保存截图顺序和文案预览图，`events/` 保存公告事件图。
 

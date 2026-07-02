@@ -45,6 +45,20 @@
       "status": "ready"
     }
   },
+  "richTextExports": [
+    {
+      "locale": "zh-CN",
+      "path": "desktop/steam/announcements/demo-scope-preview-001.zh-CN.bbcode",
+      "format": "steam_bbcode",
+      "status": "ready"
+    },
+    {
+      "locale": "en-US",
+      "path": "desktop/steam/announcements/demo-scope-preview-001.en-US.bbcode",
+      "format": "steam_bbcode",
+      "status": "ready"
+    }
+  ],
   "localizations": [
     {
       "locale": "zh-CN",

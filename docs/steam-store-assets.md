@@ -16,6 +16,7 @@
 - `desktop/tools/export-store-contact-sheet.ps1`：把最终截图展示顺序导出为 1920 x 1080 复核图。
 - `desktop/tools/export-store-content-preview.ps1`：把中英文商店页文案导出为人工复核预览图。
 - `desktop/tools/export-steam-announcement-assets.ps1`：导出 Demo 公告 cover/header 图。
+- `desktop/tools/export-steam-announcement-richtext.cjs`：导出 Demo 公告中英文 Steam BBCode 粘贴版。
 - `desktop/tools/check-store-assets.cjs`：校验必需 capsule 尺寸、截图数量、源素材引用、宣传片镜头结构。
 - `desktop/tools/check-store-page.cjs`：校验 Steam 页面截图顺序、capsule 引用和复核图尺寸。
 - `desktop/tools/check-store-content.cjs`：校验商店页文案、标签、语言支持、功能和配置草案。
@@ -113,6 +114,17 @@ npm run export:announcement-assets
 
 - `desktop/steam/store-assets/events/demo-announcement-cover.png`
 - `desktop/steam/store-assets/events/demo-announcement-header.png`
+
+生成 Demo 公告富文本粘贴版：
+
+```powershell
+npm run export:announcement-richtext
+```
+
+输出文件：
+
+- `desktop/steam/announcements/demo-scope-preview-001.zh-CN.bbcode`
+- `desktop/steam/announcements/demo-scope-preview-001.en-US.bbcode`
 
 ## 宣传片结构
 
