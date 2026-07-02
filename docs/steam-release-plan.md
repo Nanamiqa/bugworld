@@ -43,8 +43,10 @@
 - [x] 添加平台适配层，保证 Pages 和桌面版共用核心逻辑。
 - [x] 添加暂停、设置、全屏、手柄基础输入。
 - [x] 为桌面壳接入准备不破坏网页的目录结构。
+- [x] 增加 Electron 桌面壳预检和可自动退出的桌面窗口 smoke test。
 - [x] 将桌面存档路径整理成 Steam Auto-Cloud 配置草案。
-- [ ] 安装 Electron 依赖并验证桌面窗口启动。
+- [ ] 安装 Electron 依赖并运行 `npm run desktop:smoke` 验证桌面窗口启动。
+- [ ] 解决 Electron 二进制下载超时，生成 `package-lock.json`，详见 `docs/steam-desktop-smoke.md`。
 - [x] 接入音频系统的设置项、静音和第一批 UI / 战斗音效。
 - [x] 增加本地成就事件、成就清单与 Steamworks 映射草案。
 - [x] 准备 Steam 商店截图、capsule 和宣传片素材清单。

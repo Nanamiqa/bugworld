@@ -19,6 +19,20 @@ npm install
 npm run desktop
 ```
 
+无依赖的桌面壳预检：
+
+```powershell
+npm run check:electron-shell
+```
+
+安装依赖后的自动窗口加载检查：
+
+```powershell
+npm run desktop:smoke
+```
+
+验证细节和当前 Electron 下载阻塞记录见 `docs/steam-desktop-smoke.md`。
+
 构建 Windows 目录包：
 
 ```powershell
