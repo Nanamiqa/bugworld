@@ -60,7 +60,8 @@
 - [x] 生成 Steam 活动本地化导入 CSV 草案，方便后续批量录入事件标题、摘要和正文。
 - [x] 回到 Electron 阻塞项，清理/重装 Electron 二进制并重新尝试 `npm run desktop:smoke`。
 - [x] 运行 `npm run dist:win` 并校验 `dist/steam-demo` 目录包可作为 SteamPipe 上传源。
-- [ ] 稳定 Electron Builder 在自动化中的退出行为，避免目录包已产出但命令超时。
+- [x] 稳定 Electron Builder 在自动化中的退出行为，避免目录包已产出但命令超时。
+- [ ] 增加桌面版长时间运行巡检脚本，采样 10-15 分钟内的页面错误、FPS 区间、存档写入和内存占用。
 
 ## 每小时自动检查模板
 
@@ -75,6 +76,7 @@
    - `node --check src/platform/web-platform.js`
    - 新增桌面脚本的 `node --check`
    - 资源引用检查、图片尺寸或透明度等素材检查
+   - 涉及桌面发行时运行 `npm run dist:win`，它会自动串联目录包结构检查和打包 exe smoke test
    - 必要时浏览器本地加载检查
 5. 提交并推送 `origin/main`。
 6. 检查 GitHub Pages 仍可访问。

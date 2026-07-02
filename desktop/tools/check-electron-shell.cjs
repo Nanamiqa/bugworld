@@ -57,6 +57,12 @@ if (packageJson) {
   if (!packageJson.scripts?.["dist:win"]) {
     errors.push("package.json scripts.dist:win is required");
   }
+  if (packageJson.scripts?.["dist:win"] !== "node desktop/tools/run-dist-win.cjs") {
+    errors.push("package.json scripts.dist:win must use the stability wrapper");
+  }
+  if (!packageJson.scripts?.["dist:win:raw"]) {
+    errors.push("package.json scripts.dist:win:raw is required for direct electron-builder access");
+  }
   if (!packageJson.scripts?.["dist:check"]) {
     errors.push("package.json scripts.dist:check is required");
   }
@@ -71,6 +77,12 @@ if (packageJson) {
   }
   if (packageJson.build?.extraMetadata?.main !== "desktop/electron/main.cjs") {
     errors.push("build.extraMetadata.main must point at desktop/electron/main.cjs");
+  }
+  if (packageJson.build?.electronDist !== "node_modules/electron/dist") {
+    errors.push("build.electronDist must point at node_modules/electron/dist");
+  }
+  if (packageJson.build?.win?.signAndEditExecutable !== false) {
+    errors.push("build.win.signAndEditExecutable must be false for unsigned dir smoke builds");
   }
   const files = packageJson.build?.files ?? [];
   for (const requiredPattern of ["index.html", "src/**/*", "desktop/electron/**/*", "desktop/steam/**/*"]) {

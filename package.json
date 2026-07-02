@@ -3,9 +3,10 @@
   "version": "0.3.0",
   "private": true,
   "description": "A static Canvas roguelike demo with a GitHub Pages web build and a Steam-ready desktop shell.",
+  "author": "NanamiQA",
   "main": "desktop/electron/main.cjs",
   "scripts": {
-    "check": "node --check src/main.js && node --check src/data/game-data.js && node --check src/data/achievement-data.js && node --check src/platform/web-platform.js && node --check src/audio/synth-audio.js && node --check desktop/electron/main.cjs && node --check desktop/electron/preload.cjs && node --check desktop/tools/check-store-assets.cjs && node --check desktop/tools/check-store-page.cjs && node --check desktop/tools/check-store-content.cjs && node --check desktop/tools/check-steam-announcement.cjs && node --check desktop/tools/check-electron-shell.cjs && node --check desktop/tools/run-electron-smoke.cjs && node --check desktop/tools/check-dist-package.cjs && node --check desktop/tools/run-packaged-smoke.cjs && node desktop/tools/check-steam-cloud-layout.cjs && node desktop/tools/check-achievements.cjs && node desktop/tools/check-store-assets.cjs && node desktop/tools/check-store-page.cjs && node desktop/tools/check-store-content.cjs && node desktop/tools/check-steam-announcement.cjs && node desktop/tools/check-electron-shell.cjs",
+    "check": "node --check src/main.js && node --check src/data/game-data.js && node --check src/data/achievement-data.js && node --check src/platform/web-platform.js && node --check src/audio/synth-audio.js && node --check desktop/electron/main.cjs && node --check desktop/electron/preload.cjs && node --check desktop/tools/check-store-assets.cjs && node --check desktop/tools/check-store-page.cjs && node --check desktop/tools/check-store-content.cjs && node --check desktop/tools/check-steam-announcement.cjs && node --check desktop/tools/check-electron-shell.cjs && node --check desktop/tools/run-electron-smoke.cjs && node --check desktop/tools/check-dist-package.cjs && node --check desktop/tools/run-packaged-smoke.cjs && node --check desktop/tools/run-dist-win.cjs && node desktop/tools/check-steam-cloud-layout.cjs && node desktop/tools/check-achievements.cjs && node desktop/tools/check-store-assets.cjs && node desktop/tools/check-store-page.cjs && node desktop/tools/check-store-content.cjs && node desktop/tools/check-steam-announcement.cjs && node desktop/tools/check-electron-shell.cjs",
     "check:achievements": "node desktop/tools/check-achievements.cjs",
     "check:cloud": "node desktop/tools/check-steam-cloud-layout.cjs",
     "check:store-assets": "node desktop/tools/check-store-assets.cjs",
@@ -23,7 +24,8 @@
     "export:announcement-localization": "node desktop/tools/export-steam-announcement-localization.cjs",
     "desktop": "electron .",
     "desktop:smoke": "node desktop/tools/run-electron-smoke.cjs",
-    "dist:win": "electron-builder --win dir",
+    "dist:win": "node desktop/tools/run-dist-win.cjs",
+    "dist:win:raw": "electron-builder --win dir --publish never",
     "dist:check": "node desktop/tools/check-dist-package.cjs",
     "dist:smoke": "node desktop/tools/run-packaged-smoke.cjs"
   },
@@ -38,6 +40,11 @@
     "asar": true,
     "directories": {
       "output": "dist/steam-demo"
+    },
+    "electronDist": "node_modules/electron/dist",
+    "electronDownload": {
+      "mirror": "https://npmmirror.com/mirrors/electron/",
+      "cache": "tmp/electron-cache"
     },
     "files": [
       "index.html",
@@ -55,6 +62,7 @@
       "main": "desktop/electron/main.cjs"
     },
     "win": {
+      "signAndEditExecutable": false,
       "target": [
         {
           "target": "dir",
