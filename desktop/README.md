@@ -51,6 +51,8 @@ npm run check:cloud
 
 ```powershell
 npm run check:store-assets
+npm run check:store-page
+npm run check:store-content
 ```
 
 导出 Steam capsule PNG：
@@ -74,6 +76,7 @@ npm run capture:store-screenshots
 商店素材生产包在 `desktop/steam/store-assets/`：
 
 - `store-assets.json` 记录 capsule、截图、宣传片镜头和中英文短描述。
+- `../store-content.json` 记录可录入 Steamworks 的文案、标签、语言支持和系统需求草案。
 - `capsules.html` 用现有 key art 生成第一版 capsule source board。
 - `export/` 保存可提交的 capsule PNG，`screenshots/` 保存 headless 浏览器捕获的 Steam 截图。
 

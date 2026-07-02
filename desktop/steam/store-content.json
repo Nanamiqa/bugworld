@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "draftDate": "2026-07-02",
+  "sourceNotes": [
+    {
+      "label": "Steam Store Page",
+      "url": "https://partner.steamgames.com/doc/store/page",
+      "appliesTo": ["required store checklist", "written description restrictions"]
+    },
+    {
+      "label": "Steam Tags",
+      "url": "https://partner.steamgames.com/doc/store/tags",
+      "appliesTo": ["minimum five tags", "top twenty tag ordering"]
+    },
+    {
+      "label": "Steam Languages",
+      "url": "https://partner.steamgames.com/doc/store/localization/languages",
+      "appliesTo": ["Steam language codes", "English fallback"]
+    }
+  ],
+  "appIdentity": {
+    "appNameZhCN": "变量城夜巡",
+    "appNameEnUS": "Variable City Nightwatch",
+    "developer": "NanamiQA",
+    "publisher": "NanamiQA",
+    "releaseTrack": "Steam Demo first, full game later",
+    "storePageStatus": "draft_ready_for_human_review"
+  },
+  "localizations": [
+    {
+      "locale": "zh-CN",
+      "steamLanguageCode": "schinese",
+      "isFallback": false,
+      "interface": true,
+      "subtitles": true,
+      "fullAudio": false,
+      "shortDescription": "在一座被公共规则引擎扭曲的夜城里清怪、修 bug、堆叠变量祝福、破解 Boss 阶段机制，并在五个风格不同的章节中组合武器、利用地形，把失控城市一点点调试回来。",
+      "aboutSections": [
+        {
+          "heading": "调试一座失控城市",
+          "body": "你是夜班调试员安渡。办公室、环线站台、哈希夜市、承诺塔和白箱核心正在被异常规则改写，普通怪、精英怪和 Boss 都带着能被观察、躲避和反制的机制，玩家需要在混乱现场里找出规则漏洞。"
+        },
+        {
+          "heading": "把临场选择变成构筑",
+          "body": "武器、变量祝福、概念共鸣和章节事件会把每一局推向不同方向。你可以围绕投射物、修复脉冲、闪避窗口、异常清理和 Boss 弱点做出越来越锋利的组合，也可能临场转向一套完全不同的解决办法。"
+        },
+        {
+          "heading": "五章主线与章节练习",
+          "body": "当前版本已经包含五章试玩主线、章节练习入口、本地存档、成就草案、PC 设置、音频选项、全屏和手柄基础输入，网页试玩与桌面发行壳共用同一套核心逻辑，方便持续打磨到 Steam Demo 规格。"
+        }
+      ],
+      "featureBullets": [
+        "五个主题章节，每章都有独立地图元素、危险区、互动点和 Boss 战。",
+        "奇特但可克服的敌人机制，包括护盾、延迟爆发、分裂、污染地面和节奏攻击。",
+        "轻肉鸽构筑：武器、祝福、概念标签与局内升级互相叠加。",
+        "支持暂停、设置、音频、全屏、本地存档和章节练习。",
+        "保留 GitHub Pages 在线试玩，同时准备 Steam 桌面版发行流程。"
+      ]
+    },
+    {
+      "locale": "en-US",
+      "steamLanguageCode": "english",
+      "isFallback": true,
+      "interface": true,
+      "subtitles": true,
+      "fullAudio": false,
+      "shortDescription": "Debug a city twisted by a public rules engine: clear anomalies, stack variable blessings, read boss patterns, and push through five compact roguelite chapters.",
+      "aboutSections": [
+        {
+          "heading": "Debug a City That Refuses to Sleep",
+          "body": "You play as An Du, a night-shift debugger dropped into offices, metro platforms, hash markets, promise towers, and a whitebox core where public rules have started rewriting reality."
+        },
+        {
+          "heading": "Turn Pressure Into Builds",
+          "body": "Weapons, variable blessings, concept resonance, and chapter events push each run in a different direction. Build around projectiles, repair pulses, dodge windows, anomaly cleanup, and boss weak phases."
+        },
+        {
+          "heading": "A Focused Steam Demo Path",
+          "body": "The current build includes five playable chapters, chapter practice, local saves, achievement drafts, PC settings, audio controls, fullscreen support, and basic controller input while sharing the same core as the web demo."
+        }
+      ],
+      "featureBullets": [
+        "Five themed chapters with distinct map props, hazards, interaction points, and boss fights.",
+        "Readable enemy mechanics such as shields, delayed bursts, splits, polluted ground, and rhythm attacks.",
+        "Light roguelite buildcraft across weapons, blessings, concept tags, and in-run upgrades.",
+        "Pause, settings, audio, fullscreen, local saves, and chapter practice are already wired.",
+        "Built to keep the GitHub Pages demo live while preparing a Steam desktop release."
+      ]
+    }
+  ],
+  "tags": [
+    { "rank": 1, "name": "Action Roguelike", "reason": "Primary loop is repeated combat runs with upgrades." },
+    { "rank": 2, "name": "Roguelite", "reason": "Run-based progression with build choices and meta persistence." },
+    { "rank": 3, "name": "Bullet Hell", "reason": "Boss and elite attacks emphasize readable projectile patterns." },
+    { "rank": 4, "name": "Top-Down Shooter", "reason": "Canvas combat uses a top-down playfield and projectile weapons." },
+    { "rank": 5, "name": "Action RPG", "reason": "Character stats, weapons, pickups, and boss mechanics drive combat." },
+    { "rank": 6, "name": "Story Rich", "reason": "Five chapters and character logs frame the city debugging mystery." },
+    { "rank": 7, "name": "Sci-fi", "reason": "Rules engines, variables, and data structures shape the setting." },
+    { "rank": 8, "name": "Cyberpunk", "reason": "Urban night systems, delivery protocols, and public infrastructure anomalies." },
+    { "rank": 9, "name": "Singleplayer", "reason": "The current scope is a solo campaign and practice mode." },
+    { "rank": 10, "name": "2D", "reason": "The game renders through a 2D Canvas pipeline." },
+    { "rank": 11, "name": "Pixel Graphics", "reason": "Sprite-like top-down readability is the current art target." },
+    { "rank": 12, "name": "Controller", "reason": "Basic controller movement, dodge, pulse, and pause are wired." },
+    { "rank": 13, "name": "Atmospheric", "reason": "Each chapter has a distinct night-city mood and audio layer." },
+    { "rank": 14, "name": "Difficult", "reason": "Boss phases and elite modifiers ask players to learn patterns." },
+    { "rank": 15, "name": "Replay Value", "reason": "Build variety, chapter practice, and challenge routes support replays." },
+    { "rank": 16, "name": "Indie", "reason": "Small-team original game with custom systems and assets." }
+  ],
+  "storeFeatures": [
+    { "name": "Single-player", "status": "ready" },
+    { "name": "Steam Achievements", "status": "draft_mapped" },
+    { "name": "Steam Cloud", "status": "draft_layout_ready" },
+    { "name": "Partial Controller Support", "status": "ready_basic_input" }
+  ],
+  "systemRequirements": {
+    "status": "draft_until_packaged_build",
+    "windows": {
+      "minimum": {
+        "os": "Windows 10 64-bit",
+        "processor": "Intel Core i3-6100 / AMD FX-6300 or better",
+        "memory": "4 GB RAM",
+        "graphics": "DirectX 11 compatible integrated or dedicated GPU",
+        "directX": "Version 11",
+        "storage": "500 MB available space",
+        "additionalNotes": "Designed for 1080p Canvas gameplay; final numbers must be rechecked after the packaged desktop build is produced."
+      },
+      "recommended": {
+        "os": "Windows 10/11 64-bit",
+        "processor": "Intel Core i5-8400 / AMD Ryzen 3 3100 or better",
+        "memory": "8 GB RAM",
+        "graphics": "Dedicated GPU with DirectX 11 support",
+        "directX": "Version 11",
+        "storage": "1 GB available space",
+        "additionalNotes": "Recommended for long sessions with full visual effects, audio, and future Steam overlay integration."
+      }
+    }
+  },
+  "contentWarnings": {
+    "violence": "Stylized fantasy combat against anomalous entities.",
+    "flashing": "Contains projectile and boss warning effects; photosensitivity review is still required.",
+    "onlineInteractions": "None in the current scope."
+  },
+  "humanReviewChecklist": [
+    "Confirm final Steam tag ordering in the Steamworks Tag Wizard.",
+    "Review Chinese and English descriptions in the visual editor preview.",
+    "Update system requirements after the first successful packaged Electron build.",
+    "Confirm controller support wording after Steam Input action manifest work.",
+    "Run accessibility and photosensitivity review before store submission."
+  ]
+}

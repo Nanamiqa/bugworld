@@ -16,6 +16,8 @@
 - `desktop/tools/export-store-contact-sheet.ps1`：把最终截图展示顺序导出为 1920 x 1080 复核图。
 - `desktop/tools/check-store-assets.cjs`：校验必需 capsule 尺寸、截图数量、源素材引用、宣传片镜头结构。
 - `desktop/tools/check-store-page.cjs`：校验 Steam 页面截图顺序、capsule 引用和复核图尺寸。
+- `desktop/tools/check-store-content.cjs`：校验商店页文案、标签、语言支持、功能和配置草案。
+- `desktop/steam/store-content.json`：Steam 商店页录入草案，包含中英文文案、标签顺序、语言表和系统需求。
 - `desktop/steam/store-assets/export/`：后续导出 PNG 的目标目录。
 - `desktop/steam/store-assets/screenshots/`：后续捕获商店截图的目标目录。
 - `desktop/steam/store-assets/review/`：商店页人工复核和排序确认图。
@@ -97,11 +99,24 @@ npm run export:store-contact-sheet
 5. 17 秒：Boss 阶段、窗口期和可读攻击。
 6. 12 秒：标题、愿望单、试玩入口和 Steam Deck / PC 体验点。
 
+## 商店页内容草案
+
+`desktop/steam/store-content.json` 现在记录可录入 Steamworks 的首版内容：
+
+- 中文与英文 fallback 短描述、About This Game 段落和功能 bullet。
+- 16 个按权重排序的 Steam 标签，首位突出 `Action Roguelike`。
+- 语言支持：简体中文和英文界面/字幕，暂不声明完整音频。
+- 商店功能：单人、成就草案、Steam Cloud 草案、基础手柄输入。
+- Windows 最低/推荐配置草案；Electron 打包成功后需要实测并更新。
+
+校验重点包括：描述不含外链、不使用 Steam UI 或价格导向措辞、标签数量在 5 到 20 之间、英文 fallback 存在、系统需求字段完整。
+
 ## 校验
 
 ```powershell
 npm run check:store-assets
 npm run check:store-page
+npm run check:store-content
 ```
 
 完整项目校验也会执行该脚本：

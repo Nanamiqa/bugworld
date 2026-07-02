@@ -5,11 +5,12 @@
   "description": "A static Canvas roguelike demo with a GitHub Pages web build and a Steam-ready desktop shell.",
   "main": "desktop/electron/main.cjs",
   "scripts": {
-    "check": "node --check src/main.js && node --check src/data/game-data.js && node --check src/data/achievement-data.js && node --check src/platform/web-platform.js && node --check src/audio/synth-audio.js && node --check desktop/electron/main.cjs && node --check desktop/electron/preload.cjs && node --check desktop/tools/check-store-assets.cjs && node --check desktop/tools/check-store-page.cjs && node --check desktop/tools/check-electron-shell.cjs && node --check desktop/tools/run-electron-smoke.cjs && node desktop/tools/check-steam-cloud-layout.cjs && node desktop/tools/check-achievements.cjs && node desktop/tools/check-store-assets.cjs && node desktop/tools/check-store-page.cjs && node desktop/tools/check-electron-shell.cjs",
+    "check": "node --check src/main.js && node --check src/data/game-data.js && node --check src/data/achievement-data.js && node --check src/platform/web-platform.js && node --check src/audio/synth-audio.js && node --check desktop/electron/main.cjs && node --check desktop/electron/preload.cjs && node --check desktop/tools/check-store-assets.cjs && node --check desktop/tools/check-store-page.cjs && node --check desktop/tools/check-store-content.cjs && node --check desktop/tools/check-electron-shell.cjs && node --check desktop/tools/run-electron-smoke.cjs && node desktop/tools/check-steam-cloud-layout.cjs && node desktop/tools/check-achievements.cjs && node desktop/tools/check-store-assets.cjs && node desktop/tools/check-store-page.cjs && node desktop/tools/check-store-content.cjs && node desktop/tools/check-electron-shell.cjs",
     "check:achievements": "node desktop/tools/check-achievements.cjs",
     "check:cloud": "node desktop/tools/check-steam-cloud-layout.cjs",
     "check:store-assets": "node desktop/tools/check-store-assets.cjs",
     "check:store-page": "node desktop/tools/check-store-page.cjs",
+    "check:store-content": "node desktop/tools/check-store-content.cjs",
     "capture:store-screenshots": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tools/capture-store-screenshots.ps1",
     "check:electron-shell": "node desktop/tools/check-electron-shell.cjs",
     "export:store-capsules": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tools/export-store-capsules.ps1",
