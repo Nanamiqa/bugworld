@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "reviewDate": "2026-07-02",
+  "steamPageGoal": "Lead with readable combat, then prove map variety, build depth, late-game scale, persistence, and PC settings.",
+  "screenshotOrder": [
+    {
+      "rank": 1,
+      "id": "screenshot_04_boss_protocol_rider",
+      "role": "hero_combat",
+      "reason": "Boss mechanics and VFX sell the game faster than a menu screen."
+    },
+    {
+      "rank": 2,
+      "id": "screenshot_02_chapter_one_map",
+      "role": "core_exploration",
+      "reason": "Shows the upgraded chapter-one office map, obstacles, weapons, and enemies."
+    },
+    {
+      "rank": 3,
+      "id": "screenshot_03_roguelite_build",
+      "role": "build_depth",
+      "reason": "Makes the roguelite promise concrete with blessings, rarity, and synergy tags."
+    },
+    {
+      "rank": 4,
+      "id": "screenshot_05_late_chapter",
+      "role": "chapter_variety",
+      "reason": "Confirms the later chapters are visually and mechanically distinct."
+    },
+    {
+      "rank": 5,
+      "id": "screenshot_01_start_menu",
+      "role": "meta_progression",
+      "reason": "Documents the start screen, chapter practice, save slot, and achievement counters."
+    },
+    {
+      "rank": 6,
+      "id": "screenshot_06_pc_settings",
+      "role": "pc_readiness",
+      "reason": "Shows settings, audio, fullscreen, and controller support for Steam users."
+    }
+  ],
+  "capsuleUse": {
+    "primaryStoreHeader": "header_capsule",
+    "discovery": "main_capsule",
+    "library": "library_capsule",
+    "wideLibrary": "library_hero",
+    "community": "community_icon"
+  },
+  "reviewArtifacts": {
+    "contactSheet": {
+      "path": "desktop/steam/store-assets/review/store-screenshot-contact-sheet.png",
+      "width": 1920,
+      "height": 1080,
+      "status": "ready"
+    }
+  }
+}

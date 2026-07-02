@@ -13,9 +13,12 @@
 - `desktop/steam/store-assets/capsules.html`：使用现有 key art 排版的 capsule source board。
 - `desktop/tools/export-store-capsules.ps1`：使用现有 key art 和 manifest 导出 Steam capsule PNG。
 - `desktop/tools/capture-store-screenshots.ps1`：启动本地静态服务器，用 Edge / Chrome headless 捕获商店截图。
+- `desktop/tools/export-store-contact-sheet.ps1`：把最终截图展示顺序导出为 1920 x 1080 复核图。
 - `desktop/tools/check-store-assets.cjs`：校验必需 capsule 尺寸、截图数量、源素材引用、宣传片镜头结构。
+- `desktop/tools/check-store-page.cjs`：校验 Steam 页面截图顺序、capsule 引用和复核图尺寸。
 - `desktop/steam/store-assets/export/`：后续导出 PNG 的目标目录。
 - `desktop/steam/store-assets/screenshots/`：后续捕获商店截图的目标目录。
+- `desktop/steam/store-assets/review/`：商店页人工复核和排序确认图。
 
 ## Capsule 当前尺寸
 
@@ -47,13 +50,13 @@ npm run export:store-capsules
 
 ## 截图计划
 
-首批准备 6 张 1920 x 1080 商店截图：
+首批准备 6 张 1920 x 1080 商店截图。最终 Steam 页面展示顺序记录在 `desktop/steam/store-assets/store-page.json`：
 
-1. 档案柜与章节练习入口。
+1. 第一章 Boss 协议骑手·周行。
 2. 第一章办公室地图与新办公桌椅。
 3. 变量祝福与概念共鸣构筑。
-4. 第一章 Boss 协议骑手·周行。
-5. 后续章节公共规则引擎核心。
+4. 后续章节公共规则引擎核心。
+5. 档案柜与章节练习入口。
 6. PC 设置、全屏、音频与手柄。
 
 每张截图都在 `store-assets.json` 里记录 `mustShow` 检查项。后续可以把 `storeShot` 查询参数接入游戏调试态，让 Playwright 或浏览器手动捕获稳定场景。
@@ -73,6 +76,16 @@ npm run capture:store-screenshots
 - `desktop/steam/store-assets/screenshots/05-whitebox-core.png`
 - `desktop/steam/store-assets/screenshots/06-pc-settings.png`
 
+生成当前页面顺序复核图：
+
+```powershell
+npm run export:store-contact-sheet
+```
+
+输出文件：
+
+- `desktop/steam/store-assets/review/store-screenshot-contact-sheet.png`
+
 ## 宣传片结构
 
 首版宣传片目标 75 秒，按以下顺序剪：
@@ -88,6 +101,7 @@ npm run capture:store-screenshots
 
 ```powershell
 npm run check:store-assets
+npm run check:store-page
 ```
 
 完整项目校验也会执行该脚本：
