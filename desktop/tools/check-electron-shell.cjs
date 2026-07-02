@@ -51,8 +51,17 @@ if (packageJson) {
   if (!packageJson.scripts?.["desktop:smoke"]) {
     errors.push("package.json scripts.desktop:smoke is required");
   }
+  if (!packageJson.scripts?.["desktop:install-electron"]) {
+    errors.push("package.json scripts.desktop:install-electron is required");
+  }
   if (!packageJson.scripts?.["dist:win"]) {
     errors.push("package.json scripts.dist:win is required");
+  }
+  if (!packageJson.scripts?.["dist:check"]) {
+    errors.push("package.json scripts.dist:check is required");
+  }
+  if (!packageJson.scripts?.["dist:smoke"]) {
+    errors.push("package.json scripts.dist:smoke is required");
   }
   if (!packageJson.devDependencies?.electron) {
     errors.push("Electron devDependency is required");
@@ -90,4 +99,4 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log("Electron shell preflight ok: entry, bridge, storage, smoke script, and build files are wired");
+console.log("Electron shell preflight ok: entry, bridge, storage, smoke scripts, and build files are wired");

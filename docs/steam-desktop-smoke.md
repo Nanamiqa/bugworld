@@ -22,6 +22,7 @@ npm run check:electron-shell
 
 ```powershell
 npm install
+npm run desktop:install-electron
 npm run desktop:smoke
 ```
 
@@ -38,9 +39,27 @@ npm run desktop:smoke
 Electron smoke ok: {"title":"变量城夜巡","hasCanvas":true,"platformId":"electron","storageMode":"file"}
 ```
 
-## 2026-07-02 当前阻塞
+如果 Electron 的 npm 包存在但 `node_modules/electron/dist/electron.exe` 缺失，可以单独重跑二进制安装：
 
-本轮已尝试：
+```powershell
+npm run desktop:install-electron
+```
+
+该脚本默认使用 `https://npmmirror.com/mirrors/electron/` 作为 `ELECTRON_MIRROR`，并把下载缓存放在 `tmp/electron-cache`。如需使用其他镜像，先设置 `ELECTRON_MIRROR` 环境变量再运行该脚本。
+
+构建 Windows 目录包后验证产物：
+
+```powershell
+npm run dist:win
+npm run dist:check
+npm run dist:smoke
+```
+
+构建输出会进入 `dist/steam-demo`。`dist:check` 会确认 `win-unpacked`、产品 exe、`resources/app.asar` 和关键运行库存在；`dist:smoke` 会直接启动打包后的 exe，并用 `VARIABLE_CITY_ELECTRON_SMOKE=1` 验证它能加载游戏页面后自动退出。下一步接 SteamPipe 时可以把 `dist/steam-demo/win-unpacked` 作为上传源之一。
+
+## 2026-07-02 修复记录
+
+前序尝试：
 
 ```powershell
 npm install
@@ -50,8 +69,27 @@ npm run desktop:smoke
 
 结果：`npm install` 与 `npm rebuild electron` 都在长时间等待后超时，`node_modules/electron` 只有 npm 包元数据，Electron 二进制没有成功下载。`npm run desktop:smoke` 因此提示 Electron 未正确安装。
 
-下一轮可继续从以下任一方向推进：
+本轮已完成：
 
-- 在网络稳定后重新运行 `npm install`，生成 `package-lock.json` 并完成 Electron 二进制下载。
-- 若 registry / mirror 继续卡住，切换 Electron 下载镜像或预下载缓存目录。
-- 依赖完成后运行 `npm run desktop:smoke`，通过后再尝试 `npm run dist:win`。
+```powershell
+npm run desktop:install-electron
+npm run desktop:smoke
+npm install --package-lock-only --ignore-scripts
+```
+
+结果：Electron 31.7.7 Windows 二进制已下载到 `node_modules/electron/dist/electron.exe`，`desktop:smoke` 已通过，`package-lock.json` 已生成。
+
+## 2026-07-02 目录包验证
+
+本轮运行 `npm run dist:win` 时，Electron Builder 已产出 `dist/steam-demo/win-unpacked`，但命令在自动化 shell 中超过 180 秒超时。随后已直接验证产物：
+
+```powershell
+npm run dist:check
+npm run dist:smoke
+```
+
+结果：`win-unpacked` 结构完整，打包后的 `变量城夜巡.exe` 在 smoke 模式下能加载页面并返回：
+
+```text
+Electron smoke ok: {"title":"变量城夜巡","hasCanvas":true,"platformId":"electron","storageMode":"file"}
+```

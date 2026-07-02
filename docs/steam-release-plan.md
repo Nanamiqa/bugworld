@@ -45,8 +45,8 @@
 - [x] 为桌面壳接入准备不破坏网页的目录结构。
 - [x] 增加 Electron 桌面壳预检和可自动退出的桌面窗口 smoke test。
 - [x] 将桌面存档路径整理成 Steam Auto-Cloud 配置草案。
-- [ ] 安装 Electron 依赖并运行 `npm run desktop:smoke` 验证桌面窗口启动。
-- [ ] 解决 Electron 二进制下载超时，生成 `package-lock.json`，详见 `docs/steam-desktop-smoke.md`。
+- [x] 安装 Electron 依赖并运行 `npm run desktop:smoke` 验证桌面窗口启动。
+- [x] 解决 Electron 二进制下载超时，生成 `package-lock.json`，详见 `docs/steam-desktop-smoke.md`。
 - [x] 接入音频系统的设置项、静音和第一批 UI / 战斗音效。
 - [x] 增加本地成就事件、成就清单与 Steamworks 映射草案。
 - [x] 准备 Steam 商店截图、capsule 和宣传片素材清单。
@@ -58,7 +58,9 @@
 - [x] 制作首版 Steam 新闻/公告草案，用于 Demo 上线前说明玩法范围、路线图和反馈入口。
 - [x] 针对公告草案生成 Steam 富文本粘贴版，减少发布前的手工排版成本。
 - [x] 生成 Steam 活动本地化导入 CSV 草案，方便后续批量录入事件标题、摘要和正文。
-- [ ] 回到 Electron 阻塞项，清理/重装 Electron 二进制并重新尝试 `npm run desktop:smoke`。
+- [x] 回到 Electron 阻塞项，清理/重装 Electron 二进制并重新尝试 `npm run desktop:smoke`。
+- [x] 运行 `npm run dist:win` 并校验 `dist/steam-demo` 目录包可作为 SteamPipe 上传源。
+- [ ] 稳定 Electron Builder 在自动化中的退出行为，避免目录包已产出但命令超时。
 
 ## 每小时自动检查模板
 
