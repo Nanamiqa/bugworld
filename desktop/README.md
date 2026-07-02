@@ -53,6 +53,7 @@ npm run check:cloud
 npm run check:store-assets
 npm run check:store-page
 npm run check:store-content
+npm run check:announcement
 ```
 
 导出 Steam capsule PNG：
@@ -73,6 +74,12 @@ npm run capture:store-screenshots
 npm run export:store-content-preview
 ```
 
+生成 Steam Demo 公告事件图：
+
+```powershell
+npm run export:announcement-assets
+```
+
 当前 Auto-Cloud 草案在 `desktop/steam/steam-autocloud.example.vdf`：
 
 - Root: `WinAppDataRoaming`
@@ -83,8 +90,9 @@ npm run export:store-content-preview
 
 - `store-assets.json` 记录 capsule、截图、宣传片镜头和中英文短描述。
 - `../store-content.json` 记录可录入 Steamworks 的文案、标签、语言支持和系统需求草案。
+- `../announcement-draft.json` 记录 Demo 上线前公告草案、路线图、反馈入口和事件图。
 - `capsules.html` 用现有 key art 生成第一版 capsule source board。
-- `export/` 保存可提交的 capsule PNG，`screenshots/` 保存 headless 浏览器捕获的 Steam 截图，`review/` 保存截图顺序和文案预览图。
+- `export/` 保存可提交的 capsule PNG，`screenshots/` 保存 headless 浏览器捕获的 Steam 截图，`review/` 保存截图顺序和文案预览图，`events/` 保存公告事件图。
 
 ## 不影响 Pages 的约束
 

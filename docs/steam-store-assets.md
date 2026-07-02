@@ -15,10 +15,13 @@
 - `desktop/tools/capture-store-screenshots.ps1`：启动本地静态服务器，用 Edge / Chrome headless 捕获商店截图。
 - `desktop/tools/export-store-contact-sheet.ps1`：把最终截图展示顺序导出为 1920 x 1080 复核图。
 - `desktop/tools/export-store-content-preview.ps1`：把中英文商店页文案导出为人工复核预览图。
+- `desktop/tools/export-steam-announcement-assets.ps1`：导出 Demo 公告 cover/header 图。
 - `desktop/tools/check-store-assets.cjs`：校验必需 capsule 尺寸、截图数量、源素材引用、宣传片镜头结构。
 - `desktop/tools/check-store-page.cjs`：校验 Steam 页面截图顺序、capsule 引用和复核图尺寸。
 - `desktop/tools/check-store-content.cjs`：校验商店页文案、标签、语言支持、功能和配置草案。
+- `desktop/tools/check-steam-announcement.cjs`：校验 Demo 公告文案、路线图、反馈入口和事件图尺寸。
 - `desktop/steam/store-content.json`：Steam 商店页录入草案，包含中英文文案、标签顺序、语言表和系统需求。
+- `desktop/steam/announcement-draft.json`：Demo 上线前 Steam 新闻/公告草案。
 - `desktop/steam/store-assets/export/`：后续导出 PNG 的目标目录。
 - `desktop/steam/store-assets/screenshots/`：后续捕获商店截图的目标目录。
 - `desktop/steam/store-assets/review/`：商店页人工复核和排序确认图。
@@ -100,6 +103,17 @@ npm run export:store-content-preview
 - `desktop/steam/store-assets/review/store-content-preview-zh-CN.png`
 - `desktop/steam/store-assets/review/store-content-preview-en-US.png`
 
+生成 Demo 公告事件图：
+
+```powershell
+npm run export:announcement-assets
+```
+
+输出文件：
+
+- `desktop/steam/store-assets/events/demo-announcement-cover.png`
+- `desktop/steam/store-assets/events/demo-announcement-header.png`
+
 ## 宣传片结构
 
 首版宣传片目标 75 秒，按以下顺序剪：
@@ -130,6 +144,7 @@ npm run export:store-content-preview
 npm run check:store-assets
 npm run check:store-page
 npm run check:store-content
+npm run check:announcement
 ```
 
 完整项目校验也会执行该脚本：
