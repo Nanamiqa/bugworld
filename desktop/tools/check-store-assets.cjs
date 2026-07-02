@@ -134,6 +134,13 @@ if (manifest) {
     }
     if (screenshot.status === "ready") {
       requireFile(screenshot.targetFile, `Ready screenshot ${screenshot.id}`);
+      const pngSize = readPngSize(screenshot.targetFile);
+      if (pngSize && (pngSize.width !== screenshot.width || pngSize.height !== screenshot.height)) {
+        errors.push(
+          `Ready screenshot ${screenshot.id} must be ${screenshot.width}x${screenshot.height}, got ` +
+            `${pngSize.width}x${pngSize.height}`
+        );
+      }
     }
   }
 

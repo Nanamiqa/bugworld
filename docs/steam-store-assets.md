@@ -12,6 +12,7 @@
 - `desktop/steam/store-assets/store-assets.json`：capsule、截图、宣传片镜头和中英文短描述清单。
 - `desktop/steam/store-assets/capsules.html`：使用现有 key art 排版的 capsule source board。
 - `desktop/tools/export-store-capsules.ps1`：使用现有 key art 和 manifest 导出 Steam capsule PNG。
+- `desktop/tools/capture-store-screenshots.ps1`：启动本地静态服务器，用 Edge / Chrome headless 捕获商店截图。
 - `desktop/tools/check-store-assets.cjs`：校验必需 capsule 尺寸、截图数量、源素材引用、宣传片镜头结构。
 - `desktop/steam/store-assets/export/`：后续导出 PNG 的目标目录。
 - `desktop/steam/store-assets/screenshots/`：后续捕获商店截图的目标目录。
@@ -56,6 +57,21 @@ npm run export:store-capsules
 6. PC 设置、全屏、音频与手柄。
 
 每张截图都在 `store-assets.json` 里记录 `mustShow` 检查项。后续可以把 `storeShot` 查询参数接入游戏调试态，让 Playwright 或浏览器手动捕获稳定场景。
+
+捕获当前 6 张截图：
+
+```powershell
+npm run capture:store-screenshots
+```
+
+输出文件：
+
+- `desktop/steam/store-assets/screenshots/01-start-menu.png`
+- `desktop/steam/store-assets/screenshots/02-office-map.png`
+- `desktop/steam/store-assets/screenshots/03-roguelite-build.png`
+- `desktop/steam/store-assets/screenshots/04-boss-protocol-rider.png`
+- `desktop/steam/store-assets/screenshots/05-whitebox-core.png`
+- `desktop/steam/store-assets/screenshots/06-pc-settings.png`
 
 ## 宣传片结构
 

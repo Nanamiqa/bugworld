@@ -120,7 +120,7 @@
       "title": "档案柜与章节练习入口",
       "width": 1920,
       "height": 1080,
-      "status": "planned",
+      "status": "ready",
       "targetFile": "desktop/steam/store-assets/screenshots/01-start-menu.png",
       "captureUrl": "index.html?storeShot=start-menu",
       "mustShow": ["开始界面", "章节练习", "存档统计", "成就计数"]
@@ -130,7 +130,7 @@
       "title": "第一章办公室地图与新办公桌椅",
       "width": 1920,
       "height": 1080,
-      "status": "planned",
+      "status": "ready",
       "targetFile": "desktop/steam/store-assets/screenshots/02-office-map.png",
       "captureUrl": "index.html?storeShot=chapter-1",
       "mustShow": ["办公室障碍层", "可互动任务点", "武器弹幕", "异常实体"]
@@ -140,7 +140,7 @@
       "title": "变量祝福与概念共鸣构筑",
       "width": 1920,
       "height": 1080,
-      "status": "planned",
+      "status": "ready",
       "targetFile": "desktop/steam/store-assets/screenshots/03-roguelite-build.png",
       "captureUrl": "index.html?storeShot=upgrade",
       "mustShow": ["三选一升级", "稀有度", "概念标签", "构筑摘要"]
@@ -150,7 +150,7 @@
       "title": "第一章 Boss：协议骑手·周行",
       "width": 1920,
       "height": 1080,
-      "status": "planned",
+      "status": "ready",
       "targetFile": "desktop/steam/store-assets/screenshots/04-boss-protocol-rider.png",
       "captureUrl": "index.html?storeShot=boss-1",
       "mustShow": ["Boss 阶段", "专属攻击特效", "躲避空间", "战斗日志"]
@@ -160,7 +160,7 @@
       "title": "后续章节：公共规则引擎核心",
       "width": 1920,
       "height": 1080,
-      "status": "planned",
+      "status": "ready",
       "targetFile": "desktop/steam/store-assets/screenshots/05-whitebox-core.png",
       "captureUrl": "index.html?storeShot=chapter-5",
       "mustShow": ["章节差异化地图", "规则引擎敌人", "危险区", "终局氛围"]
@@ -170,7 +170,7 @@
       "title": "PC 设置、全屏、音频与手柄",
       "width": 1920,
       "height": 1080,
-      "status": "planned",
+      "status": "ready",
       "targetFile": "desktop/steam/store-assets/screenshots/06-pc-settings.png",
       "captureUrl": "index.html?storeShot=settings",
       "mustShow": ["设置界面", "音量", "手柄输入", "全屏偏好"]

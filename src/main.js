@@ -119,6 +119,8 @@ const SETTINGS_STORAGE_KEY = "variableCitySettings";
 const ACHIEVEMENT_STORAGE_KEY = "variableCityAchievements";
 const RUN_SAVE_VERSION = 2;
 const achievements = window.variableCityAchievementCatalog ?? [];
+const storeShotMode = new URLSearchParams(window.location.search).get("storeShot")?.trim() ?? "";
+const isStoreShotMode = Boolean(storeShotMode);
 const world = {
   width: 1280,
   height: 720,
@@ -932,6 +934,12 @@ function loadGameSettings() {
 }
 
 function saveGameSettings() {
+  if (isStoreShotMode) {
+    syncAudioSettings();
+    renderSettingsControls();
+    syncSystemControls();
+    return;
+  }
   writePlatformJson(SETTINGS_STORAGE_KEY, gameSettings);
   syncAudioSettings();
   renderSettingsControls();
@@ -1036,6 +1044,9 @@ function loadArchive() {
 }
 
 function saveArchive() {
+  if (isStoreShotMode) {
+    return;
+  }
   try {
     writePlatformJson(ARCHIVE_STORAGE_KEY, archiveState);
   } catch {
@@ -1093,6 +1104,9 @@ function loadRunSave() {
 }
 
 function saveRunCheckpoint(reason = "auto") {
+  if (isStoreShotMode) {
+    return;
+  }
   if (!player || !chapterState || !runStats || world.mode === "menu" || world.mode === "result") {
     return;
   }
@@ -1132,6 +1146,9 @@ function saveRunCheckpoint(reason = "auto") {
 }
 
 function deleteRunSave() {
+  if (isStoreShotMode) {
+    return;
+  }
   try {
     removePlatformJson(RUN_SAVE_STORAGE_KEY);
   } catch {
@@ -1363,7 +1380,263 @@ function bootGame() {
   syncHud();
   syncSystemControls();
   openStartMenu();
-  applyStartupFullscreenPreference();
+  if (isStoreShotMode) {
+    configureStoreShotMode();
+  } else {
+    applyStartupFullscreenPreference();
+  }
+}
+
+function createStoreArchiveState() {
+  return {
+    bestChapter: chapters.length,
+    wins: 3,
+    runs: 18,
+    totalEnemiesDefeated: 1286,
+    totalEventsResolved: 94,
+    unlockedChapters: chapters.map((_, index) => index),
+    lastBuild: "键盘宏飞弹 + 队列自动机 + 哈希弱点表",
+  };
+}
+
+function resetStoreRun(chapterIndex = 0, options = {}) {
+  archiveState = createStoreArchiveState();
+  runStats = {
+    ...createRunStats(),
+    chaptersCleared: Math.min(chapterIndex, chapters.length - 1),
+    eventsResolved: 9 + chapterIndex * 7,
+    enemiesDefeated: 48 + chapterIndex * 36,
+    bossesDefeated: Math.max(0, chapterIndex),
+    upgradesChosen: ["数组索引器", "队列自动机", "哈希弱点表"],
+    relicsChosen: ["冷掉配送单", "迟到者车票"],
+    conceptsChosen: ["数组", "队列", "哈希", "时间"],
+    synergiesUnlocked: ["队列共鸣", "哈希共鸣"],
+    damageTaken: 32,
+    highestLevel: 6 + chapterIndex,
+    bestChapterReached: chapterIndex,
+  };
+  player = {
+    ...playerBase,
+    hp: options.hp ?? 86,
+    maxHp: 132,
+    level: options.level ?? 6,
+    xp: options.xp ?? 11,
+    xpToNext: 18,
+    bugPoints: options.bugPoints ?? 9,
+    backlash: options.backlash ?? 18 + chapterIndex * 5,
+    fixed: options.fixed ?? 3,
+    relics: ["cold-delivery-note", "late-ticket"],
+    concepts: { array: 2, queue: 3, hash: 2, time: 2 },
+    unlockedSynergies: ["queue-2", "hash-2"],
+  };
+  currentChapterIndex = clamp(chapterIndex, 0, chapters.length - 1);
+  chapterState = createChapterState(options.allies ?? ["qiao-you"]);
+  chapterState.stepIndex = options.stepIndex ?? 2;
+  chapterState.resolvedInStep = options.resolvedInStep ?? 1;
+  chapterState.resolvedTotal = options.resolvedTotal ?? 3 + chapterIndex;
+  nextUpgradeAt = 2;
+  runPanelSignature = "";
+  bugNodes = [];
+  enemies = [];
+  particles = [];
+  bullets = [];
+  bugPickups = [];
+  cleaners = [];
+  boss = null;
+  protocolHazards = [];
+  enemyHazards = [];
+  activeEvent = null;
+  storyState = null;
+  world.mode = "playing";
+  world.animTime = 4.2;
+  world.spawnTimer = 99;
+  world.pulseCooldown = 0;
+  world.dashCooldown = 0;
+  world.allyAssistCooldown = 0;
+  world.mapHazardCooldown = 0;
+  world.enemyLogCooldown = 0;
+  world.cameraShake = 0;
+  world.saveCooldown = 999;
+  syncWorldToCurrentMap();
+  const focus = options.focus ?? currentMap().start ?? { x: 170, y: 560 };
+  player.x = clamp(focus.x, player.radius + 12, world.width - player.radius - 12);
+  player.y = clamp(focus.y, 92 + player.radius, world.height - player.radius - 12);
+  equipWeapon(weaponDefinitions[options.weaponIndex ?? 1] ?? weaponDefinitions[0] ?? {});
+  player.weapon.projectileCount = Math.max(player.weapon.projectileCount ?? 1, options.projectileCount ?? 3);
+  player.weapon.level = options.weaponLevel ?? 3.5;
+  centerCameraOnPlayer();
+  hidePanels();
+  setChapterObjective(options.objective ?? currentChapter().steps?.[chapterState.stepIndex]?.objective ?? currentChapter().initialObjective ?? "继续夜巡");
+  setLog(options.log ?? currentChapter().startLog ?? "商店截图模式：稳定复现夜巡场景。");
+}
+
+function addStoreEnemies(placements) {
+  for (const placement of placements) {
+    spawnEnemyNear(placement.x, placement.y, placement.type, placement.overrides ?? {});
+  }
+}
+
+function addStoreBugNodes(nodes) {
+  bugNodes = nodes.map((node) => createBugNode(node.x, node.y, node.eventId));
+}
+
+function addStoreBullets(target = enemies[0] ?? cleaners[0] ?? boss) {
+  if (!player.weapon || !target) {
+    return;
+  }
+  for (let index = 0; index < 3; index += 1) {
+    fireWeaponAt({
+      x: target.x + index * 28,
+      y: target.y - index * 18,
+    });
+  }
+}
+
+function configureStoreShotMode() {
+  document.documentElement.dataset.storeShot = storeShotMode;
+  gameSettings = {
+    ...gameSettings,
+    screenShake: false,
+    fullscreenOnStart: false,
+    audioMuted: true,
+  };
+  lastInputMethod = "gamepad";
+  archiveState = createStoreArchiveState();
+
+  if (storeShotMode === "start-menu") {
+    openStartMenu();
+    ui.startSummary.textContent = "Steam 商店截图模式：五章主线、章节练习、成就和本地档案已经准备好。";
+    setLog("商店截图：档案柜、章节练习与本地成就统计。");
+    window.__variableCityStoreShotReady = true;
+    return;
+  }
+
+  if (storeShotMode === "chapter-1") {
+    resetStoreRun(0, {
+      focus: { x: 760, y: 430 },
+      weaponIndex: 0,
+      objective: "调查办公室订单异常，清理可互动任务点",
+      log: "办公室地图：新办公桌椅、打印机、服务器门和取餐区都成为路线与障碍。",
+    });
+    addStoreBugNodes([
+      { eventId: "bullet-comments", x: 540, y: 190 },
+      { eventId: "delivery-meat", x: 1010, y: 530 },
+      { eventId: "debug-badge", x: 342, y: 520 },
+    ]);
+    addStoreEnemies([
+      { type: "stress", x: player.x + 210, y: player.y - 110 },
+      { type: "deadline", x: player.x + 310, y: player.y + 70 },
+      { type: "queueSnake", x: player.x - 200, y: player.y - 90 },
+    ]);
+    seedOfficeBugPickups();
+    addStoreBullets();
+    syncHud();
+    window.__variableCityStoreShotReady = true;
+    return;
+  }
+
+  if (storeShotMode === "upgrade") {
+    resetStoreRun(2, {
+      focus: { x: 820, y: 650 },
+      weaponIndex: 1,
+      level: 7,
+      objective: "选择变量祝福，补全数组、队列与哈希构筑",
+      log: "变量祝福三选一：从武器强化、概念共鸣和局内资源之间做取舍。",
+    });
+    player.pendingLevelUps = 1;
+    openUpgrade();
+    syncHud();
+    window.__variableCityStoreShotReady = true;
+    return;
+  }
+
+  if (storeShotMode === "boss-1") {
+    resetStoreRun(0, {
+      focus: { x: 1710, y: 672 },
+      weaponIndex: 1,
+      objective: "Boss 战：打断错误配送协议",
+      log: "Boss 机制：协议骑手进入二阶段，TCP 路线和重传包同时压场。",
+      projectileCount: 4,
+    });
+    startBossFight("delivery-rider");
+    boss.hp = boss.maxHp * 0.58;
+    boss.phase = 2;
+    boss.state = "handshake";
+    boss.lastRoute = { x1: boss.x - 380, y1: boss.y - 82, x2: boss.x + 330, y2: boss.y + 104 };
+    protocolHazards.push({
+      type: "retransmit",
+      x1: boss.x - 470,
+      y1: boss.y + 160,
+      x2: boss.x + 280,
+      y2: boss.y + 160,
+      activeTime: 1.6,
+      radius: 46,
+      damage: 16,
+    });
+    addStoreEnemies([
+      { type: "deadline", x: boss.x - 230, y: boss.y + 120 },
+      { type: "stress", x: boss.x - 340, y: boss.y - 150 },
+    ]);
+    addStoreBullets(boss);
+    centerCameraOnPlayer();
+    syncHud();
+    window.__variableCityStoreShotReady = true;
+    return;
+  }
+
+  if (storeShotMode === "chapter-5") {
+    resetStoreRun(4, {
+      focus: { x: 650, y: 430 },
+      weaponIndex: 2,
+      allies: ["qiao-you", "whitebox"],
+      objective: "公共规则引擎核心：在扫描带之间提交反例",
+      log: "第五章地图：规则扫描、申诉窗口和白箱协助形成终局压迫感。",
+      backlash: 42,
+      fixed: 5,
+    });
+    addStoreBugNodes([
+      { eventId: "whitebox-appeal", x: 500, y: 384 },
+      { eventId: "promise-bloat", x: 790, y: 492 },
+    ]);
+    addStoreEnemies([
+      { type: "inspectionProbe", x: player.x + 250, y: player.y - 140 },
+      { type: "cleaner", x: player.x - 220, y: player.y + 120 },
+      { type: "floatError", x: player.x + 180, y: player.y + 150 },
+    ]);
+    enemyHazards.push({
+      type: "scanLock",
+      x: player.x + 140,
+      y: player.y - 50,
+      radius: 92,
+      life: 3,
+      color: "#72a5ff",
+      armed: true,
+    });
+    addStoreBullets();
+    syncHud();
+    window.__variableCityStoreShotReady = true;
+    return;
+  }
+
+  if (storeShotMode === "settings") {
+    resetStoreRun(1, {
+      focus: { x: 740, y: 420 },
+      weaponIndex: 0,
+      objective: "PC / Steam Deck 设置",
+      log: "设置页：全屏、音频、手柄与输入提示都可在局内暂停时调整。",
+    });
+    gameSettings.masterVolume = 0.72;
+    gameSettings.gamepadEnabled = true;
+    gameSettings.showInputHints = true;
+    openSettingsPanel();
+    syncHud();
+    window.__variableCityStoreShotReady = true;
+    return;
+  }
+
+  openStartMenu();
+  setLog(`未知 storeShot=${storeShotMode}，已回到档案柜。`);
+  window.__variableCityStoreShotReady = true;
 }
 
 function createBugNode(x = random(90, world.width - 90), y = random(96, world.height - 86), eventId = null) {
@@ -2210,8 +2483,8 @@ function renderStartMenu() {
     return;
   }
 
-  archiveState = loadArchive();
-  const runSave = loadRunSave();
+  archiveState = isStoreShotMode ? archiveState : loadArchive();
+  const runSave = isStoreShotMode ? null : loadRunSave();
   const bestChapter = Math.min(archiveState.bestChapter ?? 1, chapters.length);
   ui.startSummary.textContent = runSave
     ? `检测到 ${formatSaveTime(runSave.savedAt)} 的跑局存档：${chapters[runSave.currentChapterIndex]?.title ?? "未知章节"}，${runSave.objective ?? "继续夜巡"}。`
