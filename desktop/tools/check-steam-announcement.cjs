@@ -53,6 +53,44 @@ function countMatches(text, pattern) {
   return (text.match(pattern) ?? []).length;
 }
 
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let inQuotes = false;
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (inQuotes) {
+      if (char === '"' && next === '"') {
+        cell += '"';
+        index++;
+      } else if (char === '"') {
+        inQuotes = false;
+      } else {
+        cell += char;
+      }
+    } else if (char === '"') {
+      inQuotes = true;
+    } else if (char === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (char === "\n") {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else if (char !== "\r") {
+      cell += char;
+    }
+  }
+  if (cell || row.length > 0) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows.filter((csvRow) => csvRow.some((value) => value !== ""));
+}
+
 function validateBbcodeExport(exportEntry, localization) {
   if (exportEntry.status !== "ready") {
     fail(`rich text export ${exportEntry.locale} must be marked ready`);
@@ -92,6 +130,86 @@ function validateBbcodeExport(exportEntry, localization) {
   }
 }
 
+function valueAt(localization, fieldKey) {
+  const [group, indexText, property] = fieldKey.split(".");
+  if (group === "root") {
+    return localization[indexText];
+  }
+  if (group === "section") {
+    return localization.sections?.[Number(indexText)]?.[property];
+  }
+  if (group === "roadmap") {
+    return localization.roadmap?.[Number(indexText)];
+  }
+  if (group === "feedback") {
+    return localization.feedbackChannels?.[Number(indexText)];
+  }
+  return undefined;
+}
+
+function validateCsvExport(exportEntry, localizationsByLocale) {
+  if (exportEntry.status !== "ready") {
+    fail(`localization export ${exportEntry.path} must be marked ready`);
+  }
+  if (exportEntry.format !== "csv") {
+    fail(`localization export ${exportEntry.path} must use csv format`);
+  }
+  if (!exportEntry.path?.endsWith(".csv")) {
+    fail(`localization export ${exportEntry.path} must use a .csv path`);
+  }
+  const text = requireTextArtifact(exportEntry.path);
+  if (!text) {
+    return;
+  }
+  if (text.charCodeAt(0) === 0xfeff) {
+    fail(`localization export ${exportEntry.path} should be UTF-8 without BOM`);
+  }
+  const rows = parseCsv(text);
+  const expectedHeader = ["field_key", "section", "field_type", "zh-CN", "en-US", "notes"];
+  const header = rows[0] ?? [];
+  if (header.join("|") !== expectedHeader.join("|")) {
+    fail(`localization export ${exportEntry.path} has an unexpected header`);
+  }
+  const bodyRows = rows.slice(1);
+  if (bodyRows.length < 14) {
+    fail(`localization export ${exportEntry.path} should contain at least 14 content rows`);
+  }
+  const seenFieldKeys = new Set();
+  for (const csvRow of bodyRows) {
+    if (csvRow.length !== expectedHeader.length) {
+      fail(`localization export ${exportEntry.path} has row with ${csvRow.length} columns`);
+      continue;
+    }
+    const [fieldKey, section, fieldType, zhText, enText, notes] = csvRow;
+    if (!fieldKey || seenFieldKeys.has(fieldKey)) {
+      fail(`localization export ${exportEntry.path} has duplicate or missing field_key: ${fieldKey}`);
+    }
+    seenFieldKeys.add(fieldKey);
+    if (!section || !fieldType || !notes) {
+      fail(`localization export ${exportEntry.path} row ${fieldKey} needs section, field_type, and notes`);
+    }
+    for (const [locale, textValue] of [
+      ["zh-CN", zhText],
+      ["en-US", enText]
+    ]) {
+      if (!textValue) {
+        fail(`localization export ${exportEntry.path} row ${fieldKey} missing ${locale} text`);
+        continue;
+      }
+      const expected = valueAt(localizationsByLocale.get(locale), fieldKey);
+      if (expected !== textValue) {
+        fail(`localization export ${exportEntry.path} row ${fieldKey} does not match ${locale} source text`);
+      }
+      assertNoRawLinks(textValue, `localization export ${exportEntry.path} ${locale} ${fieldKey}`);
+    }
+  }
+  for (const requiredField of ["root.title", "root.summary", "root.opening", "root.closing"]) {
+    if (!seenFieldKeys.has(requiredField)) {
+      fail(`localization export ${exportEntry.path} missing ${requiredField}`);
+    }
+  }
+}
+
 if (announcement.schemaVersion !== 1) {
   fail("schemaVersion must be 1");
 }
@@ -111,6 +229,7 @@ if ((announcement.publishingIntent.doNotPublishBefore ?? []).length < 3) {
 
 const storeLocales = new Set((storeContent.localizations ?? []).map((entry) => entry.locale));
 const localizations = announcement.localizations ?? [];
+const localizationsByLocale = new Map(localizations.map((entry) => [entry.locale, entry]));
 const locales = new Set();
 if (!localizations.some((entry) => entry.locale === "en-US" && entry.isFallback === true)) {
   fail("English fallback announcement localization is required");
@@ -165,6 +284,14 @@ for (const localization of localizations) {
     }
     assertNoRawLinks(item, `${prefix} roadmap or feedback item`);
   }
+}
+
+const localizationExports = announcement.localizationExports ?? [];
+if (localizationExports.length < 1) {
+  fail("localizationExports must include at least one CSV handoff file");
+}
+for (const exportEntry of localizationExports) {
+  validateCsvExport(exportEntry, localizationsByLocale);
 }
 
 for (const requiredLocale of ["zh-CN", "en-US"]) {
@@ -227,5 +354,5 @@ if (errors.length > 0) {
 
 console.log(
   `Steam announcement ok: ${localizations.length} localizations, cover 800x450, ` +
-    `header 1920x622, ${richTextExports.length} rich text exports`
+    `header 1920x622, ${richTextExports.length} rich text exports, ${localizationExports.length} CSV exports`
 );

@@ -17,6 +17,7 @@
 - `desktop/tools/export-store-content-preview.ps1`：把中英文商店页文案导出为人工复核预览图。
 - `desktop/tools/export-steam-announcement-assets.ps1`：导出 Demo 公告 cover/header 图。
 - `desktop/tools/export-steam-announcement-richtext.cjs`：导出 Demo 公告中英文 Steam BBCode 粘贴版。
+- `desktop/tools/export-steam-announcement-localization.cjs`：导出 Demo 公告中英本地化 CSV 交接表。
 - `desktop/tools/check-store-assets.cjs`：校验必需 capsule 尺寸、截图数量、源素材引用、宣传片镜头结构。
 - `desktop/tools/check-store-page.cjs`：校验 Steam 页面截图顺序、capsule 引用和复核图尺寸。
 - `desktop/tools/check-store-content.cjs`：校验商店页文案、标签、语言支持、功能和配置草案。
@@ -125,6 +126,16 @@ npm run export:announcement-richtext
 
 - `desktop/steam/announcements/demo-scope-preview-001.zh-CN.bbcode`
 - `desktop/steam/announcements/demo-scope-preview-001.en-US.bbcode`
+
+生成 Demo 公告本地化 CSV：
+
+```powershell
+npm run export:announcement-localization
+```
+
+输出文件：
+
+- `desktop/steam/announcements/demo-scope-preview-001.localization.csv`
 
 ## 宣传片结构
 

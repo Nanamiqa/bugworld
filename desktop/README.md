@@ -86,6 +86,12 @@ npm run export:announcement-assets
 npm run export:announcement-richtext
 ```
 
+生成 Steam Demo 公告本地化 CSV 交接表：
+
+```powershell
+npm run export:announcement-localization
+```
+
 当前 Auto-Cloud 草案在 `desktop/steam/steam-autocloud.example.vdf`：
 
 - Root: `WinAppDataRoaming`

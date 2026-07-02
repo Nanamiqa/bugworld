@@ -59,6 +59,14 @@
       "status": "ready"
     }
   ],
+  "localizationExports": [
+    {
+      "path": "desktop/steam/announcements/demo-scope-preview-001.localization.csv",
+      "format": "csv",
+      "status": "ready",
+      "columns": ["field_key", "section", "field_type", "zh-CN", "en-US", "notes"]
+    }
+  ],
   "localizations": [
     {
       "locale": "zh-CN",
