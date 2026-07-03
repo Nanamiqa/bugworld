@@ -119,8 +119,10 @@ const SETTINGS_STORAGE_KEY = "variableCitySettings";
 const ACHIEVEMENT_STORAGE_KEY = "variableCityAchievements";
 const RUN_SAVE_VERSION = 2;
 const achievements = window.variableCityAchievementCatalog ?? [];
-const storeShotMode = new URLSearchParams(window.location.search).get("storeShot")?.trim() ?? "";
+const urlParams = new URLSearchParams(window.location.search);
+const storeShotMode = urlParams.get("storeShot")?.trim() ?? "";
 const isStoreShotMode = Boolean(storeShotMode);
+const isAutomationMode = urlParams.get("automation") === "1";
 const world = {
   width: 1280,
   height: 720,
@@ -7413,6 +7415,227 @@ function clamp(value, min, max) {
 
 function random(min, max) {
   return Math.random() * (max - min) + min;
+}
+
+function installAutomationTestHooks() {
+  function round(value) {
+    return Number(Number(value ?? 0).toFixed(2));
+  }
+
+  function snapshot(extra = {}) {
+    const map = currentMap() ?? {};
+    return {
+      ...extra,
+      build: getBuildSummary(),
+      chapterCount: chapters.length,
+      currentChapterIndex,
+      chapterTitle: currentChapter().title,
+      map: {
+        id: map.id ?? null,
+        name: map.name ?? null,
+        width: world.width,
+        height: world.height,
+        viewWidth: world.viewWidth,
+        viewHeight: world.viewHeight,
+        configuredWidth: map.width ?? null,
+        configuredHeight: map.height ?? null,
+        largerThanView: world.width > world.viewWidth || world.height > world.viewHeight,
+        obstacleCount: (map.obstacles ?? desks).length,
+        zoneCount: (map.zones ?? []).length,
+      },
+      mode: world.mode,
+      objective: getCurrentObjectiveText(),
+      player: {
+        x: round(player?.x),
+        y: round(player?.y),
+        hp: round(player?.hp),
+        maxHp: round(player?.maxHp),
+        weapon: player?.weapon?.name ?? null,
+      },
+      camera: {
+        x: round(world.cameraX),
+        y: round(world.cameraY),
+      },
+      chapterState: {
+        chapterIndex: chapterState?.chapterIndex ?? null,
+        stepIndex: chapterState?.stepIndex ?? null,
+        resolvedTotal: chapterState?.resolvedTotal ?? null,
+        bossCleared: Boolean(chapterState?.bossCleared),
+        finished: Boolean(chapterState?.finished),
+      },
+      counts: {
+        bugNodes: bugNodes?.length ?? 0,
+        enemies: enemies?.length ?? 0,
+        cleaners: cleaners?.length ?? 0,
+        protocolHazards: protocolHazards?.length ?? 0,
+        enemyHazards: enemyHazards?.length ?? 0,
+      },
+      boss: boss ? {
+        id: boss.id,
+        name: boss.name,
+        archetype: boss.archetype,
+        hp: round(boss.hp),
+        maxHp: round(boss.maxHp),
+        phase: boss.phase,
+        x: round(boss.x),
+        y: round(boss.y),
+      } : null,
+    };
+  }
+
+  function enterChapter(chapterIndex, options = {}) {
+    const index = clamp(Number(chapterIndex) || 0, 0, chapters.length - 1);
+    const stepCount = chapters[index]?.steps?.length ?? 0;
+    const stepIndex = Number.isFinite(options.stepIndex)
+      ? clamp(options.stepIndex, -1, Math.max(-1, stepCount - 1))
+      : Math.max(0, Math.min(2, stepCount - 1));
+    resetStoreRun(index, {
+      ...options,
+      stepIndex,
+      focus: options.focus ?? chapterMaps[index]?.start,
+      objective: options.objective ?? chapters[index]?.initialObjective,
+      log: options.log ?? `自动巡检进入：${chapters[index]?.title ?? index + 1}`,
+    });
+    saveRunCheckpoint("route-pressure-enter");
+    return snapshot({ action: "enterChapter" });
+  }
+
+  function movePlayerTo(x, y, label = "route") {
+    syncWorldToCurrentMap();
+    const safePoint = findNearestFreePoint(Number(x), Number(y), player?.radius ?? playerBase.radius);
+    player.x = safePoint.x;
+    player.y = safePoint.y;
+    centerCameraOnPlayer();
+    syncHud();
+    return {
+      label,
+      requested: { x: round(x), y: round(y) },
+      actual: { x: round(player.x), y: round(player.y) },
+      inBounds: player.x >= player.radius && player.x <= world.width - player.radius && player.y >= 76 && player.y <= world.height - player.radius,
+      blocked: isPointBlockedByMap(player.x, player.y, player.radius),
+      camera: { x: round(world.cameraX), y: round(world.cameraY) },
+    };
+  }
+
+  function collectRoutePoints() {
+    const map = currentMap() ?? {};
+    const points = [];
+    const addPoint = (point, label) => {
+      if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+        return;
+      }
+      const key = `${Math.round(point.x)}:${Math.round(point.y)}`;
+      if (points.some((candidate) => candidate.key === key)) {
+        return;
+      }
+      points.push({ key, x: point.x, y: point.y, label });
+    };
+
+    addPoint(map.start, "start");
+    for (const [stepKey, targets] of Object.entries(map.stepTargets ?? {})) {
+      for (const target of targets ?? []) {
+        addPoint(target, `step-${stepKey}`);
+      }
+    }
+    addPoint(map.bossSpawn, "bossSpawn");
+    for (const [index, point] of (map.spawnPoints ?? []).entries()) {
+      if (index === 0 || index === (map.spawnPoints?.length ?? 0) - 1) {
+        addPoint(point, `spawn-${index}`);
+      }
+    }
+    addPoint({ x: world.width - 88, y: 112 }, "far-east-north");
+    addPoint({ x: world.width - 96, y: world.height - 88 }, "far-east-south");
+    return points;
+  }
+
+  function startBossForChapter(chapterIndex) {
+    const index = clamp(Number(chapterIndex) || 0, 0, chapters.length - 1);
+    const chapter = chapters[index];
+    const bossSpawn = chapterMaps[index]?.bossSpawn ?? chapterMaps[index]?.start;
+    enterChapter(index, {
+      stepIndex: Math.max(0, (chapter?.steps?.length ?? 1) - 1),
+      focus: bossSpawn,
+      objective: chapter?.boss?.objective,
+    });
+    startBossFight(chapter?.boss?.id);
+    saveRunCheckpoint("route-pressure-boss");
+    return snapshot({ action: "startBossForChapter" });
+  }
+
+  function saveAndRestoreProbe() {
+    const before = snapshot({ action: "beforeSaveRestore" });
+    saveRunCheckpoint("route-pressure-save");
+    const saved = loadRunSave();
+    restoreRunSave(saved);
+    const after = snapshot({ action: "afterSaveRestore" });
+    return {
+      ok: Boolean(saved) && before.currentChapterIndex === after.currentChapterIndex && Boolean(after.player.weapon),
+      savedAt: saved?.savedAt ?? null,
+      before,
+      after,
+    };
+  }
+
+  function runRoutePressureTest() {
+    const failures = [];
+    const chaptersCovered = [];
+
+    for (let index = 0; index < chapters.length; index += 1) {
+      const entry = enterChapter(index);
+      const routeSamples = collectRoutePoints().map((point) => movePlayerTo(point.x, point.y, point.label));
+      const badRoute = routeSamples.filter((sample) => !sample.inBounds || sample.blocked);
+      const bossSnapshot = startBossForChapter(index);
+      const saveRestore = saveAndRestoreProbe();
+
+      if (entry.currentChapterIndex !== index) {
+        failures.push(`Chapter ${index + 1} entered as ${entry.currentChapterIndex + 1}`);
+      }
+      if (routeSamples.length < 3) {
+        failures.push(`Chapter ${index + 1} has too few route samples`);
+      }
+      if (badRoute.length > 0) {
+        failures.push(`Chapter ${index + 1} has blocked route sample: ${badRoute[0].label}`);
+      }
+      if (!bossSnapshot.boss?.id || bossSnapshot.mode !== "playing") {
+        failures.push(`Chapter ${index + 1} boss did not start`);
+      }
+      if (!saveRestore.ok) {
+        failures.push(`Chapter ${index + 1} save/restore failed`);
+      }
+
+      chaptersCovered.push({
+        index,
+        title: chapters[index]?.title ?? `Chapter ${index + 1}`,
+        map: entry.map,
+        routeSamples,
+        boss: bossSnapshot.boss,
+        saveRestoreOk: saveRestore.ok,
+        restoredObjective: saveRestore.after.objective,
+      });
+    }
+
+    return {
+      ok: failures.length === 0,
+      checkedAt: new Date().toISOString(),
+      chapterCount: chapters.length,
+      failures,
+      chapters: chaptersCovered,
+      finalSnapshot: snapshot({ action: "routePressureComplete" }),
+    };
+  }
+
+  window.__variableCityTestHooks = {
+    snapshot,
+    enterChapter,
+    movePlayerTo,
+    startBossForChapter,
+    saveAndRestoreProbe,
+    runRoutePressureTest,
+  };
+}
+
+if (isAutomationMode) {
+  installAutomationTestHooks();
 }
 
 window.addEventListener("keydown", (event) => {

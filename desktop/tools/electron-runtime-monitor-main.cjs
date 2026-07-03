@@ -5,10 +5,12 @@ const { app, BrowserWindow, ipcMain, shell } = require("electron");
 const rootDir = path.resolve(__dirname, "..", "..");
 const reportDir = path.join(rootDir, "tmp", "electron-runtime-monitor");
 const reportPath = path.join(reportDir, "latest.json");
+const monitorSaveRoot = path.join(reportDir, "user-data");
 const durationMs = readDuration("VARIABLE_CITY_RUNTIME_MONITOR_MS", 600000);
 const sampleMs = readDuration("VARIABLE_CITY_RUNTIME_MONITOR_SAMPLE_MS", 1000);
 const minimumAverageFps = Number.parseFloat(process.env.VARIABLE_CITY_RUNTIME_MONITOR_MIN_FPS ?? "24");
 const maximumWorkingSetMb = Number.parseFloat(process.env.VARIABLE_CITY_RUNTIME_MONITOR_MAX_MB ?? "1200");
+const routePressureEnabled = process.env.VARIABLE_CITY_ROUTE_PRESSURE === "1";
 
 app.commandLine.appendSwitch("disable-background-timer-throttling");
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
@@ -28,6 +30,7 @@ const diagnostics = {
   rendererFailures: [],
   samples: [],
   storageProbe: null,
+  routePressure: null,
   initialProbe: null,
 };
 
@@ -51,8 +54,7 @@ function loadSaveLayout() {
 const saveLayout = loadSaveLayout();
 
 function getGameSaveRoot() {
-  const directory = saveLayout.appDataDirectory ?? "variable-city-nightwatch";
-  return path.join(app.getPath("appData"), directory);
+  return monitorSaveRoot;
 }
 
 function memorySnapshot() {
@@ -180,6 +182,18 @@ function storageProbeScript() {
   `;
 }
 
+function routePressureScript() {
+  return `
+    (() => {
+      const hooks = window.__variableCityTestHooks;
+      if (!hooks?.runRoutePressureTest) {
+        return { ok: false, failures: ["automation test hooks unavailable"] };
+      }
+      return hooks.runRoutePressureTest();
+    })()
+  `;
+}
+
 function installWindowGuards(win) {
   win.webContents.on("console-message", (_event, level, message, line, sourceId) => {
     if (level >= 3) {
@@ -254,6 +268,8 @@ function finish(exitCode = 0) {
     loadFailureCount: diagnostics.loadFailures.length,
     rendererFailureCount: diagnostics.rendererFailures.length,
     storageProbeOk: Boolean(diagnostics.storageProbe?.ok),
+    routePressureOk: !routePressureEnabled || Boolean(diagnostics.routePressure?.ok),
+    routePressureChapterCount: diagnostics.routePressure?.chapters?.length ?? 0,
     canvasNonBlank: Boolean(lastPage.canvasNonBlank),
     platformId: lastPage.platformId ?? diagnostics.initialProbe?.platformId ?? null,
   };
@@ -267,6 +283,9 @@ function finish(exitCode = 0) {
   }
   if (!summary.storageProbeOk) {
     failures.push("storage probe failed");
+  }
+  if (routePressureEnabled && !summary.routePressureOk) {
+    failures.push(`route pressure failed: ${(diagnostics.routePressure?.failures ?? ["unknown"]).join("; ")}`);
   }
   if (summary.consoleErrorCount > 0 || summary.pageErrorCount > 0 || summary.loadFailureCount > 0 || summary.rendererFailureCount > 0) {
     failures.push("runtime errors were captured");
@@ -325,6 +344,9 @@ async function startMonitor() {
     try {
       diagnostics.initialProbe = await mainWindow.webContents.executeJavaScript(pageProbeScript());
       diagnostics.storageProbe = await mainWindow.webContents.executeJavaScript(storageProbeScript());
+      if (routePressureEnabled) {
+        diagnostics.routePressure = await mainWindow.webContents.executeJavaScript(routePressureScript());
+      }
       await samplePage();
       sampleTimer = setInterval(() => {
         void samplePage();
@@ -336,7 +358,8 @@ async function startMonitor() {
     }
   });
 
-  mainWindow.loadFile(path.join(rootDir, "index.html"));
+  const loadOptions = routePressureEnabled ? { query: { automation: "1" } } : undefined;
+  mainWindow.loadFile(path.join(rootDir, "index.html"), loadOptions);
 }
 
 app.whenReady().then(() => {

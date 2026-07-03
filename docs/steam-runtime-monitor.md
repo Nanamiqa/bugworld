@@ -8,6 +8,7 @@
 
 ```powershell
 npm run desktop:monitor:quick
+npm run desktop:route:quick
 ```
 
 正式巡检：
@@ -33,6 +34,7 @@ npm run desktop:monitor
 - `console.error`、页面 `error`、`unhandledrejection`、load failure、renderer crash。
 - 桌面文件存储桥的 `writeJson`、`readJson`、`remove` 是否完整可用。
 - Electron 主进程和渲染进程的内存 working set / private bytes。
+- `desktop:route:quick` 会用 `?automation=1` 启用游戏内自动化钩子，覆盖五章入口、长地图坐标移动、Boss 触发和跑局存档恢复；普通 Pages / Steam 玩家入口不会暴露该钩子。
 
 每次运行会把完整报告写入：
 
@@ -40,4 +42,4 @@ npm run desktop:monitor
 tmp/electron-runtime-monitor/latest.json
 ```
 
-`tmp/` 不提交到仓库。自动任务使用 `desktop:monitor:quick`，发布候选包或长时间稳定性检查时使用默认 10 分钟的 `desktop:monitor`。
+巡检期间的桌面文件存档也会隔离到 `tmp/electron-runtime-monitor/user-data`，不会写入真实 Steam / Electron 用户数据目录。`tmp/` 不提交到仓库。自动任务使用 `desktop:monitor:quick` 和 `desktop:route:quick`，发布候选包或长时间稳定性检查时使用默认 10 分钟的 `desktop:monitor`。

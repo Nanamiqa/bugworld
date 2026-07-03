@@ -26,6 +26,7 @@
     "desktop:smoke": "node desktop/tools/run-electron-smoke.cjs",
     "desktop:monitor": "node desktop/tools/run-electron-runtime-monitor.cjs",
     "desktop:monitor:quick": "node desktop/tools/run-electron-runtime-monitor.cjs --duration-ms=15000",
+    "desktop:route:quick": "node desktop/tools/run-electron-runtime-monitor.cjs --duration-ms=12000 --route-pressure=1",
     "dist:win": "node desktop/tools/run-dist-win.cjs",
     "dist:win:raw": "electron-builder --win dir --publish never",
     "dist:check": "node desktop/tools/check-dist-package.cjs",

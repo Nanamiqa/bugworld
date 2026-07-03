@@ -20,6 +20,7 @@ function readArg(name) {
 
 const durationArg = readArg("duration-ms");
 const sampleArg = readArg("sample-ms");
+const routePressureArg = readArg("route-pressure");
 
 const child = spawn(electronBinary, [monitorMain], {
   cwd: rootDir,
@@ -27,6 +28,7 @@ const child = spawn(electronBinary, [monitorMain], {
     ...process.env,
     VARIABLE_CITY_RUNTIME_MONITOR_MS: durationArg ?? process.env.VARIABLE_CITY_RUNTIME_MONITOR_MS ?? "",
     VARIABLE_CITY_RUNTIME_MONITOR_SAMPLE_MS: sampleArg ?? process.env.VARIABLE_CITY_RUNTIME_MONITOR_SAMPLE_MS ?? "",
+    VARIABLE_CITY_ROUTE_PRESSURE: routePressureArg ?? process.env.VARIABLE_CITY_ROUTE_PRESSURE ?? "",
   },
   stdio: "inherit",
   windowsHide: true,

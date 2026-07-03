@@ -59,6 +59,9 @@ if (packageJson) {
   if (!packageJson.scripts?.["desktop:monitor:quick"]) {
     errors.push("package.json scripts.desktop:monitor:quick is required");
   }
+  if (!packageJson.scripts?.["desktop:route:quick"]) {
+    errors.push("package.json scripts.desktop:route:quick is required");
+  }
   if (!packageJson.scripts?.["desktop:install-electron"]) {
     errors.push("package.json scripts.desktop:install-electron is required");
   }
@@ -116,6 +119,8 @@ requireText("desktop/electron/preload.cjs", /steamCloud/, "Steam Cloud bridge me
 requireText("desktop/tools/electron-runtime-monitor-main.cjs", /requestAnimationFrame/, "Runtime FPS probe");
 requireText("desktop/tools/electron-runtime-monitor-main.cjs", /getAppMetrics/, "Runtime memory probe");
 requireText("desktop/tools/electron-runtime-monitor-main.cjs", /writeJson/, "Runtime storage write probe");
+requireText("desktop/tools/electron-runtime-monitor-main.cjs", /runRoutePressureTest/, "Runtime route pressure probe");
+requireText("src/main.js", /__variableCityTestHooks/, "Game automation test hooks");
 
 if (errors.length > 0) {
   console.error(errors.join("\n"));
