@@ -445,6 +445,7 @@ const chapterMaps = [
   {
     id: "metro-loop",
     name: "03:32 环线站台",
+    badgeKey: "chapterBadgeMetroLoop",
     width: 2240,
     height: 1260,
     start: { x: 160, y: 610 },
@@ -578,6 +579,7 @@ const chapterMaps = [
   {
     id: "hash-market",
     name: "哈希夜市雨棚",
+    badgeKey: "chapterBadgeHashMarket",
     width: 2180,
     height: 1260,
     start: { x: 158, y: 602 },
@@ -709,6 +711,7 @@ const chapterMaps = [
   {
     id: "promise-tower",
     name: "承诺塔根层",
+    badgeKey: "chapterBadgePromiseTower",
     width: 2160,
     height: 1320,
     start: { x: 160, y: 604 },
@@ -841,6 +844,7 @@ const chapterMaps = [
   {
     id: "whitebox-core",
     name: "零号白箱核心",
+    badgeKey: "chapterBadgeWhiteboxCore",
     width: 2240,
     height: 1320,
     start: { x: 150, y: 600 },
@@ -1128,6 +1132,10 @@ const assetSources = {
   propPartitionLeft: "src/assets/props/partition-left.png",
   propPartitionRight: "src/assets/props/partition-right.png",
   propMeetingTable: "src/assets/props/meeting-table-v2.png",
+  chapterBadgeMetroLoop: "src/assets/maps/chapter-badge-metro-loop-v1.png",
+  chapterBadgeHashMarket: "src/assets/maps/chapter-badge-hash-market-v1.png",
+  chapterBadgePromiseTower: "src/assets/maps/chapter-badge-promise-tower-v1.png",
+  chapterBadgeWhiteboxCore: "src/assets/maps/chapter-badge-whitebox-core-v1.png",
 };
 const storyAvatarSources = {
   安渡: "src/assets/characters/andu-avatar.png",
@@ -3167,7 +3175,15 @@ function renderStartMenu() {
     const unlocked = index === 0 || archiveState.unlockedChapters?.includes(index);
     const title = chapters[index]?.title ?? `第 ${index + 1} 章`;
     const effect = unlocked ? "从本章开局练习地图、敌人与 Boss" : "通关前一章后解锁";
-    const button = createMenuButton(title, effect, `chapter-button${unlocked ? "" : " is-locked"}`, () => startNewRun(index), !unlocked);
+    const badgeKey = chapterMaps[index]?.badgeKey;
+    const className = [
+      "chapter-button",
+      badgeKey ? "with-media chapter-card" : "",
+      unlocked ? "" : "is-locked",
+    ].filter(Boolean).join(" ");
+    const button = createMenuButton("", "", className, () => startNewRun(index), !unlocked);
+    const icon = badgeKey ? `<img class="choice-icon chapter-badge" src="${assetUrl(badgeKey)}" alt="" />` : "";
+    button.innerHTML = `${icon}<span class="choice-copy"><span class="choice-title">${title}</span><span class="choice-effect">${effect}</span></span>`;
     ui.chapterSelect.appendChild(button);
   }
 }

@@ -33,6 +33,31 @@
       "id": "office-prop-sheet",
       "path": "src/assets/scenes/office-night-scene-prop-sheet.png",
       "usage": ["store-capsule-detail", "press-kit"]
+    },
+    {
+      "id": "chapter-map-metro-loop-badge",
+      "path": "src/assets/maps/chapter-badge-metro-loop-v1.png",
+      "usage": ["chapter-select", "store-screenshot-candidate"]
+    },
+    {
+      "id": "chapter-map-hash-market-badge",
+      "path": "src/assets/maps/chapter-badge-hash-market-v1.png",
+      "usage": ["chapter-select", "store-screenshot-candidate"]
+    },
+    {
+      "id": "chapter-map-promise-tower-badge",
+      "path": "src/assets/maps/chapter-badge-promise-tower-v1.png",
+      "usage": ["chapter-select", "store-screenshot-candidate"]
+    },
+    {
+      "id": "chapter-map-whitebox-core-badge",
+      "path": "src/assets/maps/chapter-badge-whitebox-core-v1.png",
+      "usage": ["chapter-select", "store-screenshot-candidate"]
+    },
+    {
+      "id": "chapter-map-candidate-compositions",
+      "path": "desktop/steam/store-assets/review/chapter-map-candidate-compositions-v1.png",
+      "usage": ["store-page-review", "screenshot-planning"]
     }
   ],
   "capsules": [

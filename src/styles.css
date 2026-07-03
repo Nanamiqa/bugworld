@@ -447,6 +447,20 @@ h1 {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
+.choice-button.chapter-card {
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 88px;
+}
+
+.chapter-badge {
+  width: 76px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
 .chapter-button.is-locked {
   cursor: not-allowed;
   opacity: 0.48;
