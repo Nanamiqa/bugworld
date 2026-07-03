@@ -351,6 +351,57 @@ h1 {
   white-space: nowrap;
 }
 
+.meta-progress {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(26, 42, 68, 0.1);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(236, 247, 255, 0.78)),
+    rgba(247, 250, 255, 0.82);
+}
+
+.meta-progress-head {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.meta-progress-head h3 {
+  margin: 2px 0 0;
+  font-size: 1rem;
+}
+
+.meta-progress-head strong {
+  flex: 0 0 auto;
+  color: var(--teal-dark);
+  font-size: 0.92rem;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.choice-button.meta-node {
+  min-height: 82px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.choice-button.meta-node.is-maxed {
+  border-color: rgba(15, 159, 149, 0.42);
+  background: rgba(15, 159, 149, 0.1);
+}
+
+.choice-button.meta-node.is-locked {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
 .start-actions,
 .chapter-select {
   display: grid;
@@ -811,6 +862,7 @@ h1 {
 
   .start-stats,
   .start-actions,
+  .meta-grid,
   .chapter-select {
     grid-template-columns: minmax(0, 1fr);
   }

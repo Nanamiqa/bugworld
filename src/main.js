@@ -36,6 +36,8 @@ const ui = {
   startPanel: document.querySelector("#startPanel"),
   startSummary: document.querySelector("#startSummary"),
   startStats: document.querySelector("#startStats"),
+  metaSummary: document.querySelector("#metaSummary"),
+  metaProgression: document.querySelector("#metaProgression"),
   startActions: document.querySelector("#startActions"),
   chapterSelect: document.querySelector("#chapterSelect"),
   pauseButton: document.querySelector("#pauseButton"),
@@ -117,6 +119,7 @@ const ARCHIVE_STORAGE_KEY = "variableCityArchive";
 const RUN_SAVE_STORAGE_KEY = "variableCityRunSave";
 const SETTINGS_STORAGE_KEY = "variableCitySettings";
 const ACHIEVEMENT_STORAGE_KEY = "variableCityAchievements";
+const ARCHIVE_VERSION = 2;
 const RUN_SAVE_VERSION = 2;
 const achievements = window.variableCityAchievementCatalog ?? [];
 const urlParams = new URLSearchParams(window.location.search);
@@ -164,6 +167,45 @@ const playerBase = {
   dashPower: 120,
   invulnerable: 0,
 };
+
+const metaProgressNodes = [
+  {
+    id: "steady-heart",
+    title: "稳定心跳",
+    maxLevel: 4,
+    costs: [8, 14, 22, 32],
+    requirement: null,
+    summary: "每级开局生命上限 +8",
+    detail: "把前几次失误从立刻崩盘改成可修正的节奏窗口。",
+  },
+  {
+    id: "warm-cache",
+    title: "热缓存口袋",
+    maxLevel: 3,
+    costs: [6, 13, 24],
+    requirement: null,
+    summary: "每级开局 bug点数 +1",
+    detail: "开局就能更早使用修复脉冲或冲刺，重开手感更轻。",
+  },
+  {
+    id: "route-shoes",
+    title: "巡线路鞋",
+    maxLevel: 3,
+    costs: [10, 18, 30],
+    requirement: { bestChapter: 2 },
+    summary: "每级冲刺距离 +12",
+    detail: "适合大地图章节，给躲 Boss 预警和跨危险区更多余量。",
+  },
+  {
+    id: "chapter-insurance",
+    title: "章节练习保险",
+    maxLevel: 2,
+    costs: [16, 28],
+    requirement: { bestChapter: 3 },
+    summary: "章节练习开局额外生命 +8、bug点数 +1",
+    detail: "从已解锁章节练习时补一点基础资源，避免跳章开局太干。",
+  },
+];
 
 let player;
 let bugNodes;
@@ -1294,6 +1336,7 @@ function createRunStats() {
 
 function createArchiveFallback() {
   return {
+    archiveVersion: ARCHIVE_VERSION,
     bestChapter: 1,
     wins: 0,
     runs: 0,
@@ -1301,6 +1344,30 @@ function createArchiveFallback() {
     totalEventsResolved: 0,
     unlockedChapters: [0],
     lastBuild: "未记录",
+    calibrationShards: 0,
+    totalCalibrationEarned: 0,
+    metaUpgrades: Object.fromEntries(metaProgressNodes.map((node) => [node.id, 0])),
+    lastRunShardGain: null,
+  };
+}
+
+function normalizeMetaUpgrades(savedUpgrades = {}) {
+  const normalized = {};
+  for (const node of metaProgressNodes) {
+    const raw = Number(savedUpgrades?.[node.id] ?? 0);
+    normalized[node.id] = clamp(Math.trunc(Number.isFinite(raw) ? raw : 0), 0, node.maxLevel);
+  }
+  return normalized;
+}
+
+function normalizeLastRunShardGain(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  return {
+    amount: Math.max(0, Math.trunc(Number(value.amount) || 0)),
+    reason: typeof value.reason === "string" ? value.reason : "夜巡结算",
+    at: Number(value.at) || Date.now(),
   };
 }
 
@@ -1315,8 +1382,16 @@ function loadArchive() {
       ...fallback,
       ...saved,
       unlockedChapters: Array.isArray(saved.unlockedChapters) ? saved.unlockedChapters : fallback.unlockedChapters,
+      metaUpgrades: normalizeMetaUpgrades(saved.metaUpgrades),
+      lastRunShardGain: normalizeLastRunShardGain(saved.lastRunShardGain),
     };
+    normalized.archiveVersion = ARCHIVE_VERSION;
     normalized.bestChapter = clamp(Number(normalized.bestChapter) || 1, 1, chapters.length);
+    normalized.calibrationShards = Math.max(0, Math.trunc(Number(normalized.calibrationShards) || 0));
+    normalized.totalCalibrationEarned = Math.max(
+      normalized.calibrationShards,
+      Math.trunc(Number(normalized.totalCalibrationEarned) || 0),
+    );
     if (!normalized.unlockedChapters.includes(0)) {
       normalized.unlockedChapters.unshift(0);
     }
@@ -1335,6 +1410,101 @@ function saveArchive() {
   } catch {
     // Local storage can be unavailable in some embedded previews.
   }
+}
+
+function getMetaLevel(id) {
+  return clamp(Math.trunc(Number(archiveState?.metaUpgrades?.[id]) || 0), 0, metaProgressNodes.find((node) => node.id === id)?.maxLevel ?? 0);
+}
+
+function getMetaNodeCost(node) {
+  const level = getMetaLevel(node.id);
+  return level >= node.maxLevel ? null : node.costs[level] ?? node.costs.at(-1) ?? 0;
+}
+
+function getMetaRequirementText(node) {
+  const requiredChapter = node.requirement?.bestChapter;
+  if (!requiredChapter || (archiveState?.bestChapter ?? 1) >= requiredChapter) {
+    return "";
+  }
+  return `最远到达第 ${requiredChapter} 章后解锁`;
+}
+
+function buyMetaUpgrade(id) {
+  const node = metaProgressNodes.find((candidate) => candidate.id === id);
+  if (!node) {
+    return false;
+  }
+  const lockedText = getMetaRequirementText(node);
+  if (lockedText) {
+    setLog(`${node.title} 尚未解锁：${lockedText}。`);
+    return false;
+  }
+  const level = getMetaLevel(node.id);
+  const cost = getMetaNodeCost(node);
+  if (level >= node.maxLevel || cost === null) {
+    setLog(`${node.title} 已达到上限。`);
+    return false;
+  }
+  if ((archiveState.calibrationShards ?? 0) < cost) {
+    setLog(`校准碎片不足：${node.title} 需要 ${cost}。`);
+    return false;
+  }
+
+  archiveState.calibrationShards -= cost;
+  archiveState.metaUpgrades[node.id] = level + 1;
+  saveArchive();
+  setLog(`档案校准完成：${node.title} Lv.${level + 1}/${node.maxLevel}。`);
+  renderStartMenu();
+  syncHud();
+  return true;
+}
+
+function calculateRunShardReward(victory) {
+  const chaptersCleared = runStats?.chaptersCleared ?? 0;
+  const bossesDefeated = runStats?.bossesDefeated ?? 0;
+  const eventsResolved = runStats?.eventsResolved ?? 0;
+  const enemiesDefeated = runStats?.enemiesDefeated ?? 0;
+  const depthBonus = Math.max(0, currentChapterIndex - chaptersCleared) * 2;
+  const raw = 4
+    + chaptersCleared * 7
+    + bossesDefeated * 5
+    + Math.floor(eventsResolved / 2)
+    + Math.floor(enemiesDefeated / 22)
+    + depthBonus
+    + (victory ? 18 : 0);
+  return clamp(raw, 4, 72);
+}
+
+function grantCalibrationShards(amount, reason) {
+  const reward = Math.max(0, Math.trunc(Number(amount) || 0));
+  archiveState.calibrationShards = Math.max(0, (archiveState.calibrationShards ?? 0) + reward);
+  archiveState.totalCalibrationEarned = Math.max(archiveState.totalCalibrationEarned ?? 0, 0) + reward;
+  archiveState.lastRunShardGain = {
+    amount: reward,
+    reason,
+    at: Date.now(),
+  };
+  return reward;
+}
+
+function getMetaProgressionBonuses(chapterIndex = 0) {
+  const steadyHeart = getMetaLevel("steady-heart");
+  const warmCache = getMetaLevel("warm-cache");
+  const routeShoes = getMetaLevel("route-shoes");
+  const chapterInsurance = chapterIndex > 0 ? getMetaLevel("chapter-insurance") : 0;
+  return {
+    maxHp: steadyHeart * 8 + chapterInsurance * 8,
+    bugPoints: warmCache + chapterInsurance,
+    dashPower: routeShoes * 12,
+  };
+}
+
+function applyMetaProgressionBonuses(chapterIndex = 0) {
+  const bonuses = getMetaProgressionBonuses(chapterIndex);
+  player.maxHp += bonuses.maxHp;
+  player.hp = player.maxHp;
+  player.bugPoints += bonuses.bugPoints;
+  player.dashPower += bonuses.dashPower;
 }
 
 function cloneForSave(value, fallback = null) {
@@ -1547,12 +1717,14 @@ function recordChapterProgress(clearedChapterIndex) {
 
 function recordRunEnd(victory) {
   deleteRunSave();
+  const shardReward = calculateRunShardReward(victory);
   archiveState.runs = (archiveState.runs ?? 0) + 1;
   archiveState.wins = (archiveState.wins ?? 0) + (victory ? 1 : 0);
   archiveState.bestChapter = Math.max(archiveState.bestChapter ?? 1, currentChapterIndex + 1);
   archiveState.totalEnemiesDefeated = (archiveState.totalEnemiesDefeated ?? 0) + (runStats?.enemiesDefeated ?? 0);
   archiveState.totalEventsResolved = (archiveState.totalEventsResolved ?? 0) + (runStats?.eventsResolved ?? 0);
   archiveState.lastBuild = getBuildSummary();
+  grantCalibrationShards(shardReward, victory ? "五章通关奖励" : `${currentChapter().title} 结算`);
   if (victory) {
     unlockLocalAchievement("ACH_FULL_CLEAR");
     if ((runStats?.damageTaken ?? 0) <= 80) {
@@ -1588,6 +1760,7 @@ function startNewRun(chapterIndex = 0) {
   player.concepts = {};
   player.unlockedSynergies = [];
   currentChapterIndex = clamp(chapterIndex, 0, chapters.length - 1);
+  applyMetaProgressionBonuses(currentChapterIndex);
   positionPlayerAtMapStart();
   bugNodes = [];
   enemies = [];
@@ -1672,6 +1845,7 @@ function bootGame() {
 
 function createStoreArchiveState() {
   return {
+    ...createArchiveFallback(),
     bestChapter: chapters.length,
     wins: 3,
     runs: 18,
@@ -1679,6 +1853,14 @@ function createStoreArchiveState() {
     totalEventsResolved: 94,
     unlockedChapters: chapters.map((_, index) => index),
     lastBuild: "键盘宏飞弹 + 队列自动机 + 哈希弱点表",
+    calibrationShards: 42,
+    totalCalibrationEarned: 168,
+    metaUpgrades: {
+      "steady-heart": 3,
+      "warm-cache": 2,
+      "route-shoes": 2,
+      "chapter-insurance": 1,
+    },
   };
 }
 
@@ -2761,6 +2943,47 @@ function createMenuButton(title, effect, className, onClick, disabled = false) {
   return button;
 }
 
+function renderMetaProgression() {
+  if (!ui.metaProgression || !ui.metaSummary) {
+    return;
+  }
+
+  const shards = archiveState?.calibrationShards ?? 0;
+  const totalLevels = metaProgressNodes.reduce((sum, node) => sum + getMetaLevel(node.id), 0);
+  const maxLevels = metaProgressNodes.reduce((sum, node) => sum + node.maxLevel, 0);
+  const lastGain = archiveState?.lastRunShardGain?.amount
+    ? ` · 上轮 +${archiveState.lastRunShardGain.amount}`
+    : "";
+  ui.metaSummary.textContent = `碎片 ${shards} · 节点 ${totalLevels}/${maxLevels}${lastGain}`;
+  ui.metaProgression.innerHTML = "";
+
+  for (const node of metaProgressNodes) {
+    const level = getMetaLevel(node.id);
+    const cost = getMetaNodeCost(node);
+    const lockedText = getMetaRequirementText(node);
+    const maxed = level >= node.maxLevel;
+    const affordable = cost !== null && shards >= cost;
+    const disabled = Boolean(lockedText) || maxed || !affordable;
+    const status = maxed
+      ? "已满级"
+      : lockedText || `消耗 ${cost} 校准碎片`;
+    const className = [
+      "meta-node",
+      maxed ? "is-maxed" : "",
+      lockedText ? "is-locked" : "",
+    ].filter(Boolean).join(" ");
+    const button = createMenuButton(
+      `${node.title} Lv.${level}/${node.maxLevel}`,
+      `${node.summary}｜${status}`,
+      className,
+      () => buyMetaUpgrade(node.id),
+      disabled,
+    );
+    button.title = node.detail;
+    ui.metaProgression.appendChild(button);
+  }
+}
+
 function renderStartMenu() {
   if (!ui.startPanel) {
     return;
@@ -2778,6 +3001,8 @@ function renderStartMenu() {
     ["通关次数", `${archiveState.wins ?? 0}`],
     ["夜巡次数", `${archiveState.runs ?? 0}`],
     ["累计击破", `${archiveState.totalEnemiesDefeated ?? 0}`],
+    ["校准碎片", `${archiveState.calibrationShards ?? 0}`],
+    ["档案节点", `${metaProgressNodes.reduce((sum, node) => sum + getMetaLevel(node.id), 0)}/${metaProgressNodes.reduce((sum, node) => sum + node.maxLevel, 0)}`],
     ["平台", getPlatformDisplayLabel()],
     ["存档", getStorageDisplayLabel()],
     ["成就", `${readUnlockedAchievements().length}/${achievements.length}`],
@@ -2789,6 +3014,8 @@ function renderStartMenu() {
     item.innerHTML = `${label}<strong>${value}</strong>`;
     ui.startStats.appendChild(item);
   }
+
+  renderMetaProgression();
 
   ui.startActions.innerHTML = "";
   ui.startActions.appendChild(createMenuButton(
@@ -4841,6 +5068,7 @@ function renderResultStats(victory) {
     ["共鸣", `${runStats?.synergiesUnlocked?.length ?? 0} 次`],
     ["耗时", `${minutes}:${String(seconds).padStart(2, "0")}`],
     ["构筑", getBuildSummary()],
+    ["校准碎片", `+${archiveState?.lastRunShardGain?.amount ?? 0} / 持有 ${archiveState?.calibrationShards ?? 0}`],
     ["档案", victory ? `通关 ${archiveState.wins} 次` : `最远 ${archiveState.bestChapter}/${chapters.length}`],
   ];
 
@@ -7744,6 +7972,11 @@ function installAutomationTestHooks() {
         bossCleared: Boolean(chapterState?.bossCleared),
         finished: Boolean(chapterState?.finished),
       },
+      archive: {
+        bestChapter: archiveState?.bestChapter ?? null,
+        calibrationShards: archiveState?.calibrationShards ?? null,
+        metaLevels: cloneForSave(archiveState?.metaUpgrades, {}),
+      },
       counts: {
         bugNodes: bugNodes?.length ?? 0,
         enemies: enemies?.length ?? 0,
@@ -7761,6 +7994,34 @@ function installAutomationTestHooks() {
         x: round(boss.x),
         y: round(boss.y),
       } : null,
+    };
+  }
+
+  function runMetaProgressionProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    archiveState = {
+      ...createArchiveFallback(),
+      bestChapter: 3,
+      calibrationShards: 20,
+      metaUpgrades: normalizeMetaUpgrades({
+        "steady-heart": 2,
+        "warm-cache": 1,
+        "route-shoes": 1,
+        "chapter-insurance": 1,
+      }),
+    };
+    const firstChapter = getMetaProgressionBonuses(0);
+    const practiceChapter = getMetaProgressionBonuses(2);
+    archiveState = previousArchive ?? loadArchive();
+    return {
+      ok: firstChapter.maxHp === 16
+        && firstChapter.bugPoints === 1
+        && firstChapter.dashPower === 12
+        && practiceChapter.maxHp === 24
+        && practiceChapter.bugPoints === 2
+        && practiceChapter.dashPower === 12,
+      firstChapter,
+      practiceChapter,
     };
   }
 
@@ -7873,6 +8134,11 @@ function installAutomationTestHooks() {
   function runRoutePressureTest() {
     const failures = [];
     const chaptersCovered = [];
+    const metaProgression = runMetaProgressionProbe();
+
+    if (!metaProgression.ok) {
+      failures.push("meta progression bonuses failed");
+    }
 
     for (let index = 0; index < chapters.length; index += 1) {
       const entry = enterChapter(index);
@@ -7917,6 +8183,7 @@ function installAutomationTestHooks() {
       checkedAt: new Date().toISOString(),
       chapterCount: chapters.length,
       failures,
+      metaProgression,
       chapters: chaptersCovered,
       finalSnapshot: snapshot({ action: "routePressureComplete" }),
     };
@@ -7928,6 +8195,7 @@ function installAutomationTestHooks() {
     movePlayerTo,
     startBossForChapter,
     saveAndRestoreProbe,
+    runMetaProgressionProbe,
     runRoutePressureTest,
   };
 }
