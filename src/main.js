@@ -205,6 +205,36 @@ const metaProgressNodes = [
     summary: "章节练习开局额外生命 +8、bug点数 +1",
     detail: "从已解锁章节练习时补一点基础资源，避免跳章开局太干。",
   },
+  {
+    id: "paperclip-specialist",
+    title: "回形针专精",
+    maxLevel: 3,
+    costs: [12, 22, 36],
+    requirement: { bestChapter: 2 },
+    weaponId: "paperclip",
+    summary: "每级回形针伤害 +3，精准弹更强",
+    detail: "适合喜欢点杀和控距离的路线，满级后加粗精准弹更快进入循环。",
+  },
+  {
+    id: "keyboard-specialist",
+    title: "键盘宏专精",
+    maxLevel: 3,
+    costs: [14, 24, 38],
+    requirement: { bestChapter: 3 },
+    weaponId: "keyboard",
+    summary: "每级键盘宏冷却 -4%，击退更强",
+    detail: "让覆盖型武器在大地图里更稳定，适合清理分裂和召唤型敌人。",
+  },
+  {
+    id: "correction-specialist",
+    title: "修正液专精",
+    maxLevel: 3,
+    costs: [16, 26, 40],
+    requirement: { bestChapter: 4 },
+    weaponId: "correction-fluid",
+    summary: "每级修正液射程 +22，减速更久",
+    detail: "强化近距控场的容错，让 Boss 召唤物和高速敌人更容易被压住。",
+  },
 ];
 
 let player;
@@ -1453,6 +1483,7 @@ function buyMetaUpgrade(id) {
   archiveState.calibrationShards -= cost;
   archiveState.metaUpgrades[node.id] = level + 1;
   saveArchive();
+  playAudioCue("upgrade-select");
   setLog(`档案校准完成：${node.title} Lv.${level + 1}/${node.maxLevel}。`);
   renderStartMenu();
   syncHud();
@@ -1505,6 +1536,63 @@ function applyMetaProgressionBonuses(chapterIndex = 0) {
   player.hp = player.maxHp;
   player.bugPoints += bonuses.bugPoints;
   player.dashPower += bonuses.dashPower;
+}
+
+function getWeaponSpecializationNode(weaponId) {
+  return metaProgressNodes.find((node) => node.weaponId === weaponId) ?? null;
+}
+
+function getWeaponSpecializationPreview(weapon) {
+  const node = getWeaponSpecializationNode(weapon?.id);
+  if (!node) {
+    return null;
+  }
+  const level = getMetaLevel(node.id);
+  const lockedText = getMetaRequirementText(node);
+  return {
+    node,
+    level,
+    lockedText,
+    active: level > 0,
+    text: level > 0
+      ? `${node.title} Lv.${level}/${node.maxLevel} 已生效`
+      : lockedText || `${node.title} 未点亮，可在档案校准中购买`,
+  };
+}
+
+function applyWeaponSpecializationToWeapon(weapon) {
+  const preview = getWeaponSpecializationPreview(weapon);
+  const level = preview?.level ?? 0;
+  if (!weapon || level <= 0) {
+    return null;
+  }
+
+  if (weapon.id === "paperclip") {
+    weapon.damage += level * 3;
+    weapon.trait.damageMultiplier = (weapon.trait.damageMultiplier ?? 1.85) + level * 0.12;
+    weapon.trait.every = Math.max(2, (weapon.trait.every ?? 4) - (level >= 3 ? 1 : 0));
+    weapon.level += level * 0.18;
+    return `回形针专精 Lv.${level}：伤害和精准弹已校准。`;
+  }
+
+  if (weapon.id === "keyboard") {
+    weapon.cooldown = clamp(weapon.cooldown * (1 - level * 0.04), 0.12, weapon.cooldown);
+    weapon.range += level * 18;
+    weapon.trait.force = (weapon.trait.force ?? 18) + level * 5;
+    weapon.level += level * 0.18;
+    return `键盘宏专精 Lv.${level}：覆盖频率和击退已校准。`;
+  }
+
+  if (weapon.id === "correction-fluid") {
+    weapon.range += level * 22;
+    weapon.damage += level;
+    weapon.trait.duration = (weapon.trait.duration ?? 0.85) + level * 0.14;
+    weapon.trait.factor = Math.max(0.4, (weapon.trait.factor ?? 0.55) - level * 0.03);
+    weapon.level += level * 0.18;
+    return `修正液专精 Lv.${level}：射程和减速已校准。`;
+  }
+
+  return null;
 }
 
 function cloneForSave(value, fallback = null) {
@@ -1860,6 +1948,9 @@ function createStoreArchiveState() {
       "warm-cache": 2,
       "route-shoes": 2,
       "chapter-insurance": 1,
+      "paperclip-specialist": 2,
+      "keyboard-specialist": 2,
+      "correction-specialist": 1,
     },
   };
 }
@@ -2284,7 +2375,11 @@ function openWeaponSelect() {
     const button = document.createElement("button");
     button.className = "choice-button with-media weapon-choice";
     const icon = weapon.assetKey ? `<img class="choice-icon weapon-icon" src="${assetUrl(weapon.assetKey)}" alt="" />` : "";
-    button.innerHTML = `${icon}<span class="choice-copy"><span class="choice-title">${weapon.name} · ${weapon.role}</span><span class="choice-effect">${weapon.desc}<br>${weapon.traitText}</span></span>`;
+    const specialization = getWeaponSpecializationPreview(weapon);
+    const specializationLine = specialization
+      ? `<span class="specialization-line ${specialization.active ? "is-active" : ""}">${specialization.text}</span>`
+      : "";
+    button.innerHTML = `${icon}<span class="choice-copy"><span class="choice-title">${weapon.name} · ${weapon.role}</span><span class="choice-effect">${weapon.desc}<br>${weapon.traitText}${specializationLine}</span></span>`;
     button.addEventListener("click", () => {
       equipWeapon(weapon);
       saveRunCheckpoint("weapon-selected");
@@ -2299,7 +2394,8 @@ function openWeaponSelect() {
 
 function equipWeapon(weapon) {
   player.weapon = { ...JSON.parse(JSON.stringify(weapon)), cooldownLeft: 0, level: 1, shotsFired: 0 };
-  setLog(`已装备：${weapon.name}。它会自动攻击最近的异常实体。`);
+  const specializationLog = applyWeaponSpecializationToWeapon(player.weapon);
+  setLog(`已装备：${weapon.name}。它会自动攻击最近的异常实体。${specializationLog ? ` ${specializationLog}` : ""}`);
 }
 
 function modifyWeapon({ stat, add = 0, multiply = 1, min = -Infinity, max = Infinity }) {
@@ -8008,10 +8104,19 @@ function installAutomationTestHooks() {
         "warm-cache": 1,
         "route-shoes": 1,
         "chapter-insurance": 1,
+        "paperclip-specialist": 3,
+        "keyboard-specialist": 2,
+        "correction-specialist": 2,
       }),
     };
     const firstChapter = getMetaProgressionBonuses(0);
     const practiceChapter = getMetaProgressionBonuses(2);
+    const paperclip = cloneForSave(weaponDefinitions.find((weapon) => weapon.id === "paperclip"), {});
+    const keyboard = cloneForSave(weaponDefinitions.find((weapon) => weapon.id === "keyboard"), {});
+    const correction = cloneForSave(weaponDefinitions.find((weapon) => weapon.id === "correction-fluid"), {});
+    applyWeaponSpecializationToWeapon(paperclip);
+    applyWeaponSpecializationToWeapon(keyboard);
+    applyWeaponSpecializationToWeapon(correction);
     archiveState = previousArchive ?? loadArchive();
     return {
       ok: firstChapter.maxHp === 16
@@ -8019,9 +8124,20 @@ function installAutomationTestHooks() {
         && firstChapter.dashPower === 12
         && practiceChapter.maxHp === 24
         && practiceChapter.bugPoints === 2
-        && practiceChapter.dashPower === 12,
+        && practiceChapter.dashPower === 12
+        && paperclip.damage === 37
+        && paperclip.trait.every === 3
+        && keyboard.trait.force === 28
+        && keyboard.cooldown < 0.46
+        && correction.range === 354
+        && correction.trait.factor < 0.55,
       firstChapter,
       practiceChapter,
+      weaponSpecializations: {
+        paperclip: { damage: paperclip.damage, chargedEvery: paperclip.trait.every },
+        keyboard: { cooldown: round(keyboard.cooldown), force: keyboard.trait.force },
+        correction: { range: correction.range, slowFactor: round(correction.trait.factor) },
+      },
     };
   }
 
