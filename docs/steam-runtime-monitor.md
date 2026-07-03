@@ -34,7 +34,7 @@ npm run desktop:monitor
 - `console.error`、页面 `error`、`unhandledrejection`、load failure、renderer crash。
 - 桌面文件存储桥的 `writeJson`、`readJson`、`remove` 是否完整可用。
 - Electron 主进程和渲染进程的内存 working set / private bytes。
-- `desktop:route:quick` 会用 `?automation=1` 启用游戏内自动化钩子，覆盖五章入口、长地图坐标移动、Boss 触发和跑局存档恢复；普通 Pages / Steam 玩家入口不会暴露该钩子。
+- `desktop:route:quick` 会用 `?automation=1` 启用游戏内自动化钩子，覆盖五章入口、大于视口的分区地图、长地图坐标移动、Boss 触发和跑局存档恢复；存档探针会先清掉旧跑局档，再校验读回的 `reason`、章节索引、目标和恢复后的武器状态。普通 Pages / Steam 玩家入口不会暴露该钩子。
 
 每次运行会把完整报告写入：
 

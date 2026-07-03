@@ -365,14 +365,41 @@ const chapterMaps = [
   {
     id: "metro-loop",
     name: "03:32 环线站台",
+    width: 2240,
+    height: 1260,
     start: { x: 160, y: 610 },
+    bossSpawn: { x: 1938, y: 936 },
+    bossPayload: { x: 1768, y: 890 },
+    stepTargets: {
+      0: [{ eventId: "subway-loop", x: 638, y: 478 }],
+      1: [
+        { eventId: "skipped-station", x: 316, y: 196 },
+        { eventId: "queue-timetable", x: 948, y: 236 },
+      ],
+      2: [{ eventId: "clock-debt", x: 1398, y: 742 }],
+      3: [
+        { eventId: "debug-badge", x: 1668, y: 330 },
+        { eventId: "fish-dimension", x: 1886, y: 1082 },
+      ],
+    },
+    stepHints: {
+      0: "末班车残影沿左侧站台循环，先稳定起点轨道。",
+      1: "跳站名单分散在旧闸机和补票大厅，两个信标都要处理。",
+      2: "时间债账单被冲到东侧换乘厅，沿蓝色轨道继续前进。",
+      3: "终点站在远端折返区，清掉阻塞班次后再进入管理员站台。",
+    },
     spawnPoints: [
       { x: 90, y: 106 }, { x: 1190, y: 112 }, { x: 94, y: 618 }, { x: 1188, y: 624 },
       { x: 520, y: 98 }, { x: 760, y: 638 },
+      { x: 1460, y: 118 }, { x: 2076, y: 176 }, { x: 2140, y: 1120 }, { x: 1520, y: 1010 },
     ],
     paths: [
       { kind: "rail", x1: 84, y1: 504, x2: 1196, y2: 384, color: "#72a5ff" },
       { kind: "rail", x1: 92, y1: 558, x2: 1198, y2: 440, color: "#f1c15b" },
+      { kind: "rail", x1: 1118, y1: 426, x2: 2076, y2: 314, color: "#72a5ff", label: "东行环线" },
+      { kind: "rail", x1: 1178, y1: 506, x2: 2058, y2: 830, color: "#f1c15b", label: "折返线" },
+      { kind: "corridor", x: 1338, y: 666, w: 560, h: 128, label: "换乘厅", color: "#5de2d1" },
+      { kind: "corridor", x: 1768, y: 882, w: 352, h: 164, label: "终点站", color: "#72a5ff" },
     ],
     zones: [
       {
@@ -400,6 +427,31 @@ const chapterMaps = [
         color: "#5de2d1",
         slowFactor: 0.84,
       },
+      {
+        id: "transfer-crowd",
+        x: 1358,
+        y: 652,
+        w: 506,
+        h: 156,
+        type: "slow",
+        label: "换乘人潮",
+        color: "#5de2d1",
+        slowFactor: 0.8,
+      },
+      {
+        id: "terminal-echo",
+        x: 1740,
+        y: 858,
+        w: 420,
+        h: 218,
+        type: "hazard",
+        label: "终点站重播",
+        color: "#ef6a70",
+        damage: 7,
+        cooldown: 1.2,
+        slowFactor: 0.72,
+        log: "终点站广播重播旧日到站，脚下轨道闪了一下。",
+      },
     ],
     obstacles: [
       { kind: "gate", x: 172, y: 164, w: 178, h: 52, label: "检票闸机" },
@@ -409,6 +461,12 @@ const chapterMaps = [
       { kind: "pillar", x: 292, y: 360, w: 52, h: 52, label: "立柱" },
       { kind: "pillar", x: 608, y: 334, w: 52, h: 52, label: "立柱" },
       { kind: "pillar", x: 924, y: 310, w: 52, h: 52, label: "立柱" },
+      { kind: "gate", x: 1328, y: 184, w: 196, h: 54, label: "东厅闸机" },
+      { kind: "gate", x: 1618, y: 184, w: 196, h: 54, label: "迟到者门" },
+      { kind: "kiosk", x: 1878, y: 206, w: 148, h: 102, label: "终点调度" },
+      { kind: "pillar", x: 1488, y: 470, w: 58, h: 58, label: "换乘柱" },
+      { kind: "pillar", x: 1788, y: 642, w: 58, h: 58, label: "折返柱" },
+      { kind: "train", x: 1328, y: 1012, w: 382, h: 82, label: "空车厢" },
     ],
     props: [
       { kind: "stationSign", x: 760, y: 92, label: "环线 03:32" },
@@ -419,21 +477,61 @@ const chapterMaps = [
       { kind: "signalLight", x: 108, y: 334, w: 54, h: 94, label: "信号" },
       { kind: "plant", x: 1168, y: 520, scale: 0.78 },
       { kind: "printer", x: 1048, y: 306 },
+      { kind: "stationSign", x: 1516, y: 112, label: "换乘厅" },
+      { kind: "stationSign", x: 1950, y: 808, label: "终点站" },
+      { kind: "metroBench", x: 1388, y: 548, w: 188, h: 42, label: "换乘椅" },
+      { kind: "metroBench", x: 1818, y: 758, w: 188, h: 42, label: "终点椅" },
+      { kind: "ticketMachine", x: 1528, y: 850, w: 84, h: 92, label: "旧票机" },
+      { kind: "signalLight", x: 2028, y: 616, w: 54, h: 94, label: "折返" },
     ],
     decorations: [
       { kind: "platformEdge", x: 94, y: 574, w: 1090, h: 24, color: "#f1c15b" },
       { kind: "ticketTrail", x: 252, y: 292, count: 9, color: "#72a5ff" },
       { kind: "signalPulse", x: 136, y: 338, color: "#ef6a70" },
       { kind: "crowdGhosts", x: 286, y: 252, count: 11, color: "#5de2d1" },
+      { kind: "platformEdge", x: 1288, y: 618, w: 772, h: 24, color: "#72a5ff" },
+      { kind: "ticketTrail", x: 1398, y: 742, count: 12, color: "#f1c15b" },
+      { kind: "crowdGhosts", x: 1458, y: 646, count: 14, color: "#5de2d1" },
+      { kind: "signalPulse", x: 2048, y: 640, color: "#ef6a70" },
     ],
   },
   {
     id: "hash-market",
     name: "哈希夜市雨棚",
+    width: 2180,
+    height: 1260,
     start: { x: 158, y: 602 },
+    bossSpawn: { x: 1846, y: 892 },
+    bossPayload: { x: 1668, y: 740 },
+    stepTargets: {
+      0: [{ eventId: "night-market-hash", x: 360, y: 488 }],
+      1: [
+        { eventId: "duplicate-menu", x: 860, y: 196 },
+        { eventId: "price-index", x: 1538, y: 558 },
+      ],
+      2: [{ eventId: "salted-memory", x: 1328, y: 228 }],
+      3: [
+        { eventId: "delivery-meat", x: 520, y: 930 },
+        { eventId: "promise-bloat", x: 1768, y: 412 },
+      ],
+    },
+    stepHints: {
+      0: "夜市入口的短码招牌亮起，先给名字加盐。",
+      1: "重复编号藏在西侧摊位，价格索引已经滑到东侧扩容街。",
+      2: "老梁的小票被盐雨冲到雨棚背面，沿绿光摊位追过去。",
+      3: "缓存保卫战分成前街和索引中庭，两个信标都要清掉。",
+    },
     spawnPoints: [
       { x: 86, y: 110 }, { x: 1190, y: 116 }, { x: 92, y: 636 }, { x: 1170, y: 628 },
       { x: 636, y: 104 }, { x: 640, y: 634 },
+      { x: 1440, y: 110 }, { x: 2072, y: 188 }, { x: 2048, y: 1074 }, { x: 1110, y: 1120 },
+    ],
+    paths: [
+      { kind: "corridor", x: 70, y: 476, w: 1036, h: 112, label: "夜市前街", color: "#d8b26e" },
+      { kind: "corridor", x: 1008, y: 320, w: 760, h: 152, label: "短码雨棚", color: "#96e072" },
+      { kind: "corridor", x: 1450, y: 712, w: 548, h: 168, label: "索引中庭", color: "#72a5ff" },
+      { kind: "route", x1: 620, y1: 510, x2: 1328, y2: 228, color: "#96e072", label: "盐雨小票" },
+      { kind: "route", x1: 1090, y1: 536, x2: 1846, y2: 892, color: "#d8b26e", label: "索引摊主" },
     ],
     zones: [
       {
@@ -459,6 +557,32 @@ const chapterMaps = [
         color: "#d8b26e",
         slowFactor: 0.78,
       },
+      {
+        id: "salt-rain-east",
+        x: 1218,
+        y: 168,
+        w: 452,
+        h: 176,
+        type: "backlash",
+        label: "背面盐雨",
+        color: "#96e072",
+        backlashPerSecond: 4.4,
+        slowFactor: 0.86,
+      },
+      {
+        id: "index-clearance",
+        x: 1512,
+        y: 686,
+        w: 438,
+        h: 226,
+        type: "hazard",
+        label: "索引清场线",
+        color: "#ef6a70",
+        damage: 7,
+        cooldown: 1.25,
+        slowFactor: 0.76,
+        log: "摊位号被强制重排，脚下的编号突然变成红色。",
+      },
     ],
     obstacles: [
       { kind: "stall", x: 92, y: 144, w: 214, h: 110, label: "字符串烤摊", color: "#d8b26e" },
@@ -467,6 +591,12 @@ const chapterMaps = [
       { kind: "stall", x: 978, y: 156, w: 210, h: 106, label: "盐值档案" },
       { kind: "stall", x: 104, y: 384, w: 214, h: 112, label: "冲突修补" },
       { kind: "stall", x: 902, y: 406, w: 234, h: 112, label: "桶扩容" },
+      { kind: "stall", x: 1264, y: 122, w: 224, h: 112, label: "昨日小票" },
+      { kind: "stall", x: 1582, y: 126, w: 224, h: 112, label: "短码伞铺" },
+      { kind: "stall", x: 1368, y: 482, w: 220, h: 112, label: "价格索引" },
+      { kind: "stall", x: 1740, y: 534, w: 246, h: 118, label: "缓存门面" },
+      { kind: "gate", x: 1088, y: 880, w: 232, h: 58, label: "雨棚后门" },
+      { kind: "pillar", x: 1968, y: 760, w: 58, h: 58, label: "短码柱" },
     ],
     props: [
       { kind: "marketCanopy", x: 198, y: 584, color: "#d8b26e", label: "夜市出口" },
@@ -477,26 +607,65 @@ const chapterMaps = [
       { kind: "hashCounter", x: 596, y: 302, w: 86, h: 76, label: "#12" },
       { kind: "plant", x: 620, y: 624, scale: 0.82 },
       { kind: "water", x: 1170, y: 570 },
+      { kind: "marketCanopy", x: 1360, y: 310, color: "#96e072", label: "背面盐棚" },
+      { kind: "marketCanopy", x: 1788, y: 842, color: "#72a5ff", label: "索引中庭" },
+      { kind: "saltCrates", x: 1248, y: 438, w: 128, h: 58, label: "盐值缓存" },
+      { kind: "noodleCart", x: 1540, y: 742, w: 150, h: 66, label: "重号面车" },
+      { kind: "memoryReceipt", x: 1328, y: 228, w: 112, h: 48, label: "背面小票" },
+      { kind: "hashCounter", x: 1706, y: 386, w: 92, h: 82, label: "#404" },
+      { kind: "water", x: 2028, y: 1002 },
     ],
     decorations: [
       { kind: "lanternString", x1: 72, y1: 92, x2: 1188, y2: 128, color: "#f1c15b" },
       { kind: "neonPuddle", x: 628, y: 348, radius: 120, color: "#96e072" },
       { kind: "saltRain", x: 438, y: 238, w: 398, h: 178, color: "#96e072" },
       { kind: "receiptTrail", x: 766, y: 482, count: 8, color: "#d8b26e" },
+      { kind: "lanternString", x1: 1128, y1: 108, x2: 2056, y2: 166, color: "#96e072" },
+      { kind: "saltRain", x: 1218, y: 168, w: 452, h: 176, color: "#96e072" },
+      { kind: "neonPuddle", x: 1708, y: 812, radius: 138, color: "#72a5ff" },
+      { kind: "receiptTrail", x: 1462, y: 724, count: 11, color: "#d8b26e" },
     ],
   },
   {
     id: "promise-tower",
     name: "承诺塔根层",
+    width: 2160,
+    height: 1320,
     start: { x: 160, y: 604 },
+    bossSpawn: { x: 1828, y: 982 },
+    bossPayload: { x: 1608, y: 826 },
+    stepTargets: {
+      0: [{ eventId: "branch-pledge", x: 522, y: 212 }],
+      1: [{ eventId: "null-contract", x: 1418, y: 558 }],
+      2: [
+        { eventId: "stack-debt", x: 246, y: 872 },
+        { eventId: "promise-bloat", x: 1642, y: 232 },
+      ],
+      3: [
+        { eventId: "queue-timetable", x: 920, y: 170 },
+        { eventId: "salted-memory", x: 1782, y: 622 },
+      ],
+    },
+    stepHints: {
+      0: "根层入口分叉正在抽芽，先修剪左侧空头承诺。",
+      1: "空值合同被推到东侧责任廊，沿主根向右上推进。",
+      2: "债务堆分散到下层和高层分枝，两个栈顶都要卸掉。",
+      3: "根节点苏醒前，时间账和盐雨记忆在远端合流。",
+    },
     spawnPoints: [
       { x: 82, y: 112 }, { x: 1192, y: 110 }, { x: 86, y: 638 }, { x: 1188, y: 634 },
       { x: 640, y: 92 }, { x: 640, y: 642 },
+      { x: 1478, y: 104 }, { x: 2074, y: 208 }, { x: 2020, y: 1120 }, { x: 850, y: 1174 },
     ],
     paths: [
       { kind: "root", x1: 640, y1: 688, x2: 640, y2: 92, color: "#96e072" },
       { kind: "root", x1: 640, y1: 420, x2: 286, y2: 262, color: "#96e072" },
       { kind: "root", x1: 640, y1: 350, x2: 1028, y2: 216, color: "#96e072" },
+      { kind: "root", x1: 640, y1: 420, x2: 1418, y2: 558, color: "#72a5ff", label: "责任廊" },
+      { kind: "root", x1: 1028, y1: 216, x2: 1642, y2: 232, color: "#96e072", label: "高层分枝" },
+      { kind: "root", x1: 1418, y1: 558, x2: 1828, y2: 982, color: "#f1c15b", label: "根节点" },
+      { kind: "corridor", x: 1328, y: 500, w: 498, h: 134, label: "责任廊", color: "#72a5ff" },
+      { kind: "corridor", x: 1548, y: 878, w: 456, h: 182, label: "根心平台", color: "#96e072" },
     ],
     zones: [
       {
@@ -524,6 +693,31 @@ const chapterMaps = [
         color: "#72a5ff",
         slowFactor: 0.74,
       },
+      {
+        id: "debt-stack",
+        x: 1568,
+        y: 178,
+        w: 318,
+        h: 170,
+        type: "hazard",
+        label: "债务栈顶",
+        color: "#f1c15b",
+        damage: 7,
+        cooldown: 1.28,
+        slowFactor: 0.7,
+        log: "一叠旧承诺从高层分枝落下，砸出新的责任坐标。",
+      },
+      {
+        id: "root-heart-fog",
+        x: 1550,
+        y: 876,
+        w: 470,
+        h: 196,
+        type: "slow",
+        label: "根心雾带",
+        color: "#96e072",
+        slowFactor: 0.76,
+      },
     ],
     obstacles: [
       { kind: "rootWall", x: 584, y: 116, w: 112, h: 168, label: "主根" },
@@ -531,6 +725,11 @@ const chapterMaps = [
       { kind: "rootWall", x: 760, y: 298, w: 256, h: 58, label: "未决链" },
       { kind: "pillar", x: 176, y: 488, w: 62, h: 62, label: "叶节点" },
       { kind: "pillar", x: 1078, y: 514, w: 62, h: 62, label: "叶节点" },
+      { kind: "rootWall", x: 1292, y: 318, w: 276, h: 58, label: "责任分枝" },
+      { kind: "rootWall", x: 1580, y: 690, w: 320, h: 62, label: "根心护栏" },
+      { kind: "pillar", x: 1448, y: 762, w: 66, h: 66, label: "债务柱" },
+      { kind: "pillar", x: 1982, y: 928, w: 66, h: 66, label: "盖章柱" },
+      { kind: "gate", x: 988, y: 930, w: 260, h: 58, label: "下层回廊" },
     ],
     props: [
       { kind: "stationSign", x: 824, y: 92, label: "根承诺" },
@@ -541,21 +740,60 @@ const chapterMaps = [
       { kind: "contractMonolith", x: 116, y: 354, w: 72, h: 112, label: "责任碑" },
       { kind: "plant", x: 1160, y: 160, scale: 0.86 },
       { kind: "whiteboard", x: 86, y: 92, w: 184, h: 46 },
+      { kind: "stationSign", x: 1506, y: 118, label: "高层分枝" },
+      { kind: "coreTree", x: 1768, y: 820, w: 104, h: 156, label: "根心" },
+      { kind: "promiseTablet", x: 1372, y: 506, w: 104, h: 124, label: "空值合同" },
+      { kind: "awaitHourglass", x: 1630, y: 544, w: 78, h: 86, label: "等待" },
+      { kind: "rootLantern", x: 1948, y: 742, w: 74, h: 82, label: "根灯" },
+      { kind: "contractMonolith", x: 884, y: 1012, w: 80, h: 122, label: "债碑" },
     ],
     decorations: [
       { kind: "contractRibbon", x1: 236, y1: 188, x2: 1018, y2: 566, color: "#96e072" },
       { kind: "rootBud", x: 640, y: 418, count: 12, color: "#96e072" },
       { kind: "awaitGlyphs", x: 736, y: 448, w: 260, h: 92, color: "#72a5ff" },
       { kind: "recursionRings", x: 524, y: 272, radius: 92, color: "#96e072" },
+      { kind: "contractRibbon", x1: 1028, y1: 216, x2: 1828, y2: 982, color: "#96e072" },
+      { kind: "rootBud", x: 1506, y: 548, count: 14, color: "#72a5ff" },
+      { kind: "awaitGlyphs", x: 1550, y: 876, w: 470, h: 196, color: "#96e072" },
+      { kind: "recursionRings", x: 1776, y: 916, radius: 128, color: "#f1c15b" },
     ],
   },
   {
     id: "whitebox-core",
     name: "零号白箱核心",
+    width: 2240,
+    height: 1320,
     start: { x: 150, y: 600 },
+    bossSpawn: { x: 1884, y: 904 },
+    bossPayload: { x: 1698, y: 790 },
+    stepTargets: {
+      0: [{ eventId: "graph-alley", x: 520, y: 526 }],
+      1: [{ eventId: "inspector-memory", x: 1298, y: 196 }],
+      2: [{ eventId: "city-heart", x: 1698, y: 790 }],
+      3: [
+        { eventId: "branch-pledge", x: 226, y: 234 },
+        { eventId: "night-market-hash", x: 1462, y: 1038 },
+        { eventId: "queue-timetable", x: 1980, y: 376 },
+      ],
+    },
+    stepHints: {
+      0: "核心入口像图一样分叉，先稳定左侧连接走廊。",
+      1: "巡检员记忆被封在北侧白箱舱，穿过扫描线读取。",
+      2: "城市心跳藏在远端核心室，沿红蓝证据链推进。",
+      3: "最终反例散落在旧承诺、夜市缓存和环线时刻表三处。",
+    },
     spawnPoints: [
       { x: 84, y: 106 }, { x: 1190, y: 110 }, { x: 90, y: 632 }, { x: 1190, y: 632 },
       { x: 640, y: 94 }, { x: 640, y: 640 },
+      { x: 1478, y: 112 }, { x: 2112, y: 198 }, { x: 2090, y: 1136 }, { x: 1486, y: 1168 },
+    ],
+    paths: [
+      { kind: "corridor", x: 92, y: 496, w: 1030, h: 118, label: "图结构走廊", color: "#72a5ff" },
+      { kind: "corridor", x: 1106, y: 286, w: 650, h: 126, label: "巡检记忆舱", color: "#d8e0e8" },
+      { kind: "corridor", x: 1518, y: 646, w: 520, h: 174, label: "城市心跳室", color: "#ef6a70" },
+      { kind: "route", x1: 520, y1: 526, x2: 1298, y2: 196, color: "#72a5ff", label: "记忆链" },
+      { kind: "route", x1: 1298, y1: 196, x2: 1698, y2: 790, color: "#ef6a70", label: "心跳链" },
+      { kind: "route", x1: 1462, y1: 1038, x2: 1980, y2: 376, color: "#f1c15b", label: "反例链" },
     ],
     zones: [
       {
@@ -583,6 +821,32 @@ const chapterMaps = [
         backlashPerSecond: -5.5,
         slowFactor: 0.92,
       },
+      {
+        id: "memory-scan-lane",
+        x: 1138,
+        y: 258,
+        w: 590,
+        h: 58,
+        type: "hazard",
+        label: "记忆扫描线",
+        color: "#ef6a70",
+        damage: 8,
+        cooldown: 1.08,
+        slowFactor: 0.74,
+        log: "白箱记忆扫描线划过，未命名差异被临时冻结。",
+      },
+      {
+        id: "city-heart-field",
+        x: 1518,
+        y: 646,
+        w: 520,
+        h: 174,
+        type: "backlash",
+        label: "城市心跳场",
+        color: "#72a5ff",
+        backlashPerSecond: -6.4,
+        slowFactor: 0.9,
+      },
     ],
     obstacles: [
       { kind: "coreBlock", x: 520, y: 118, w: 240, h: 132, label: "零号核心" },
@@ -591,6 +855,12 @@ const chapterMaps = [
       { kind: "gate", x: 228, y: 464, w: 228, h: 62, label: "保留门" },
       { kind: "gate", x: 824, y: 464, w: 228, h: 62, label: "重写门" },
       { kind: "pillar", x: 606, y: 586, w: 68, h: 68, label: "判定柱" },
+      { kind: "coreBlock", x: 1582, y: 598, w: 252, h: 138, label: "城市心跳" },
+      { kind: "serverCluster", x: 1168, y: 132, w: 206, h: 112, label: "巡检记忆" },
+      { kind: "serverCluster", x: 1888, y: 204, w: 206, h: 112, label: "规则缓存" },
+      { kind: "gate", x: 1188, y: 924, w: 246, h: 62, label: "反例门" },
+      { kind: "gate", x: 1802, y: 1032, w: 246, h: 62, label: "清零门" },
+      { kind: "pillar", x: 2048, y: 706, w: 70, h: 70, label: "校准柱" },
     ],
     props: [
       { kind: "stationSign", x: 744, y: 92, label: "差异保留" },
@@ -601,12 +871,23 @@ const chapterMaps = [
       { kind: "calibrationObelisk", x: 602, y: 286, w: 86, h: 122, label: "校准柱" },
       { kind: "rack", x: 1120, y: 548 },
       { kind: "rack", x: 62, y: 542 },
+      { kind: "stationSign", x: 1388, y: 110, label: "巡检记忆" },
+      { kind: "stationSign", x: 1818, y: 560, label: "城市心跳" },
+      { kind: "scanConsole", x: 1238, y: 452, w: 100, h: 78, label: "记忆台" },
+      { kind: "evidencePod", x: 1462, y: 988, w: 92, h: 92, label: "夜市反例" },
+      { kind: "archiveTerminal", x: 1972, y: 350, w: 96, h: 88, label: "环线证据" },
+      { kind: "calibrationObelisk", x: 1704, y: 842, w: 92, h: 132, label: "主规则" },
+      { kind: "rack", x: 2120, y: 938 },
     ],
     decorations: [
       { kind: "scanGrid", x: 240, y: 180, w: 800, h: 392, color: "#ef6a70" },
       { kind: "evidenceLinks", color: "#72a5ff" },
       { kind: "coreConduit", x1: 640, y1: 184, x2: 640, y2: 636, color: "#ef6a70" },
       { kind: "exceptionDots", x: 492, y: 384, w: 318, h: 154, color: "#72a5ff" },
+      { kind: "scanGrid", x: 1120, y: 146, w: 962, h: 332, color: "#ef6a70" },
+      { kind: "coreConduit", x1: 1298, y1: 196, x2: 1698, y2: 790, color: "#72a5ff" },
+      { kind: "coreConduit", x1: 1698, y1: 790, x2: 1980, y2: 376, color: "#ef6a70" },
+      { kind: "exceptionDots", x: 1518, y: 646, w: 520, h: 174, color: "#72a5ff" },
     ],
   },
 ];
@@ -7564,13 +7845,26 @@ function installAutomationTestHooks() {
 
   function saveAndRestoreProbe() {
     const before = snapshot({ action: "beforeSaveRestore" });
+    deleteRunSave();
     saveRunCheckpoint("route-pressure-save");
     const saved = loadRunSave();
-    restoreRunSave(saved);
+    if (saved) {
+      restoreRunSave(saved);
+    }
     const after = snapshot({ action: "afterSaveRestore" });
+    const savedSummary = saved ? {
+      reason: saved.reason ?? null,
+      currentChapterIndex: saved.currentChapterIndex ?? null,
+      objective: saved.objective ?? null,
+      hasWeapon: Boolean(saved.player?.weapon),
+      bossId: saved.boss?.id ?? null,
+    } : null;
+    const sameChapter = before.currentChapterIndex === after.currentChapterIndex
+      && before.currentChapterIndex === savedSummary?.currentChapterIndex;
     return {
-      ok: Boolean(saved) && before.currentChapterIndex === after.currentChapterIndex && Boolean(after.player.weapon),
+      ok: Boolean(saved) && sameChapter && Boolean(after.player.weapon) && savedSummary?.reason === "route-pressure-save",
       savedAt: saved?.savedAt ?? null,
+      saved: savedSummary,
       before,
       after,
     };
@@ -7589,6 +7883,9 @@ function installAutomationTestHooks() {
 
       if (entry.currentChapterIndex !== index) {
         failures.push(`Chapter ${index + 1} entered as ${entry.currentChapterIndex + 1}`);
+      }
+      if (!entry.map.largerThanView) {
+        failures.push(`Chapter ${index + 1} map is not larger than the viewport`);
       }
       if (routeSamples.length < 3) {
         failures.push(`Chapter ${index + 1} has too few route samples`);
@@ -7610,6 +7907,7 @@ function installAutomationTestHooks() {
         routeSamples,
         boss: bossSnapshot.boss,
         saveRestoreOk: saveRestore.ok,
+        saveRestore,
         restoredObjective: saveRestore.after.objective,
       });
     }
