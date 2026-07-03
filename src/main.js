@@ -175,6 +175,7 @@ const metaProgressNodes = [
     maxLevel: 4,
     costs: [8, 14, 22, 32],
     requirement: null,
+    iconKey: "metaSteadyHeart",
     summary: "每级开局生命上限 +8",
     detail: "把前几次失误从立刻崩盘改成可修正的节奏窗口。",
   },
@@ -184,6 +185,7 @@ const metaProgressNodes = [
     maxLevel: 3,
     costs: [6, 13, 24],
     requirement: null,
+    iconKey: "metaWarmCache",
     summary: "每级开局 bug点数 +1",
     detail: "开局就能更早使用修复脉冲或冲刺，重开手感更轻。",
   },
@@ -193,6 +195,7 @@ const metaProgressNodes = [
     maxLevel: 3,
     costs: [10, 18, 30],
     requirement: { bestChapter: 2 },
+    iconKey: "metaRouteShoes",
     summary: "每级冲刺距离 +12",
     detail: "适合大地图章节，给躲 Boss 预警和跨危险区更多余量。",
   },
@@ -202,6 +205,7 @@ const metaProgressNodes = [
     maxLevel: 2,
     costs: [16, 28],
     requirement: { bestChapter: 3 },
+    iconKey: "metaChapterInsurance",
     summary: "章节练习开局额外生命 +8、bug点数 +1",
     detail: "从已解锁章节练习时补一点基础资源，避免跳章开局太干。",
   },
@@ -212,6 +216,7 @@ const metaProgressNodes = [
     costs: [12, 22, 36],
     requirement: { bestChapter: 2 },
     weaponId: "paperclip",
+    iconKey: "metaPaperclipSpecialist",
     summary: "每级回形针伤害 +3，精准弹更强",
     detail: "适合喜欢点杀和控距离的路线，满级后加粗精准弹更快进入循环。",
   },
@@ -222,6 +227,7 @@ const metaProgressNodes = [
     costs: [14, 24, 38],
     requirement: { bestChapter: 3 },
     weaponId: "keyboard",
+    iconKey: "metaKeyboardSpecialist",
     summary: "每级键盘宏冷却 -4%，击退更强",
     detail: "让覆盖型武器在大地图里更稳定，适合清理分裂和召唤型敌人。",
   },
@@ -232,6 +238,7 @@ const metaProgressNodes = [
     costs: [16, 26, 40],
     requirement: { bestChapter: 4 },
     weaponId: "correction-fluid",
+    iconKey: "metaCorrectionSpecialist",
     summary: "每级修正液射程 +22，减速更久",
     detail: "强化近距控场的容错，让 Boss 召唤物和高速敌人更容易被压住。",
   },
@@ -259,6 +266,7 @@ let gameSettings;
 let gamepadState;
 let audioSystem;
 let lastInputMethod = "keyboard";
+let metaUnlockPulseNodeId = null;
 
 const desks = [
   { x: 84, y: 104, w: 136, h: 54, tag: "Q3报表", assetKey: "propWorkstationA" },
@@ -1079,6 +1087,13 @@ const assetSources = {
   breakpointBadge: "src/assets/items/breakpoint-badge-v2.png",
   sceneKeyArt: "src/assets/scenes/variable-city-key-art.png",
   variableBlessingCard: "src/assets/ui/variable-blessing-card.png",
+  metaSteadyHeart: "src/assets/ui/meta-steady-heart-v1.png",
+  metaWarmCache: "src/assets/ui/meta-warm-cache-v1.png",
+  metaRouteShoes: "src/assets/ui/meta-route-shoes-v1.png",
+  metaChapterInsurance: "src/assets/ui/meta-chapter-insurance-v1.png",
+  metaPaperclipSpecialist: "src/assets/ui/meta-paperclip-specialist-v1.png",
+  metaKeyboardSpecialist: "src/assets/ui/meta-keyboard-specialist-v1.png",
+  metaCorrectionSpecialist: "src/assets/ui/meta-correction-specialist-v1.png",
   abilityIntegerPrecision: "src/assets/abilities/integer-precision-v2.png",
   abilityFloatingPointError: "src/assets/abilities/floating-point-error-v2.png",
   abilityArrayBarrage: "src/assets/abilities/array-barrage-v2.png",
@@ -1483,6 +1498,7 @@ function buyMetaUpgrade(id) {
   archiveState.calibrationShards -= cost;
   archiveState.metaUpgrades[node.id] = level + 1;
   saveArchive();
+  metaUnlockPulseNodeId = node.id;
   playAudioCue("upgrade-select");
   setLog(`档案校准完成：${node.title} Lv.${level + 1}/${node.maxLevel}。`);
   renderStartMenu();
@@ -3065,19 +3081,18 @@ function renderMetaProgression() {
       : lockedText || `消耗 ${cost} 校准碎片`;
     const className = [
       "meta-node",
+      node.iconKey ? "with-media" : "",
       maxed ? "is-maxed" : "",
       lockedText ? "is-locked" : "",
+      metaUnlockPulseNodeId === node.id ? "is-just-unlocked" : "",
     ].filter(Boolean).join(" ");
-    const button = createMenuButton(
-      `${node.title} Lv.${level}/${node.maxLevel}`,
-      `${node.summary}｜${status}`,
-      className,
-      () => buyMetaUpgrade(node.id),
-      disabled,
-    );
+    const button = createMenuButton("", "", className, () => buyMetaUpgrade(node.id), disabled);
+    const icon = node.iconKey ? `<img class="choice-icon meta-icon" src="${assetUrl(node.iconKey)}" alt="" />` : "";
+    button.innerHTML = `${icon}<span class="choice-copy"><span class="choice-title">${node.title} Lv.${level}/${node.maxLevel}</span><span class="choice-effect">${node.summary}｜${status}</span></span>`;
     button.title = node.detail;
     ui.metaProgression.appendChild(button);
   }
+  metaUnlockPulseNodeId = null;
 }
 
 function renderStartMenu() {
