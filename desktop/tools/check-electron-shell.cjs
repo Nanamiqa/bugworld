@@ -38,6 +38,8 @@ const saveLayout = readJson("desktop/steam/save-layout.json");
 requireFile("index.html", "Web entry");
 requireFile("desktop/electron/main.cjs", "Electron main");
 requireFile("desktop/electron/preload.cjs", "Electron preload");
+requireFile("desktop/tools/electron-runtime-monitor-main.cjs", "Electron runtime monitor main");
+requireFile("desktop/tools/run-electron-runtime-monitor.cjs", "Electron runtime monitor runner");
 requireFile("desktop/steam/save-layout.json", "Steam Cloud layout");
 requireFile("desktop/steam/steam-autocloud.example.vdf", "Steam Auto-Cloud VDF");
 
@@ -50,6 +52,12 @@ if (packageJson) {
   }
   if (!packageJson.scripts?.["desktop:smoke"]) {
     errors.push("package.json scripts.desktop:smoke is required");
+  }
+  if (!packageJson.scripts?.["desktop:monitor"]) {
+    errors.push("package.json scripts.desktop:monitor is required");
+  }
+  if (!packageJson.scripts?.["desktop:monitor:quick"]) {
+    errors.push("package.json scripts.desktop:monitor:quick is required");
   }
   if (!packageJson.scripts?.["desktop:install-electron"]) {
     errors.push("package.json scripts.desktop:install-electron is required");
@@ -105,6 +113,9 @@ requireText("desktop/electron/main.cjs", /setWindowOpenHandler/, "External link 
 requireText("desktop/electron/preload.cjs", /contextBridge\.exposeInMainWorld\("VariableCityPlatform"/, "Platform bridge");
 requireText("desktop/electron/preload.cjs", /describeStorage/, "Desktop storage description");
 requireText("desktop/electron/preload.cjs", /steamCloud/, "Steam Cloud bridge metadata");
+requireText("desktop/tools/electron-runtime-monitor-main.cjs", /requestAnimationFrame/, "Runtime FPS probe");
+requireText("desktop/tools/electron-runtime-monitor-main.cjs", /getAppMetrics/, "Runtime memory probe");
+requireText("desktop/tools/electron-runtime-monitor-main.cjs", /writeJson/, "Runtime storage write probe");
 
 if (errors.length > 0) {
   console.error(errors.join("\n"));
