@@ -632,6 +632,22 @@ const chapterMaps = [
         code: "SIG",
       },
     ],
+    interactives: [
+      {
+        id: "metro-time-gate",
+        x: 1038,
+        y: 492,
+        label: "准点闸门",
+        message: "互动地标：准点闸门把下一班车锁在当前帧，闪避和修复脉冲立刻冷却。",
+        bugPoints: 1,
+        xp: 4,
+        hp: 5,
+        cooldownReset: true,
+        invulnerable: 1,
+        color: "#72a5ff",
+        code: "T+",
+      },
+    ],
     spawnPoints: [
       { x: 90, y: 106 }, { x: 1190, y: 112 }, { x: 94, y: 618 }, { x: 1188, y: 624 },
       { x: 520, y: 98 }, { x: 760, y: 638 },
@@ -802,6 +818,21 @@ const chapterMaps = [
         code: "#+",
       },
     ],
+    interactives: [
+      {
+        id: "hash-salt-lantern",
+        x: 1328,
+        y: 228,
+        label: "盐值灯串",
+        message: "互动地标：盐值灯串重新打散重复编号，掉出几份可读缓存。",
+        bugPoints: 1,
+        xp: 5,
+        backlash: 6,
+        spawnPickups: 3,
+        color: "#96e072",
+        code: "#!",
+      },
+    ],
     spawnPoints: [
       { x: 86, y: 110 }, { x: 1190, y: 116 }, { x: 92, y: 636 }, { x: 1170, y: 628 },
       { x: 636, y: 104 }, { x: 640, y: 634 },
@@ -970,6 +1001,22 @@ const chapterMaps = [
         code: "AWT",
       },
     ],
+    interactives: [
+      {
+        id: "pledge-branch-relay",
+        x: 1028,
+        y: 182,
+        label: "叶灯中继",
+        message: "互动地标：叶灯中继截断一段新承诺，给安渡留出短暂安全窗口。",
+        bugPoints: 1,
+        xp: 5,
+        hp: 12,
+        invulnerable: 1.6,
+        cooldownReset: true,
+        color: "#96e072",
+        code: "OK",
+      },
+    ],
     spawnPoints: [
       { x: 82, y: 112 }, { x: 1192, y: 110 }, { x: 86, y: 638 }, { x: 1188, y: 634 },
       { x: 640, y: 92 }, { x: 640, y: 642 },
@@ -1135,6 +1182,22 @@ const chapterMaps = [
         backlash: 10,
         color: "#72a5ff",
         code: "EX",
+      },
+    ],
+    interactives: [
+      {
+        id: "whitebox-diff-console",
+        x: 1704,
+        y: 842,
+        label: "差异控制台",
+        message: "互动地标：差异控制台把周围追踪实体标成非必删项，白箱清场短暂停顿。",
+        bugPoints: 1,
+        xp: 6,
+        backlash: 8,
+        weakenRadius: 340,
+        weakenDamage: 38,
+        color: "#72a5ff",
+        code: "!=",
       },
     ],
     spawnPoints: [
@@ -3022,6 +3085,7 @@ function restoreRunSave(save) {
     allies: cloneForSave(save.chapterState?.allies, []),
     echoesCollected: cloneForSave(save.chapterState?.echoesCollected, []),
     mapCachesCollected: cloneForSave(save.chapterState?.mapCachesCollected, []),
+    mapInteractivesActivated: cloneForSave(save.chapterState?.mapInteractivesActivated, []),
   };
   chapterState.chapterIndex = currentChapterIndex;
   nextUpgradeAt = Math.max(2, Number(save.nextUpgradeAt) || 2);
@@ -3187,6 +3251,7 @@ function createChapterState(allies = []) {
     allies: [...new Set(allies)],
     echoesCollected: [],
     mapCachesCollected: [],
+    mapInteractivesActivated: [],
     bossCleared: false,
     finished: false,
   };
@@ -5196,6 +5261,7 @@ function updatePlaying(dt) {
   updateBugPickups(dt);
   checkDiscoveryEchoCollision();
   checkMapCacheCollision();
+  checkMapInteractiveCollision();
   updateNightHook(dt);
   updateCombatTempo(dt);
   updateStarterIgnition(dt);
@@ -6883,6 +6949,23 @@ function checkMapCacheCollision() {
   }
 }
 
+function checkMapInteractiveCollision() {
+  if (world.mode !== "playing" || !player) {
+    return;
+  }
+
+  for (const device of getMapInteractives()) {
+    if (isMapInteractiveActivated(device)) {
+      continue;
+    }
+    const radius = device.interactRadius ?? device.radius ?? 68;
+    if (distance(player, device) <= radius + (player.radius ?? 0)) {
+      activateMapInteractive(device);
+      break;
+    }
+  }
+}
+
 function collectDiscoveryEcho(echo) {
   if (!echo?.id || isDiscoveryEchoCollected(echo)) {
     return;
@@ -6957,6 +7040,84 @@ function collectMapCache(cache) {
   setLog(`${cache.message ?? `发现地标补给：${cache.label ?? "未命名装置"}。`}${rewards ? ` ${rewards}。` : ""}`);
   syncHud();
   saveRunCheckpoint("map-cache");
+}
+
+function activateMapInteractive(device) {
+  if (!device?.id || isMapInteractiveActivated(device)) {
+    return;
+  }
+
+  const activated = getActivatedMapInteractiveIds();
+  activated.push(device.id);
+  const bugReward = Math.max(0, Math.trunc(Number(device.bugPoints) || 0));
+  const xpReward = Math.max(0, Math.trunc(Number(device.xp) || 0));
+  const healReward = Math.max(0, Math.trunc(Number(device.hp) || 0));
+  const backlashRelief = Math.max(0, Math.trunc(Number(device.backlash) || 0));
+  const invulnerable = Math.max(0, Number(device.invulnerable) || 0);
+
+  player.bugPoints += bugReward;
+  if (xpReward > 0) {
+    addExperience(xpReward);
+  }
+  if (healReward > 0) {
+    player.hp = clamp(player.hp + healReward, 1, player.maxHp);
+  }
+  if (backlashRelief > 0) {
+    player.backlash = clamp(player.backlash - backlashRelief, 0, 100);
+  }
+  if (invulnerable > 0) {
+    player.invulnerable = Math.max(player.invulnerable ?? 0, invulnerable);
+  }
+  if (device.cooldownReset) {
+    world.pulseCooldown = 0;
+    world.dashCooldown = 0;
+  }
+  if (device.spawnPickups > 0) {
+    for (let index = 0; index < device.spawnPickups; index += 1) {
+      const angle = (Math.PI * 2 * index) / device.spawnPickups + world.animTime;
+      spawnBugPickup(device.x + Math.cos(angle) * 38, device.y + Math.sin(angle) * 30, 1, 2);
+    }
+  }
+  const weakened = applyMapInteractiveWeaken(device);
+
+  burst(device.x, device.y, device.color ?? "#72a5ff", 24);
+  burst(player.x, player.y, "#5de2d1", 14);
+  playAudioCue("upgrade-select");
+  const rewards = [
+    bugReward > 0 ? `bug点数 +${bugReward}` : null,
+    xpReward > 0 ? `经验 +${xpReward}` : null,
+    healReward > 0 ? `生命 +${healReward}` : null,
+    backlashRelief > 0 ? `反噬 -${backlashRelief}` : null,
+    invulnerable > 0 ? `安全窗口 ${invulnerable.toFixed(1)}秒` : null,
+    device.cooldownReset ? "闪避/脉冲冷却归零" : null,
+    device.spawnPickups > 0 ? `缓存补给 x${device.spawnPickups}` : null,
+    weakened > 0 ? `削弱周围实体 x${weakened}` : null,
+  ].filter(Boolean).join("，");
+  setLog(`${device.message ?? `互动地标启动：${device.label ?? "地图装置"}。`}${rewards ? ` ${rewards}。` : ""}`);
+  syncHud();
+  saveRunCheckpoint("map-interactive");
+}
+
+function applyMapInteractiveWeaken(device) {
+  const radius = Math.max(0, Number(device.weakenRadius) || 0);
+  const damage = Math.max(0, Number(device.weakenDamage) || 0);
+  if (!radius || !damage) {
+    return 0;
+  }
+
+  let affected = 0;
+  for (const enemy of [...enemies, ...cleaners]) {
+    if (distance(enemy, device) > radius) {
+      continue;
+    }
+    enemy.hp -= damage;
+    enemy.slowFactor = Math.min(enemy.slowFactor ?? 1, 0.72);
+    enemy.slowTimer = Math.max(enemy.slowTimer ?? 0, 2.2);
+    enemy.hitFlash = 0.18;
+    affected += 1;
+  }
+  clearDefeatedHostiles();
+  return affected;
 }
 
 function maybeEscalateBacklash(dt) {
@@ -7280,6 +7441,7 @@ function drawOffice() {
   drawMapObjects(map, visual);
   drawDiscoveryEchoes(map, visual);
   drawMapCaches(map, visual);
+  drawMapInteractives(map, visual);
 
   if ((chapterState?.stepIndex ?? -1) >= 3 || player.fixed >= 3) {
     drawLaoLiangSprite(1080, 118, 0.88);
@@ -7373,6 +7535,10 @@ function getMapCaches(map = currentMap()) {
   return Array.isArray(map?.caches) ? map.caches : [];
 }
 
+function getMapInteractives(map = currentMap()) {
+  return Array.isArray(map?.interactives) ? map.interactives : [];
+}
+
 function getCollectedEchoIds() {
   if (!chapterState) {
     return [];
@@ -7401,6 +7567,20 @@ function isMapCacheCollected(cache) {
   return Boolean(cache?.id && getCollectedMapCacheIds().includes(cache.id));
 }
 
+function getActivatedMapInteractiveIds() {
+  if (!chapterState) {
+    return [];
+  }
+  if (!Array.isArray(chapterState.mapInteractivesActivated)) {
+    chapterState.mapInteractivesActivated = [];
+  }
+  return chapterState.mapInteractivesActivated;
+}
+
+function isMapInteractiveActivated(device) {
+  return Boolean(device?.id && getActivatedMapInteractiveIds().includes(device.id));
+}
+
 function getMapDiscoverySummary(map = currentMap()) {
   const taskMarkers = [];
   for (const [stepKey, targets] of Object.entries(map.stepTargets ?? {})) {
@@ -7424,6 +7604,8 @@ function getMapDiscoverySummary(map = currentMap()) {
     uncollectedEchoCount: getMapEchoes(map).filter((echo) => !isDiscoveryEchoCollected(echo)).length,
     cacheCount: getMapCaches(map).length,
     uncollectedCacheCount: getMapCaches(map).filter((cache) => !isMapCacheCollected(cache)).length,
+    interactiveCount: getMapInteractives(map).length,
+    unactivatedInteractiveCount: getMapInteractives(map).filter((device) => !isMapInteractiveActivated(device)).length,
   };
 }
 
@@ -7554,6 +7736,46 @@ function drawMapCache(cache, visual, index = 0) {
   ctx.restore();
 
   drawMarkerTag(`地标 · ${shortenText(cache.label ?? "补给", 8)}`, cache.x, cache.y + 52, color);
+}
+
+function drawMapInteractives(map, visual) {
+  for (const [index, device] of getMapInteractives(map).entries()) {
+    if (isMapInteractiveActivated(device)) {
+      continue;
+    }
+    drawMapInteractive(device, visual, index);
+  }
+}
+
+function drawMapInteractive(device, visual, index = 0) {
+  const color = device.color ?? visual.accent ?? visualColorFallback(index + 3);
+  const radius = device.radius ?? 54;
+  const pulse = 1 + Math.sin(world.animTime * 4.1 + index * 1.2) * 0.08;
+
+  ctx.save();
+  ctx.globalAlpha = 0.14;
+  fillCircle(device.x, device.y, radius * 1.45 * pulse, color);
+  ctx.globalAlpha = 0.38;
+  strokeCircle(device.x, device.y, radius * pulse, color, 3);
+  ctx.globalAlpha = 0.9;
+  ctx.translate(device.x, device.y);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.fillRect(-26, -20, 52, 40);
+  ctx.strokeRect(-26, -20, 52, 40);
+  ctx.beginPath();
+  ctx.moveTo(-14, 16);
+  ctx.lineTo(14, 16);
+  ctx.lineTo(20, 27);
+  ctx.lineTo(-20, 27);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  drawSmallText(device.code ?? "触", -14, 6, color, 14);
+  ctx.restore();
+
+  drawMarkerTag(`互动 · ${shortenText(device.label ?? "装置", 8)}`, device.x, device.y + 56, color);
 }
 
 function drawZoneSignal(zone, visual) {
@@ -10353,6 +10575,8 @@ function installAutomationTestHooks() {
         uncollectedEchoCount: discovery.uncollectedEchoCount,
         cacheCount: discovery.cacheCount,
         uncollectedCacheCount: discovery.uncollectedCacheCount,
+        interactiveCount: discovery.interactiveCount,
+        unactivatedInteractiveCount: discovery.unactivatedInteractiveCount,
       },
       mode: world.mode,
       objective: getCurrentObjectiveText(),
@@ -10373,6 +10597,7 @@ function installAutomationTestHooks() {
         resolvedTotal: chapterState?.resolvedTotal ?? null,
         echoesCollected: cloneForSave(chapterState?.echoesCollected, []),
         mapCachesCollected: cloneForSave(chapterState?.mapCachesCollected, []),
+        mapInteractivesActivated: cloneForSave(chapterState?.mapInteractivesActivated, []),
         bossCleared: Boolean(chapterState?.bossCleared),
         finished: Boolean(chapterState?.finished),
       },
@@ -10845,6 +11070,9 @@ function installAutomationTestHooks() {
     for (const [index, cache] of getMapCaches(map).entries()) {
       addPoint(cache, `cache-${index}`);
     }
+    for (const [index, device] of getMapInteractives(map).entries()) {
+      addPoint(device, `interactive-${index}`);
+    }
     addPoint(map.bossSpawn, "bossSpawn");
     for (const [index, point] of (map.spawnPoints ?? []).entries()) {
       if (index === 0 || index === (map.spawnPoints?.length ?? 0) - 1) {
@@ -10951,6 +11179,64 @@ function installAutomationTestHooks() {
     return result;
   }
 
+  function runMapInteractiveProbe(chapterIndex) {
+    const device = getMapInteractives()[0];
+    if (!device) {
+      return { ok: chapterIndex === 0, reason: "missing optional interactive" };
+    }
+
+    if (device.weakenRadius) {
+      spawnEnemyNear(device.x + 44, device.y + 24, "stress", { hpMultiplier: 0.45, speedMultiplier: 0.8 });
+    }
+    const beforeBugPoints = player.bugPoints;
+    const beforeHp = player.hp;
+    const beforeBacklash = player.backlash;
+    const beforeInvulnerable = player.invulnerable ?? 0;
+    const beforeDefeats = runStats.enemiesDefeated ?? 0;
+    const beforePickups = bugPickups.length;
+    world.pulseCooldown = 1.1;
+    world.dashCooldown = 1.2;
+    world.mode = "playing";
+    const sample = movePlayerTo(device.x, device.y, `interactive-probe-${chapterIndex}`);
+    checkMapInteractiveCollision();
+    const activated = getActivatedMapInteractiveIds().includes(device.id);
+    const bugReward = Math.max(0, Math.trunc(Number(device.bugPoints) || 0));
+    const healReward = Math.max(0, Math.trunc(Number(device.hp) || 0));
+    const backlashReward = Math.max(0, Math.trunc(Number(device.backlash) || 0));
+    const pickupReward = Math.max(0, Math.trunc(Number(device.spawnPickups) || 0));
+    const savedAfterInteractive = loadRunSave();
+
+    return {
+      ok: activated
+        && player.bugPoints >= beforeBugPoints + bugReward
+        && player.hp >= Math.min(player.maxHp, beforeHp + healReward)
+        && player.backlash <= Math.max(0, beforeBacklash - backlashReward)
+        && (!device.cooldownReset || (world.pulseCooldown === 0 && world.dashCooldown === 0))
+        && (!device.invulnerable || (player.invulnerable ?? 0) >= Math.max(beforeInvulnerable, device.invulnerable))
+        && (!pickupReward || bugPickups.length >= beforePickups + pickupReward)
+        && (!device.weakenRadius || (runStats.enemiesDefeated ?? 0) > beforeDefeats || enemies.some((enemy) => enemy.slowTimer > 0))
+        && savedAfterInteractive?.reason === "map-interactive",
+      deviceId: device.id,
+      label: device.label ?? null,
+      sample,
+      beforeBugPoints,
+      afterBugPoints: player.bugPoints,
+      beforeHp: round(beforeHp),
+      afterHp: round(player.hp),
+      beforeBacklash: round(beforeBacklash),
+      afterBacklash: round(player.backlash),
+      cooldowns: {
+        pulse: round(world.pulseCooldown),
+        dash: round(world.dashCooldown),
+      },
+      invulnerable: round(player.invulnerable ?? 0),
+      pickupsAdded: bugPickups.length - beforePickups,
+      defeatsAdded: (runStats.enemiesDefeated ?? 0) - beforeDefeats,
+      savedReason: savedAfterInteractive?.reason ?? null,
+      activated: cloneForSave(chapterState?.mapInteractivesActivated, []),
+    };
+  }
+
   function startBossForChapter(chapterIndex) {
     const index = clamp(Number(chapterIndex) || 0, 0, chapters.length - 1);
     const chapter = chapters[index];
@@ -11033,6 +11319,7 @@ function installAutomationTestHooks() {
       const entry = enterChapter(index);
       const echoProbe = runDiscoveryEchoProbe(index);
       const cacheProbe = runMapCacheProbe(index);
+      const interactiveProbe = runMapInteractiveProbe(index);
       const routeSamples = collectRoutePoints().map((point) => movePlayerTo(point.x, point.y, point.label));
       const badRoute = routeSamples.filter((sample) => !sample.inBounds || sample.blocked);
       const bossSnapshot = startBossForChapter(index);
@@ -11062,11 +11349,17 @@ function installAutomationTestHooks() {
       if (entry.map.cacheCount < 1) {
         failures.push(`Chapter ${index + 1} is missing landmark cache`);
       }
+      if (index > 0 && entry.map.interactiveCount < 1) {
+        failures.push(`Chapter ${index + 1} is missing interactive map device`);
+      }
       if (!echoProbe.ok) {
         failures.push(`Chapter ${index + 1} discovery echo probe failed`);
       }
       if (!cacheProbe.ok) {
         failures.push(`Chapter ${index + 1} landmark cache probe failed`);
+      }
+      if (index > 0 && !interactiveProbe.ok) {
+        failures.push(`Chapter ${index + 1} interactive map device probe failed`);
       }
       if (badRoute.length > 0) {
         failures.push(`Chapter ${index + 1} has blocked route sample: ${badRoute[0].label}`);
@@ -11084,6 +11377,7 @@ function installAutomationTestHooks() {
         map: entry.map,
         echoProbe,
         cacheProbe,
+        interactiveProbe,
         routeSamples,
         boss: bossSnapshot.boss,
         saveRestoreOk: saveRestore.ok,
@@ -11122,6 +11416,7 @@ function installAutomationTestHooks() {
     runEchoArchiveProbe,
     runOpeningSprintProbe,
     runOpeningSurgeProbe,
+    runMapInteractiveProbe,
     runResultReviewProbe,
     runStarterBuildProbe,
     runRoutePressureTest,
