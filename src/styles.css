@@ -274,6 +274,7 @@ h1 {
   white-space: nowrap;
 }
 
+.opening-tracker,
 .hook-tracker {
   display: grid;
   gap: 3px;
@@ -284,16 +285,48 @@ h1 {
   background: rgba(239, 250, 249, 0.72);
 }
 
+.opening-tracker {
+  position: relative;
+  overflow: hidden;
+  padding-bottom: 11px;
+  border-color: rgba(62, 114, 216, 0.22);
+  background: rgba(244, 248, 255, 0.78);
+}
+
+.opening-tracker::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--opening-progress, 0%);
+  height: 3px;
+  background: linear-gradient(90deg, var(--blue), var(--amber), var(--cyan));
+  transition: width 120ms linear;
+}
+
+.opening-tracker.is-completed {
+  border-color: rgba(15, 159, 149, 0.34);
+  background: rgba(239, 250, 249, 0.84);
+}
+
+.opening-tracker.hidden,
 .hook-tracker.hidden {
   display: none;
 }
 
+.opening-tracker span,
 .hook-tracker span {
   color: var(--cyan);
   font-size: 0.72rem;
   font-weight: 800;
 }
 
+.opening-tracker span {
+  color: var(--blue);
+}
+
+.opening-tracker strong,
+.opening-tracker small,
 .hook-tracker strong,
 .hook-tracker small {
   display: block;
@@ -303,11 +336,13 @@ h1 {
   white-space: nowrap;
 }
 
+.opening-tracker strong,
 .hook-tracker strong {
   color: var(--text);
   font-size: 0.84rem;
 }
 
+.opening-tracker small,
 .hook-tracker small {
   color: var(--muted);
   font-size: 0.76rem;

@@ -23,6 +23,7 @@ const ui = {
   build: document.querySelector("#buildValue"),
   resonance: document.querySelector("#resonanceValue"),
   defeat: document.querySelector("#defeatValue"),
+  openingTracker: document.querySelector("#openingTracker"),
   hookTracker: document.querySelector("#hookTracker"),
   tempoTracker: document.querySelector("#tempoTracker"),
   starterTracker: document.querySelector("#starterTracker"),
@@ -1182,6 +1183,35 @@ const weaponDefinitions = gameData.weapons ?? [];
 const weaponUpgrades = gameData.weaponUpgrades ?? [];
 const chapterRelics = gameData.chapterRelics ?? [];
 const enemyTypes = gameData.enemyTypes ?? {};
+const openingSprintSteps = [
+  {
+    id: "first-anomaly",
+    title: "处理第一处异常",
+    metric: "events",
+    target: 1,
+    rewardBugPoints: 1,
+    rewardXp: 2,
+    log: "开场牵引：第一处异常被处理，路线不再只是一团噪声。",
+  },
+  {
+    id: "first-wave",
+    title: "打穿第一波追击",
+    metric: "defeats",
+    target: 6,
+    rewardBugPoints: 1,
+    rewardHp: 6,
+    log: "开场牵引：第一波追击被打穿，补给节奏已经接上。",
+  },
+  {
+    id: "first-build-spark",
+    title: "点亮第一种打法",
+    metric: "build",
+    target: 1,
+    rewardBugPoints: 2,
+    rewardXp: 4,
+    log: "开场牵引完成：武器、目标和补给连成一条可继续推进的路线。",
+  },
+];
 const starterBuilds = [
   {
     id: "precision-breakpoint",
@@ -1654,6 +1684,7 @@ function createRunStats() {
     distanceTraveled: 0,
     activeHook: null,
     tempo: createCombatTempoState(),
+    openingSprint: null,
     starterBuild: null,
     starterIgnition: null,
     highestLevel: 1,
@@ -2240,6 +2271,120 @@ function getCombatTempoText() {
   return `x${tempo.streak} · ${formatHookTime(tempo.timer)} · 下次补给 ${Math.min(tempo.streak, next)}/${next}`;
 }
 
+function createOpeningSprintState() {
+  return {
+    id: "first-night-sprint",
+    active: currentChapterIndex === 0,
+    completed: false,
+    elapsed: 0,
+    stepIndex: 0,
+    completedStepIds: [],
+    startEvents: runStats?.eventsResolved ?? 0,
+    startDefeats: runStats?.enemiesDefeated ?? 0,
+    startUpgrades: runStats?.upgradesChosen?.length ?? 0,
+    startTempoRewards: runStats?.tempo?.rewardsClaimed ?? 0,
+  };
+}
+
+function normalizeOpeningSprintState(savedSprint = null) {
+  if (!savedSprint || typeof savedSprint !== "object") {
+    return null;
+  }
+  const fallback = createOpeningSprintState();
+  const completedStepIds = Array.isArray(savedSprint.completedStepIds)
+    ? savedSprint.completedStepIds.filter((id) => openingSprintSteps.some((step) => step.id === id))
+    : [];
+  const stepIndex = clamp(
+    Math.trunc(Number(savedSprint.stepIndex) || completedStepIds.length),
+    0,
+    openingSprintSteps.length,
+  );
+  return {
+    ...fallback,
+    ...savedSprint,
+    id: "first-night-sprint",
+    active: Boolean(savedSprint.active),
+    completed: Boolean(savedSprint.completed) || completedStepIds.length >= openingSprintSteps.length,
+    elapsed: Math.max(0, Number(savedSprint.elapsed) || 0),
+    stepIndex,
+    completedStepIds,
+    startEvents: Math.max(0, Math.trunc(Number(savedSprint.startEvents) || 0)),
+    startDefeats: Math.max(0, Math.trunc(Number(savedSprint.startDefeats) || 0)),
+    startUpgrades: Math.max(0, Math.trunc(Number(savedSprint.startUpgrades) || 0)),
+    startTempoRewards: Math.max(0, Math.trunc(Number(savedSprint.startTempoRewards) || 0)),
+  };
+}
+
+function getOpeningSprintProgress(step, sprint = runStats?.openingSprint) {
+  if (!step || !sprint || !runStats) {
+    return { value: 0, target: 1, complete: false };
+  }
+
+  let value = 0;
+  if (step.metric === "events") {
+    value = Math.max(0, (runStats.eventsResolved ?? 0) - (sprint.startEvents ?? 0));
+  } else if (step.metric === "defeats") {
+    value = Math.max(0, (runStats.enemiesDefeated ?? 0) - (sprint.startDefeats ?? 0));
+  } else if (step.metric === "build") {
+    value = (runStats.starterIgnition?.completed
+      || (runStats.upgradesChosen?.length ?? 0) > (sprint.startUpgrades ?? 0)
+      || (runStats.tempo?.rewardsClaimed ?? 0) > (sprint.startTempoRewards ?? 0))
+      ? 1
+      : 0;
+  }
+
+  const target = Math.max(1, Math.trunc(Number(step.target) || 1));
+  return {
+    value: clamp(value, 0, target),
+    target,
+    complete: value >= target,
+  };
+}
+
+function completeOpeningSprintStep(sprint, step) {
+  if (!sprint || !step || sprint.completedStepIds?.includes(step.id)) {
+    return;
+  }
+
+  sprint.completedStepIds = [...(sprint.completedStepIds ?? []), step.id];
+  sprint.stepIndex = Math.min(openingSprintSteps.length, (sprint.stepIndex ?? 0) + 1);
+  player.bugPoints += Math.max(0, Math.trunc(Number(step.rewardBugPoints) || 0));
+  if (step.rewardHp > 0) {
+    player.hp = clamp(player.hp + step.rewardHp, 1, player.maxHp);
+  }
+  if (step.rewardXp > 0) {
+    addExperience(step.rewardXp);
+  }
+
+  const isFinal = sprint.completedStepIds.length >= openingSprintSteps.length;
+  sprint.completed = isFinal;
+  sprint.active = !isFinal;
+  burst(player.x, player.y, isFinal ? "#5de2d1" : "#72a5ff", isFinal ? 24 : 14);
+  playAudioCue(isFinal ? "upgrade-select" : "pickup");
+  setLog(`${step.log} +${step.rewardBugPoints ?? 0} bug点数${step.rewardXp ? `，+${step.rewardXp} 经验` : ""}${step.rewardHp ? `，+${step.rewardHp} 生命` : ""}。`);
+  saveRunCheckpoint(isFinal ? "opening-sprint-complete" : "opening-sprint-step");
+}
+
+function updateOpeningSprint(dt = 0) {
+  const sprint = runStats?.openingSprint;
+  if (!sprint || sprint.completed || !sprint.active || currentChapterIndex !== 0) {
+    return;
+  }
+
+  sprint.elapsed = Math.max(0, (sprint.elapsed ?? 0) + Math.max(0, dt));
+  while (sprint.stepIndex < openingSprintSteps.length) {
+    const step = openingSprintSteps[sprint.stepIndex];
+    const progress = getOpeningSprintProgress(step, sprint);
+    if (!progress.complete) {
+      break;
+    }
+    completeOpeningSprintStep(sprint, step);
+    if (world.mode !== "playing") {
+      break;
+    }
+  }
+}
+
 function getMetaProgressionBonuses(chapterIndex = 0) {
   const steadyHeart = getMetaLevel("steady-heart");
   const warmCache = getMetaLevel("warm-cache");
@@ -2447,6 +2592,7 @@ function restoreRunSave(save) {
     tempo: normalizeCombatTempoState(save.runStats?.tempo),
   };
   runStats.activeHook = normalizeNightHookState(save.runStats?.activeHook, currentChapterIndex);
+  runStats.openingSprint = normalizeOpeningSprintState(save.runStats?.openingSprint);
   runStats.starterBuild = getStarterBuildById(save.runStats?.starterBuild)?.id ?? null;
   runStats.starterIgnition = normalizeStarterIgnitionState(save.runStats?.starterIgnition, runStats.starterBuild);
   player = {
@@ -2733,6 +2879,7 @@ function startNewRun(chapterIndex = 0, options = {}) {
   world.saveCooldown = 6;
   hidePanels();
   storyState = null;
+  runStats.openingSprint = createOpeningSprintState();
   seedOfficeBugPickups();
   setChapterObjective(currentChapter().initialObjective ?? "调查办公室异常");
   setLog(currentChapter().startLog ?? "凌晨 03:32，安渡从键盘上醒来。手机显示：外卖订单已超时 999 分钟。");
@@ -4287,6 +4434,42 @@ function openStartMenu() {
   syncHud();
 }
 
+function renderOpeningSprintTracker() {
+  if (!ui.openingTracker) {
+    return;
+  }
+
+  const sprint = runStats?.openingSprint;
+  if (!sprint || world.mode === "menu" || currentChapterIndex !== 0) {
+    ui.openingTracker.className = "opening-tracker hidden";
+    ui.openingTracker.innerHTML = "";
+    ui.openingTracker.style.removeProperty("--opening-progress");
+    return;
+  }
+
+  const step = openingSprintSteps[Math.min(sprint.stepIndex ?? 0, openingSprintSteps.length - 1)];
+  const progress = sprint.completed
+    ? { value: openingSprintSteps.length, target: openingSprintSteps.length }
+    : getOpeningSprintProgress(step, sprint);
+  const totalProgress = sprint.completed
+    ? 1
+    : clamp(((sprint.completedStepIds?.length ?? 0) + (progress.value / Math.max(1, progress.target))) / openingSprintSteps.length, 0, 1);
+  const rewardText = sprint.completed
+    ? "开场目标链完成"
+    : `${progress.value}/${progress.target} · 奖励 +${step.rewardBugPoints ?? 0} bug点数`;
+
+  ui.openingTracker.style.setProperty("--opening-progress", `${Math.round(totalProgress * 100)}%`);
+  ui.openingTracker.className = [
+    "opening-tracker",
+    sprint.completed ? "is-completed" : "",
+  ].filter(Boolean).join(" ");
+  ui.openingTracker.innerHTML = `
+    <span>开场牵引</span>
+    <strong>${sprint.completed ? "第一条路线已接通" : step.title}</strong>
+    <small>${rewardText}</small>
+  `;
+}
+
 function renderRunPanel() {
   if (!ui.chapterPips) {
     return;
@@ -4315,6 +4498,7 @@ function renderRunPanel() {
   ui.build.textContent = getBuildSummary();
   ui.resonance.textContent = getResonanceSummary();
   ui.defeat.textContent = runStats?.enemiesDefeated ?? 0;
+  renderOpeningSprintTracker();
   renderNightHookTracker();
   renderCombatTempoTracker();
   renderStarterIgnitionTracker();
@@ -4472,6 +4656,7 @@ function updatePlaying(dt) {
   updateNightHook(dt);
   updateCombatTempo(dt);
   updateStarterIgnition(dt);
+  updateOpeningSprint(dt);
   if (world.mode !== "playing") {
     return;
   }
@@ -9505,6 +9690,11 @@ function installAutomationTestHooks() {
         timer: round(runStats.tempo.timer),
         rewardsClaimed: runStats.tempo.rewardsClaimed,
       } : null,
+      openingSprint: runStats?.openingSprint ? {
+        completed: Boolean(runStats.openingSprint.completed),
+        stepIndex: runStats.openingSprint.stepIndex,
+        completedStepIds: cloneForSave(runStats.openingSprint.completedStepIds, []),
+      } : null,
       counts: {
         bugNodes: bugNodes?.length ?? 0,
         enemies: enemies?.length ?? 0,
@@ -9682,6 +9872,44 @@ function installAutomationTestHooks() {
       summary,
       samples,
     };
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
+    return result;
+  }
+
+  function runOpeningSprintProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    resetStoreRun(0, { stepIndex: 0, bugPoints: 0, xp: 0, hp: 80 });
+    player.xp = 0;
+    player.xpToNext = 99;
+    runStats.openingSprint = createOpeningSprintState();
+    const startBugPoints = player.bugPoints;
+    const startHp = player.hp;
+    const expectedBugPoints = openingSprintSteps.reduce((sum, step) => sum + (step.rewardBugPoints ?? 0), 0);
+
+    runStats.eventsResolved += 1;
+    updateOpeningSprint(0.1);
+    runStats.enemiesDefeated += openingSprintSteps[1]?.target ?? 6;
+    updateOpeningSprint(0.1);
+    runStats.starterIgnition = { completed: true };
+    updateOpeningSprint(0.1);
+
+    const savedAfterSprint = loadRunSave();
+    const result = {
+      ok: Boolean(runStats.openingSprint?.completed)
+        && runStats.openingSprint.completedStepIds.length === openingSprintSteps.length
+        && player.bugPoints === startBugPoints + expectedBugPoints
+        && player.hp >= startHp
+        && savedAfterSprint?.reason === "opening-sprint-complete",
+      sprint: cloneForSave(runStats.openingSprint, null),
+      expectedBugPoints,
+      reward: {
+        bugPoints: player.bugPoints - startBugPoints,
+        hp: round(player.hp - startHp),
+        savedReason: savedAfterSprint?.reason ?? null,
+      },
+    };
+    deleteRunSave();
     archiveState = previousArchive ?? loadArchive();
     saveArchive();
     return result;
@@ -9908,6 +10136,7 @@ function installAutomationTestHooks() {
     const nightHook = runNightHookProbe();
     const combatTempo = runCombatTempoProbe();
     const echoArchive = runEchoArchiveProbe();
+    const openingSprint = runOpeningSprintProbe();
     const starterBuild = runStarterBuildProbe();
 
     if (!metaProgression.ok) {
@@ -9921,6 +10150,9 @@ function installAutomationTestHooks() {
     }
     if (!echoArchive.ok) {
       failures.push("echo archive progression failed");
+    }
+    if (!openingSprint.ok) {
+      failures.push("opening sprint guidance failed");
     }
     if (!starterBuild.ok) {
       failures.push("starter build quick start failed");
@@ -9990,6 +10222,7 @@ function installAutomationTestHooks() {
       nightHook,
       combatTempo,
       echoArchive,
+      openingSprint,
       starterBuild,
       chapters: chaptersCovered,
       finalSnapshot: snapshot({ action: "routePressureComplete" }),
@@ -10006,6 +10239,7 @@ function installAutomationTestHooks() {
     runNightHookProbe,
     runCombatTempoProbe,
     runEchoArchiveProbe,
+    runOpeningSprintProbe,
     runStarterBuildProbe,
     runRoutePressureTest,
   };
