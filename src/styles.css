@@ -551,6 +551,114 @@ h1 {
   white-space: nowrap;
 }
 
+.echo-archive {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(62, 114, 216, 0.14);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(114, 165, 255, 0.12), rgba(241, 193, 91, 0.11)),
+    rgba(247, 250, 255, 0.82);
+}
+
+.echo-archive-head {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.echo-archive-head h3 {
+  margin: 2px 0 0;
+  font-size: 1rem;
+}
+
+.echo-archive-head strong {
+  flex: 0 0 auto;
+  color: var(--blue);
+  font-size: 0.94rem;
+}
+
+.echo-archive-last {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.echo-archive-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.echo-chapter {
+  min-width: 0;
+  min-height: 92px;
+  padding: 9px;
+  border: 1px solid rgba(26, 42, 68, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.echo-chapter.is-complete {
+  border-color: rgba(15, 159, 149, 0.34);
+  background: rgba(15, 159, 149, 0.09);
+}
+
+.echo-chapter.is-locked {
+  opacity: 0.58;
+}
+
+.echo-chapter-top {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.echo-chapter-top span {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.echo-chapter-top strong {
+  flex: 0 0 auto;
+  color: var(--teal-dark);
+  font-size: 0.78rem;
+}
+
+.echo-chapter p {
+  display: -webkit-box;
+  min-height: 30px;
+  margin: 7px 0 6px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.echo-chapter em {
+  display: block;
+  overflow: hidden;
+  color: var(--blue);
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .meta-progress {
   display: grid;
   gap: 10px;
@@ -1126,6 +1234,7 @@ h1 {
 
   .start-stats,
   .start-actions,
+  .echo-archive-grid,
   .meta-grid,
   .chapter-select {
     grid-template-columns: minmax(0, 1fr);

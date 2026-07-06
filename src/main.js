@@ -39,6 +39,7 @@ const ui = {
   startSummary: document.querySelector("#startSummary"),
   tonightHook: document.querySelector("#tonightHook"),
   startStats: document.querySelector("#startStats"),
+  echoArchive: document.querySelector("#echoArchive"),
   metaSummary: document.querySelector("#metaSummary"),
   metaProgression: document.querySelector("#metaProgression"),
   startActions: document.querySelector("#startActions"),
@@ -1600,8 +1601,47 @@ function createArchiveFallback() {
     completedNightHooks: [],
     nightHookCompletions: 0,
     bestTempoStreak: 0,
+    discoveredEchoes: [],
+    completedEchoChapters: [],
+    lastEchoDiscovery: null,
     metaUpgrades: Object.fromEntries(metaProgressNodes.map((node) => [node.id, 0])),
     lastRunShardGain: null,
+  };
+}
+
+function getAllDiscoveryEchoes() {
+  return chapterMaps.flatMap((map, chapterIndex) => getMapEchoes(map).map((echo) => ({
+    ...echo,
+    chapterIndex,
+    chapterId: map.id,
+    chapterTitle: chapters[chapterIndex]?.title ?? map.name ?? `第 ${chapterIndex + 1} 章`,
+  })));
+}
+
+function normalizeEchoIds(savedEchoIds = []) {
+  const validEchoIds = new Set(getAllDiscoveryEchoes().map((echo) => echo.id));
+  return [...new Set(Array.isArray(savedEchoIds) ? savedEchoIds : [])]
+    .filter((id) => typeof id === "string" && validEchoIds.has(id));
+}
+
+function normalizeEchoChapterIds(savedChapterIds = []) {
+  const validChapterIds = new Set(chapterMaps.map((map) => map.id).filter(Boolean));
+  return [...new Set(Array.isArray(savedChapterIds) ? savedChapterIds : [])]
+    .filter((id) => typeof id === "string" && validChapterIds.has(id));
+}
+
+function normalizeLastEchoDiscovery(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  return {
+    id: typeof value.id === "string" ? value.id : "",
+    label: typeof value.label === "string" ? value.label : "地图回声",
+    chapterId: typeof value.chapterId === "string" ? value.chapterId : "",
+    chapterTitle: typeof value.chapterTitle === "string" ? value.chapterTitle : "未知章节",
+    completedChapter: Boolean(value.completedChapter),
+    shardReward: Math.max(0, Math.trunc(Number(value.shardReward) || 0)),
+    at: Number(value.at) || Date.now(),
   };
 }
 
@@ -1639,6 +1679,9 @@ function loadArchive() {
       metaUpgrades: normalizeMetaUpgrades(saved.metaUpgrades),
       lastRunShardGain: normalizeLastRunShardGain(saved.lastRunShardGain),
       completedNightHooks: Array.isArray(saved.completedNightHooks) ? [...new Set(saved.completedNightHooks)] : fallback.completedNightHooks,
+      discoveredEchoes: normalizeEchoIds(saved.discoveredEchoes),
+      completedEchoChapters: normalizeEchoChapterIds(saved.completedEchoChapters),
+      lastEchoDiscovery: normalizeLastEchoDiscovery(saved.lastEchoDiscovery),
     };
     normalized.archiveVersion = ARCHIVE_VERSION;
     normalized.bestChapter = clamp(Number(normalized.bestChapter) || 1, 1, chapters.length);
@@ -1747,6 +1790,90 @@ function grantCalibrationShards(amount, reason) {
     at: Date.now(),
   };
   return reward;
+}
+
+function getEchoChapterReward(chapterIndex = currentChapterIndex) {
+  return 2 + Math.max(0, Math.trunc(Number(chapterIndex) || 0));
+}
+
+function getEchoArchiveSummary(archive = archiveState) {
+  const discovered = new Set(normalizeEchoIds(archive?.discoveredEchoes));
+  const completedChapters = new Set(normalizeEchoChapterIds(archive?.completedEchoChapters));
+  const chaptersSummary = chapterMaps.map((map, chapterIndex) => {
+    const echoes = getMapEchoes(map);
+    const discoveredInChapter = echoes.filter((echo) => discovered.has(echo.id));
+    return {
+      chapterIndex,
+      chapterId: map.id,
+      title: chapters[chapterIndex]?.title ?? map.name ?? `第 ${chapterIndex + 1} 章`,
+      discovered: discoveredInChapter.length,
+      total: echoes.length,
+      complete: echoes.length > 0 && discoveredInChapter.length === echoes.length,
+      rewardClaimed: completedChapters.has(map.id),
+      echoes: echoes.map((echo) => ({
+        id: echo.id,
+        label: echo.label ?? "地图回声",
+        discovered: discovered.has(echo.id),
+      })),
+    };
+  });
+  return {
+    discovered: discovered.size,
+    total: getAllDiscoveryEchoes().length,
+    completedChapters: completedChapters.size,
+    chapterCount: chaptersSummary.length,
+    chapters: chaptersSummary,
+    last: normalizeLastEchoDiscovery(archive?.lastEchoDiscovery),
+  };
+}
+
+function recordDiscoveryEchoInArchive(echo) {
+  if (!echo?.id) {
+    return { wasNew: false, chapterCompleted: false, shardReward: 0, summary: getEchoArchiveSummary() };
+  }
+
+  if (!archiveState) {
+    archiveState = loadArchive();
+  }
+  archiveState.discoveredEchoes = normalizeEchoIds(archiveState.discoveredEchoes);
+  archiveState.completedEchoChapters = normalizeEchoChapterIds(archiveState.completedEchoChapters);
+
+  const map = currentMap();
+  const chapterId = map?.id ?? "";
+  const chapterEchoes = getMapEchoes(map);
+  const discoveredSet = new Set(archiveState.discoveredEchoes);
+  const wasNew = !discoveredSet.has(echo.id);
+  if (wasNew) {
+    archiveState.discoveredEchoes.push(echo.id);
+    discoveredSet.add(echo.id);
+  }
+
+  const chapterComplete = Boolean(chapterId)
+    && chapterEchoes.length > 0
+    && chapterEchoes.every((chapterEcho) => discoveredSet.has(chapterEcho.id));
+  const chapterAlreadyRewarded = archiveState.completedEchoChapters.includes(chapterId);
+  let shardReward = 0;
+  if (chapterComplete && !chapterAlreadyRewarded) {
+    archiveState.completedEchoChapters.push(chapterId);
+    shardReward = grantCalibrationShards(getEchoChapterReward(currentChapterIndex), `回声档案：${currentChapter().title}`);
+  }
+
+  archiveState.lastEchoDiscovery = {
+    id: echo.id,
+    label: echo.label ?? "地图回声",
+    chapterId,
+    chapterTitle: currentChapter().title,
+    completedChapter: chapterComplete && !chapterAlreadyRewarded,
+    shardReward,
+    at: Date.now(),
+  };
+  saveArchive();
+  return {
+    wasNew,
+    chapterCompleted: chapterComplete && !chapterAlreadyRewarded,
+    shardReward,
+    summary: getEchoArchiveSummary(),
+  };
 }
 
 function getNightHookConfigById(id) {
@@ -2473,6 +2600,17 @@ function createStoreArchiveState() {
     completedNightHooks: ["delivery-save-90", "metro-fast-line"],
     nightHookCompletions: 7,
     bestTempoStreak: 18,
+    discoveredEchoes: getAllDiscoveryEchoes().slice(0, 7).map((echo) => echo.id),
+    completedEchoChapters: chapterMaps.slice(0, 3).map((map) => map.id),
+    lastEchoDiscovery: {
+      id: "pledge-null-contract",
+      label: "空值合同",
+      chapterId: "promise-tower",
+      chapterTitle: chapters[3]?.title ?? "第四章",
+      completedChapter: false,
+      shardReward: 0,
+      at: Date.now(),
+    },
     metaUpgrades: {
       "steady-heart": 3,
       "warm-cache": 2,
@@ -3653,6 +3791,58 @@ function renderTonightHook() {
   });
 }
 
+function renderEchoArchive() {
+  if (!ui.echoArchive) {
+    return;
+  }
+
+  const summary = getEchoArchiveSummary();
+  const last = summary.last?.id
+    ? `最近：${summary.last.label}${summary.last.shardReward ? ` +${summary.last.shardReward}碎片` : ""}`
+    : "最近：暂无记录";
+  const chapterCards = summary.chapters.map((chapter) => {
+    const unlocked = chapter.chapterIndex === 0 || archiveState?.unlockedChapters?.includes(chapter.chapterIndex);
+    const labels = chapter.echoes.map((echo) => {
+      if (echo.discovered) {
+        return echo.label;
+      }
+      return unlocked ? "未发现" : "锁定";
+    }).join(" / ");
+    const className = [
+      "echo-chapter",
+      chapter.complete ? "is-complete" : "",
+      unlocked ? "" : "is-locked",
+    ].filter(Boolean).join(" ");
+    const rewardText = chapter.rewardClaimed
+      ? "奖励已归档"
+      : chapter.complete
+        ? `可归档 +${getEchoChapterReward(chapter.chapterIndex)}碎片`
+        : `集齐 +${getEchoChapterReward(chapter.chapterIndex)}碎片`;
+    return `
+      <div class="${className}">
+        <div class="echo-chapter-top">
+          <span>${chapter.title}</span>
+          <strong>${chapter.discovered}/${chapter.total}</strong>
+        </div>
+        <p>${labels}</p>
+        <em>${rewardText}</em>
+      </div>
+    `;
+  }).join("");
+
+  ui.echoArchive.innerHTML = `
+    <div class="echo-archive-head">
+      <div>
+        <p class="event-kicker">回声档案</p>
+        <h3>城市反转线索</h3>
+      </div>
+      <strong>${summary.discovered}/${summary.total}</strong>
+    </div>
+    <div class="echo-archive-last">${last}</div>
+    <div class="echo-archive-grid">${chapterCards}</div>
+  `;
+}
+
 function renderStartMenu() {
   if (!ui.startPanel) {
     return;
@@ -3661,6 +3851,7 @@ function renderStartMenu() {
   archiveState = isStoreShotMode ? archiveState : loadArchive();
   const runSave = isStoreShotMode ? null : loadRunSave();
   const bestChapter = Math.min(archiveState.bestChapter ?? 1, chapters.length);
+  const echoSummary = getEchoArchiveSummary();
   ui.startSummary.textContent = runSave
     ? `检测到 ${formatSaveTime(runSave.savedAt)} 的跑局存档：${chapters[runSave.currentChapterIndex]?.title ?? "未知章节"}，${runSave.objective ?? "继续夜巡"}。`
     : "档案已就绪。可以从第一章重新出发，也可以进入已解锁章节练习。";
@@ -3673,6 +3864,7 @@ function renderStartMenu() {
     ["累计击破", `${archiveState.totalEnemiesDefeated ?? 0}`],
     ["校准碎片", `${archiveState.calibrationShards ?? 0}`],
     ["档案节点", `${metaProgressNodes.reduce((sum, node) => sum + getMetaLevel(node.id), 0)}/${metaProgressNodes.reduce((sum, node) => sum + node.maxLevel, 0)}`],
+    ["回声档案", `${echoSummary.discovered}/${echoSummary.total}`],
     ["平台", getPlatformDisplayLabel()],
     ["存档", getStorageDisplayLabel()],
     ["爆点委托", `${archiveState.nightHookCompletions ?? 0} 次`],
@@ -3688,6 +3880,7 @@ function renderStartMenu() {
   }
 
   renderMetaProgression();
+  renderEchoArchive();
 
   ui.startActions.innerHTML = "";
   ui.startActions.appendChild(createMenuButton(
@@ -5674,6 +5867,7 @@ function collectDiscoveryEcho(echo) {
   if (healReward > 0) {
     player.hp = clamp(player.hp + healReward, 1, player.maxHp);
   }
+  const archiveReward = recordDiscoveryEchoInArchive(echo);
 
   burst(echo.x, echo.y, echo.color ?? "#5de2d1", 18);
   playAudioCue("pickup");
@@ -5681,6 +5875,8 @@ function collectDiscoveryEcho(echo) {
     bugReward > 0 ? `bug点数 +${bugReward}` : null,
     xpReward > 0 ? `经验 +${xpReward}` : null,
     healReward > 0 ? `生命 +${healReward}` : null,
+    archiveReward.wasNew ? `回声档案 ${archiveReward.summary.discovered}/${archiveReward.summary.total}` : null,
+    archiveReward.shardReward > 0 ? `章节集齐 +${archiveReward.shardReward} 校准碎片` : null,
   ].filter(Boolean).join("，");
   setLog(`${echo.message ?? `发现地图回声：${echo.label ?? "未命名线索"}。`}${rewards ? ` ${rewards}。` : ""}`);
   syncHud();
@@ -8954,6 +9150,7 @@ function installAutomationTestHooks() {
   function snapshot(extra = {}) {
     const map = currentMap() ?? {};
     const discovery = getMapDiscoverySummary(map);
+    const echoArchive = getEchoArchiveSummary();
     return {
       ...extra,
       build: getBuildSummary(),
@@ -9005,6 +9202,9 @@ function installAutomationTestHooks() {
         completedNightHooks: cloneForSave(archiveState?.completedNightHooks, []),
         nightHookCompletions: archiveState?.nightHookCompletions ?? 0,
         metaLevels: cloneForSave(archiveState?.metaUpgrades, {}),
+        discoveredEchoes: echoArchive.discovered,
+        totalEchoes: echoArchive.total,
+        completedEchoChapters: echoArchive.completedChapters,
       },
       nightHook: runStats?.activeHook ? {
         id: runStats.activeHook.id,
@@ -9156,6 +9356,50 @@ function installAutomationTestHooks() {
     return result;
   }
 
+  function runEchoArchiveProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    resetStoreRun(0, { stepIndex: 0, bugPoints: 0, xp: 0 });
+    player.xp = 0;
+    player.xpToNext = 99;
+    archiveState = {
+      ...createArchiveFallback(),
+      calibrationShards: 0,
+      discoveredEchoes: [],
+      completedEchoChapters: [],
+      lastEchoDiscovery: null,
+    };
+
+    const echoes = getMapEchoes();
+    const samples = [];
+    for (const echo of echoes) {
+      samples.push(movePlayerTo(echo.x, echo.y, `echo-archive-${echo.id}`));
+      checkDiscoveryEchoCollision();
+      world.mode = "playing";
+    }
+
+    const summary = getEchoArchiveSummary();
+    const expectedReward = getEchoChapterReward(0);
+    const result = {
+      ok: echoes.length > 0
+        && summary.discovered === echoes.length
+        && summary.completedChapters === 1
+        && archiveState.completedEchoChapters.includes(currentMap().id)
+        && archiveState.calibrationShards === expectedReward,
+      expectedReward,
+      archive: {
+        calibrationShards: archiveState.calibrationShards,
+        discoveredEchoes: cloneForSave(archiveState.discoveredEchoes, []),
+        completedEchoChapters: cloneForSave(archiveState.completedEchoChapters, []),
+        lastEchoDiscovery: cloneForSave(archiveState.lastEchoDiscovery, null),
+      },
+      summary,
+      samples,
+    };
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
+    return result;
+  }
+
   function enterChapter(chapterIndex, options = {}) {
     const index = clamp(Number(chapterIndex) || 0, 0, chapters.length - 1);
     const stepCount = chapters[index]?.steps?.length ?? 0;
@@ -9225,6 +9469,7 @@ function installAutomationTestHooks() {
   }
 
   function runDiscoveryEchoProbe(chapterIndex) {
+    const previousArchive = cloneForSave(archiveState, null);
     const echo = getMapEchoes()[0];
     if (!echo) {
       return { ok: false, reason: "missing echo" };
@@ -9235,6 +9480,9 @@ function installAutomationTestHooks() {
     checkDiscoveryEchoCollision();
     const collected = getCollectedEchoIds().includes(echo.id);
     const bugReward = Math.max(0, Number(echo.bugPoints) || 0);
+    const archiveSummary = getEchoArchiveSummary();
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
 
     return {
       ok: collected && player.bugPoints >= beforeBugPoints + bugReward,
@@ -9244,6 +9492,11 @@ function installAutomationTestHooks() {
       expectedBugReward: bugReward,
       beforeBugPoints,
       afterBugPoints: player.bugPoints,
+      archiveSummary: {
+        discovered: archiveSummary.discovered,
+        total: archiveSummary.total,
+        completedChapters: archiveSummary.completedChapters,
+      },
       collected: cloneForSave(chapterState?.echoesCollected, []),
     };
   }
@@ -9295,6 +9548,7 @@ function installAutomationTestHooks() {
     const metaProgression = runMetaProgressionProbe();
     const nightHook = runNightHookProbe();
     const combatTempo = runCombatTempoProbe();
+    const echoArchive = runEchoArchiveProbe();
 
     if (!metaProgression.ok) {
       failures.push("meta progression bonuses failed");
@@ -9304,6 +9558,9 @@ function installAutomationTestHooks() {
     }
     if (!combatTempo.ok) {
       failures.push("combat tempo reward failed");
+    }
+    if (!echoArchive.ok) {
+      failures.push("echo archive progression failed");
     }
 
     for (let index = 0; index < chapters.length; index += 1) {
@@ -9369,6 +9626,7 @@ function installAutomationTestHooks() {
       metaProgression,
       nightHook,
       combatTempo,
+      echoArchive,
       chapters: chaptersCovered,
       finalSnapshot: snapshot({ action: "routePressureComplete" }),
     };
@@ -9383,6 +9641,7 @@ function installAutomationTestHooks() {
     runMetaProgressionProbe,
     runNightHookProbe,
     runCombatTempoProbe,
+    runEchoArchiveProbe,
     runRoutePressureTest,
   };
 }
