@@ -420,6 +420,20 @@ const chapterMaps = [
         color: "#5de2d1",
       },
     ],
+    caches: [
+      {
+        id: "office-overtime-sorter",
+        x: 940,
+        y: 558,
+        label: "超时件分拣台",
+        message: "地标补给：超时件分拣台吐出一份还能用的凌晨补给。",
+        bugPoints: 1,
+        xp: 3,
+        hp: 6,
+        color: "#f1c15b",
+        code: "999",
+      },
+    ],
     paths: [
       { kind: "corridor", x: 58, y: 332, w: 760, h: 92, label: "工位通道", color: "#5de2d1" },
       { kind: "corridor", x: 676, y: 512, w: 684, h: 112, label: "配送走廊", color: "#f1c15b" },
@@ -604,6 +618,20 @@ const chapterMaps = [
         color: "#f1c15b",
       },
     ],
+    caches: [
+      {
+        id: "metro-turnback-signal",
+        x: 1528,
+        y: 850,
+        label: "折返信号箱",
+        message: "地标补给：折返信号箱吐出一张提前到站的车票。",
+        bugPoints: 2,
+        xp: 4,
+        hp: 6,
+        color: "#72a5ff",
+        code: "SIG",
+      },
+    ],
     spawnPoints: [
       { x: 90, y: 106 }, { x: 1190, y: 112 }, { x: 94, y: 618 }, { x: 1188, y: 624 },
       { x: 520, y: 98 }, { x: 760, y: 638 },
@@ -760,6 +788,20 @@ const chapterMaps = [
         color: "#96e072",
       },
     ],
+    caches: [
+      {
+        id: "hash-spice-counter",
+        x: 1540,
+        y: 742,
+        label: "重号面车",
+        message: "地标补给：重号面车把同一份订单拆成两份可读缓存。",
+        bugPoints: 2,
+        xp: 5,
+        backlash: 8,
+        color: "#96e072",
+        code: "#+",
+      },
+    ],
     spawnPoints: [
       { x: 86, y: 110 }, { x: 1190, y: 116 }, { x: 92, y: 636 }, { x: 1170, y: 628 },
       { x: 636, y: 104 }, { x: 640, y: 634 },
@@ -914,6 +956,20 @@ const chapterMaps = [
         color: "#96e072",
       },
     ],
+    caches: [
+      {
+        id: "pledge-await-hourglass",
+        x: 874,
+        y: 546,
+        label: "await 沙漏",
+        message: "地标补给：await 沙漏倒转一圈，把一次旧承诺换成呼吸空间。",
+        bugPoints: 1,
+        xp: 5,
+        hp: 10,
+        color: "#f1c15b",
+        code: "AWT",
+      },
+    ],
     spawnPoints: [
       { x: 82, y: 112 }, { x: 1192, y: 110 }, { x: 86, y: 638 }, { x: 1188, y: 634 },
       { x: 640, y: 92 }, { x: 640, y: 642 },
@@ -1065,6 +1121,20 @@ const chapterMaps = [
         bugPoints: 2,
         xp: 6,
         color: "#ef6a70",
+      },
+    ],
+    caches: [
+      {
+        id: "whitebox-counterexample-cache",
+        x: 1238,
+        y: 452,
+        label: "反例缓存台",
+        message: "地标补给：反例缓存台保留了一段不该被清零的差异。",
+        bugPoints: 2,
+        xp: 6,
+        backlash: 10,
+        color: "#72a5ff",
+        code: "EX",
       },
     ],
     spawnPoints: [
@@ -2631,6 +2701,7 @@ function restoreRunSave(save) {
     ...cloneForSave(save.chapterState, {}),
     allies: cloneForSave(save.chapterState?.allies, []),
     echoesCollected: cloneForSave(save.chapterState?.echoesCollected, []),
+    mapCachesCollected: cloneForSave(save.chapterState?.mapCachesCollected, []),
   };
   chapterState.chapterIndex = currentChapterIndex;
   nextUpgradeAt = Math.max(2, Number(save.nextUpgradeAt) || 2);
@@ -2795,6 +2866,7 @@ function createChapterState(allies = []) {
     resolvedTotal: 0,
     allies: [...new Set(allies)],
     echoesCollected: [],
+    mapCachesCollected: [],
     bossCleared: false,
     finished: false,
   };
@@ -4746,6 +4818,7 @@ function updatePlaying(dt) {
   updateAllyAssist(dt);
   updateBugPickups(dt);
   checkDiscoveryEchoCollision();
+  checkMapCacheCollision();
   updateNightHook(dt);
   updateCombatTempo(dt);
   updateStarterIgnition(dt);
@@ -6414,6 +6487,23 @@ function checkDiscoveryEchoCollision() {
   }
 }
 
+function checkMapCacheCollision() {
+  if (world.mode !== "playing" || !player) {
+    return;
+  }
+
+  for (const cache of getMapCaches()) {
+    if (isMapCacheCollected(cache)) {
+      continue;
+    }
+    const radius = cache.interactRadius ?? cache.radius ?? 62;
+    if (distance(player, cache) <= radius + (player.radius ?? 0)) {
+      collectMapCache(cache);
+      break;
+    }
+  }
+}
+
 function collectDiscoveryEcho(echo) {
   if (!echo?.id || isDiscoveryEchoCollected(echo)) {
     return;
@@ -6446,6 +6536,45 @@ function collectDiscoveryEcho(echo) {
   setLog(`${echo.message ?? `发现地图回声：${echo.label ?? "未命名线索"}。`}${rewards ? ` ${rewards}。` : ""}`);
   syncHud();
   saveRunCheckpoint("discovery-echo");
+}
+
+function collectMapCache(cache) {
+  if (!cache?.id || isMapCacheCollected(cache)) {
+    return;
+  }
+
+  const collected = getCollectedMapCacheIds();
+  collected.push(cache.id);
+  const bugReward = Math.max(0, Math.trunc(Number(cache.bugPoints) || 0));
+  const xpReward = Math.max(0, Math.trunc(Number(cache.xp) || 0));
+  const healReward = Math.max(0, Math.trunc(Number(cache.hp) || 0));
+  const backlashRelief = Math.max(0, Math.trunc(Number(cache.backlash) || 0));
+
+  player.bugPoints += bugReward;
+  if (xpReward > 0) {
+    addExperience(xpReward);
+  }
+  if (healReward > 0) {
+    player.hp = clamp(player.hp + healReward, 1, player.maxHp);
+  }
+  if (backlashRelief > 0) {
+    player.backlash = clamp(player.backlash - backlashRelief, 0, 100);
+  }
+  world.pulseCooldown = Math.min(world.pulseCooldown ?? 0, 0.2);
+  world.dashCooldown = Math.min(world.dashCooldown ?? 0, 0.2);
+
+  burst(cache.x, cache.y, cache.color ?? "#f1c15b", 22);
+  burst(player.x, player.y, "#5de2d1", 12);
+  playAudioCue("pickup");
+  const rewards = [
+    bugReward > 0 ? `bug点数 +${bugReward}` : null,
+    xpReward > 0 ? `经验 +${xpReward}` : null,
+    healReward > 0 ? `生命 +${healReward}` : null,
+    backlashRelief > 0 ? `反噬 -${backlashRelief}` : null,
+  ].filter(Boolean).join("，");
+  setLog(`${cache.message ?? `发现地标补给：${cache.label ?? "未命名装置"}。`}${rewards ? ` ${rewards}。` : ""}`);
+  syncHud();
+  saveRunCheckpoint("map-cache");
 }
 
 function maybeEscalateBacklash(dt) {
@@ -6768,6 +6897,7 @@ function drawOffice() {
   ctx.fillRect(0, 66, world.width, 3);
   drawMapObjects(map, visual);
   drawDiscoveryEchoes(map, visual);
+  drawMapCaches(map, visual);
 
   if ((chapterState?.stepIndex ?? -1) >= 3 || player.fixed >= 3) {
     drawLaoLiangSprite(1080, 118, 0.88);
@@ -6857,6 +6987,10 @@ function getMapEchoes(map = currentMap()) {
   return Array.isArray(map?.echoes) ? map.echoes : [];
 }
 
+function getMapCaches(map = currentMap()) {
+  return Array.isArray(map?.caches) ? map.caches : [];
+}
+
 function getCollectedEchoIds() {
   if (!chapterState) {
     return [];
@@ -6869,6 +7003,20 @@ function getCollectedEchoIds() {
 
 function isDiscoveryEchoCollected(echo) {
   return Boolean(echo?.id && getCollectedEchoIds().includes(echo.id));
+}
+
+function getCollectedMapCacheIds() {
+  if (!chapterState) {
+    return [];
+  }
+  if (!Array.isArray(chapterState.mapCachesCollected)) {
+    chapterState.mapCachesCollected = [];
+  }
+  return chapterState.mapCachesCollected;
+}
+
+function isMapCacheCollected(cache) {
+  return Boolean(cache?.id && getCollectedMapCacheIds().includes(cache.id));
 }
 
 function getMapDiscoverySummary(map = currentMap()) {
@@ -6892,6 +7040,8 @@ function getMapDiscoverySummary(map = currentMap()) {
     landmarkMarkers: [map.start, map.bossSpawn].filter(Boolean).length,
     echoCount: getMapEchoes(map).length,
     uncollectedEchoCount: getMapEchoes(map).filter((echo) => !isDiscoveryEchoCollected(echo)).length,
+    cacheCount: getMapCaches(map).length,
+    uncollectedCacheCount: getMapCaches(map).filter((cache) => !isMapCacheCollected(cache)).length,
   };
 }
 
@@ -6982,6 +7132,46 @@ function drawDiscoveryEcho(echo, visual, index = 0) {
   ctx.restore();
 
   drawMarkerTag(`回声 · ${shortenText(echo.label ?? "线索", 8)}`, echo.x, echo.y + 50, color);
+}
+
+function drawMapCaches(map, visual) {
+  for (const [index, cache] of getMapCaches(map).entries()) {
+    if (isMapCacheCollected(cache)) {
+      continue;
+    }
+    drawMapCache(cache, visual, index);
+  }
+}
+
+function drawMapCache(cache, visual, index = 0) {
+  const color = cache.color ?? visual.accent ?? visualColorFallback(index + 2);
+  const radius = cache.radius ?? 50;
+  const pulse = 1 + Math.sin(world.animTime * 3.8 + index * 1.4) * 0.1;
+
+  ctx.save();
+  ctx.globalAlpha = 0.15;
+  fillCircle(cache.x, cache.y, radius * 1.28 * pulse, color);
+  ctx.globalAlpha = 0.48;
+  strokeCircle(cache.x, cache.y, radius * pulse, color, 3);
+  ctx.globalAlpha = 0.86;
+  ctx.translate(cache.x, cache.y);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, -22);
+  ctx.lineTo(24, -7);
+  ctx.lineTo(24, 17);
+  ctx.lineTo(0, 29);
+  ctx.lineTo(-24, 17);
+  ctx.lineTo(-24, -7);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  drawSmallText(cache.code ?? "补", -12, 6, color, 14);
+  ctx.restore();
+
+  drawMarkerTag(`地标 · ${shortenText(cache.label ?? "补给", 8)}`, cache.x, cache.y + 52, color);
 }
 
 function drawZoneSignal(zone, visual) {
@@ -9778,6 +9968,8 @@ function installAutomationTestHooks() {
         landmarkMarkerCount: discovery.landmarkMarkers,
         echoCount: discovery.echoCount,
         uncollectedEchoCount: discovery.uncollectedEchoCount,
+        cacheCount: discovery.cacheCount,
+        uncollectedCacheCount: discovery.uncollectedCacheCount,
       },
       mode: world.mode,
       objective: getCurrentObjectiveText(),
@@ -9797,6 +9989,7 @@ function installAutomationTestHooks() {
         stepIndex: chapterState?.stepIndex ?? null,
         resolvedTotal: chapterState?.resolvedTotal ?? null,
         echoesCollected: cloneForSave(chapterState?.echoesCollected, []),
+        mapCachesCollected: cloneForSave(chapterState?.mapCachesCollected, []),
         bossCleared: Boolean(chapterState?.bossCleared),
         finished: Boolean(chapterState?.finished),
       },
@@ -10218,6 +10411,9 @@ function installAutomationTestHooks() {
     for (const [index, echo] of getMapEchoes(map).entries()) {
       addPoint(echo, `echo-${index}`);
     }
+    for (const [index, cache] of getMapCaches(map).entries()) {
+      addPoint(cache, `cache-${index}`);
+    }
     addPoint(map.bossSpawn, "bossSpawn");
     for (const [index, point] of (map.spawnPoints ?? []).entries()) {
       if (index === 0 || index === (map.spawnPoints?.length ?? 0) - 1) {
@@ -10259,6 +10455,41 @@ function installAutomationTestHooks() {
         completedChapters: archiveSummary.completedChapters,
       },
       collected: cloneForSave(chapterState?.echoesCollected, []),
+    };
+  }
+
+  function runMapCacheProbe(chapterIndex) {
+    const cache = getMapCaches()[0];
+    if (!cache) {
+      return { ok: false, reason: "missing cache" };
+    }
+
+    const beforeBugPoints = player.bugPoints;
+    const beforeHp = player.hp;
+    const beforeBacklash = player.backlash;
+    const sample = movePlayerTo(cache.x, cache.y, `cache-probe-${chapterIndex}`);
+    checkMapCacheCollision();
+    const collected = getCollectedMapCacheIds().includes(cache.id);
+    const bugReward = Math.max(0, Math.trunc(Number(cache.bugPoints) || 0));
+    const healReward = Math.max(0, Math.trunc(Number(cache.hp) || 0));
+    const backlashReward = Math.max(0, Math.trunc(Number(cache.backlash) || 0));
+
+    return {
+      ok: collected
+        && player.bugPoints >= beforeBugPoints + bugReward
+        && player.hp >= Math.min(player.maxHp, beforeHp + healReward)
+        && player.backlash <= Math.max(0, beforeBacklash - backlashReward),
+      cacheId: cache.id,
+      label: cache.label ?? null,
+      sample,
+      expectedBugReward: bugReward,
+      beforeBugPoints,
+      afterBugPoints: player.bugPoints,
+      beforeHp: round(beforeHp),
+      afterHp: round(player.hp),
+      beforeBacklash: round(beforeBacklash),
+      afterBacklash: round(player.backlash),
+      collected: cloneForSave(chapterState?.mapCachesCollected, []),
     };
   }
 
@@ -10339,6 +10570,7 @@ function installAutomationTestHooks() {
     for (let index = 0; index < chapters.length; index += 1) {
       const entry = enterChapter(index);
       const echoProbe = runDiscoveryEchoProbe(index);
+      const cacheProbe = runMapCacheProbe(index);
       const routeSamples = collectRoutePoints().map((point) => movePlayerTo(point.x, point.y, point.label));
       const badRoute = routeSamples.filter((sample) => !sample.inBounds || sample.blocked);
       const bossSnapshot = startBossForChapter(index);
@@ -10365,8 +10597,14 @@ function installAutomationTestHooks() {
       if (entry.map.echoCount < 2) {
         failures.push(`Chapter ${index + 1} has too few discovery echoes`);
       }
+      if (entry.map.cacheCount < 1) {
+        failures.push(`Chapter ${index + 1} is missing landmark cache`);
+      }
       if (!echoProbe.ok) {
         failures.push(`Chapter ${index + 1} discovery echo probe failed`);
+      }
+      if (!cacheProbe.ok) {
+        failures.push(`Chapter ${index + 1} landmark cache probe failed`);
       }
       if (badRoute.length > 0) {
         failures.push(`Chapter ${index + 1} has blocked route sample: ${badRoute[0].label}`);
@@ -10383,6 +10621,7 @@ function installAutomationTestHooks() {
         title: chapters[index]?.title ?? `Chapter ${index + 1}`,
         map: entry.map,
         echoProbe,
+        cacheProbe,
         routeSamples,
         boss: bossSnapshot.boss,
         saveRestoreOk: saveRestore.ok,
