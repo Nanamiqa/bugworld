@@ -392,6 +392,28 @@ const chapterMaps = [
       2: "办公室向茶水间和配送走廊展开，跟着地面路线继续推进。",
       3: "外卖取餐区在东侧深处，穿过重算路线后再进入 Boss 区。",
     },
+    echoes: [
+      {
+        id: "office-cold-receipt",
+        x: 826,
+        y: 540,
+        label: "冷掉配送单",
+        message: "回声：配送单背面写着“03:32 后不要相信自动重派”。",
+        bugPoints: 1,
+        xp: 3,
+        color: "#f1c15b",
+      },
+      {
+        id: "office-server-whisper",
+        x: 1868,
+        y: 924,
+        label: "服务器门缝",
+        message: "回声：门缝里传来老梁的咳嗽声，他说异常不是第一次发生。",
+        bugPoints: 1,
+        xp: 4,
+        color: "#5de2d1",
+      },
+    ],
     paths: [
       { kind: "corridor", x: 58, y: 332, w: 760, h: 92, label: "工位通道", color: "#5de2d1" },
       { kind: "corridor", x: 676, y: 512, w: 684, h: 112, label: "配送走廊", color: "#f1c15b" },
@@ -554,6 +576,28 @@ const chapterMaps = [
       2: "时间债账单被冲到东侧换乘厅，沿蓝色轨道继续前进。",
       3: "终点站在远端折返区，清掉阻塞班次后再进入管理员站台。",
     },
+    echoes: [
+      {
+        id: "metro-late-ticket",
+        x: 412,
+        y: 430,
+        label: "迟到者车票",
+        message: "回声：车票打孔处写着“下一站会提前到达昨天”。",
+        bugPoints: 1,
+        xp: 4,
+        color: "#72a5ff",
+      },
+      {
+        id: "metro-terminal-echo",
+        x: 1888,
+        y: 786,
+        label: "终点广播",
+        message: "回声：终点站广播重复安渡的名字，却少念了一个字。",
+        bugPoints: 1,
+        xp: 5,
+        color: "#f1c15b",
+      },
+    ],
     spawnPoints: [
       { x: 90, y: 106 }, { x: 1190, y: 112 }, { x: 94, y: 618 }, { x: 1188, y: 624 },
       { x: 520, y: 98 }, { x: 760, y: 638 },
@@ -688,6 +732,28 @@ const chapterMaps = [
       2: "老梁的小票被盐雨冲到雨棚背面，沿绿光摊位追过去。",
       3: "缓存保卫战分成前街和索引中庭，两个信标都要清掉。",
     },
+    echoes: [
+      {
+        id: "hash-salted-receipt",
+        x: 842,
+        y: 556,
+        label: "昨日小票",
+        message: "回声：小票上的名字被加盐，只有老梁还记得原价。",
+        bugPoints: 1,
+        xp: 5,
+        color: "#d8b26e",
+      },
+      {
+        id: "hash-short-code",
+        x: 1706,
+        y: 386,
+        label: "短码柜台",
+        message: "回声：#404 柜台拒绝承认自己卖过同一道面。",
+        bugPoints: 2,
+        xp: 4,
+        color: "#96e072",
+      },
+    ],
     spawnPoints: [
       { x: 86, y: 110 }, { x: 1190, y: 116 }, { x: 92, y: 636 }, { x: 1170, y: 628 },
       { x: 636, y: 104 }, { x: 640, y: 634 },
@@ -820,6 +886,28 @@ const chapterMaps = [
       2: "债务堆分散到下层和高层分枝，两个栈顶都要卸掉。",
       3: "根节点苏醒前，时间账和盐雨记忆在远端合流。",
     },
+    echoes: [
+      {
+        id: "pledge-null-contract",
+        x: 1418,
+        y: 558,
+        label: "空值合同",
+        message: "回声：合同第一页没有甲方，最后一页却签着安渡。",
+        bugPoints: 1,
+        xp: 5,
+        color: "#72a5ff",
+      },
+      {
+        id: "pledge-root-lamp",
+        x: 1948,
+        y: 742,
+        label: "根灯",
+        message: "回声：根灯每亮一次，就有一个旧承诺被写成债务。",
+        bugPoints: 2,
+        xp: 5,
+        color: "#96e072",
+      },
+    ],
     spawnPoints: [
       { x: 82, y: 112 }, { x: 1192, y: 110 }, { x: 86, y: 638 }, { x: 1188, y: 634 },
       { x: 640, y: 92 }, { x: 640, y: 642 },
@@ -951,6 +1039,28 @@ const chapterMaps = [
       2: "城市心跳藏在远端核心室，沿红蓝证据链推进。",
       3: "最终反例散落在旧承诺、夜市缓存和环线时刻表三处。",
     },
+    echoes: [
+      {
+        id: "whitebox-evidence-pod",
+        x: 520,
+        y: 526,
+        label: "保留证据",
+        message: "回声：证据柜里有一张便签：差异不是错误。",
+        bugPoints: 2,
+        xp: 5,
+        color: "#72a5ff",
+      },
+      {
+        id: "whitebox-city-heart",
+        x: 1698,
+        y: 790,
+        label: "城市心跳",
+        message: "回声：心跳室短暂承认，规则也需要被别人保护。",
+        bugPoints: 2,
+        xp: 6,
+        color: "#ef6a70",
+      },
+    ],
     spawnPoints: [
       { x: 84, y: 106 }, { x: 1190, y: 110 }, { x: 90, y: 632 }, { x: 1190, y: 632 },
       { x: 640, y: 94 }, { x: 640, y: 640 },
@@ -2147,6 +2257,7 @@ function restoreRunSave(save) {
     ...createChapterState(),
     ...cloneForSave(save.chapterState, {}),
     allies: cloneForSave(save.chapterState?.allies, []),
+    echoesCollected: cloneForSave(save.chapterState?.echoesCollected, []),
   };
   chapterState.chapterIndex = currentChapterIndex;
   nextUpgradeAt = Math.max(2, Number(save.nextUpgradeAt) || 2);
@@ -2243,6 +2354,7 @@ function createChapterState(allies = []) {
     resolvedInStep: 0,
     resolvedTotal: 0,
     allies: [...new Set(allies)],
+    echoesCollected: [],
     bossCleared: false,
     finished: false,
   };
@@ -3877,6 +3989,7 @@ function updatePlaying(dt) {
   updateEnemies(dt);
   updateAllyAssist(dt);
   updateBugPickups(dt);
+  checkDiscoveryEchoCollision();
   updateNightHook(dt);
   updateCombatTempo(dt);
   if (world.mode !== "playing") {
@@ -5526,6 +5639,54 @@ function updateBugPickups(dt) {
   });
 }
 
+function checkDiscoveryEchoCollision() {
+  if (world.mode !== "playing" || !player) {
+    return;
+  }
+
+  for (const echo of getMapEchoes()) {
+    if (isDiscoveryEchoCollected(echo)) {
+      continue;
+    }
+    const radius = echo.interactRadius ?? echo.radius ?? 72;
+    if (distance(player, echo) <= radius + (player.radius ?? 0)) {
+      collectDiscoveryEcho(echo);
+      break;
+    }
+  }
+}
+
+function collectDiscoveryEcho(echo) {
+  if (!echo?.id || isDiscoveryEchoCollected(echo)) {
+    return;
+  }
+
+  const collected = getCollectedEchoIds();
+  collected.push(echo.id);
+  const bugReward = Math.max(0, Number(echo.bugPoints) || 0);
+  const xpReward = Math.max(0, Number(echo.xp) || 0);
+  const healReward = Math.max(0, Number(echo.heal) || 0);
+
+  player.bugPoints += bugReward;
+  if (xpReward > 0) {
+    addExperience(xpReward);
+  }
+  if (healReward > 0) {
+    player.hp = clamp(player.hp + healReward, 1, player.maxHp);
+  }
+
+  burst(echo.x, echo.y, echo.color ?? "#5de2d1", 18);
+  playAudioCue("pickup");
+  const rewards = [
+    bugReward > 0 ? `bug点数 +${bugReward}` : null,
+    xpReward > 0 ? `经验 +${xpReward}` : null,
+    healReward > 0 ? `生命 +${healReward}` : null,
+  ].filter(Boolean).join("，");
+  setLog(`${echo.message ?? `发现地图回声：${echo.label ?? "未命名线索"}。`}${rewards ? ` ${rewards}。` : ""}`);
+  syncHud();
+  saveRunCheckpoint("discovery-echo");
+}
+
 function maybeEscalateBacklash(dt) {
   if (boss && boss.hp > 0) {
     return;
@@ -5806,6 +5967,7 @@ function drawOffice() {
   ctx.fillStyle = visual.trim;
   ctx.fillRect(0, 66, world.width, 3);
   drawMapObjects(map, visual);
+  drawDiscoveryEchoes(map, visual);
 
   if ((chapterState?.stepIndex ?? -1) >= 3 || player.fixed >= 3) {
     drawLaoLiangSprite(1080, 118, 0.88);
@@ -5891,6 +6053,24 @@ function drawMapZones(map, visual) {
   }
 }
 
+function getMapEchoes(map = currentMap()) {
+  return Array.isArray(map?.echoes) ? map.echoes : [];
+}
+
+function getCollectedEchoIds() {
+  if (!chapterState) {
+    return [];
+  }
+  if (!Array.isArray(chapterState.echoesCollected)) {
+    chapterState.echoesCollected = [];
+  }
+  return chapterState.echoesCollected;
+}
+
+function isDiscoveryEchoCollected(echo) {
+  return Boolean(echo?.id && getCollectedEchoIds().includes(echo.id));
+}
+
 function getMapDiscoverySummary(map = currentMap()) {
   const taskMarkers = [];
   for (const [stepKey, targets] of Object.entries(map.stepTargets ?? {})) {
@@ -5910,6 +6090,8 @@ function getMapDiscoverySummary(map = currentMap()) {
     taskMarkers,
     hazardSignals: (map.zones ?? []).filter((zone) => ["hazard", "backlash", "slow", "focus"].includes(zone.type)).length,
     landmarkMarkers: [map.start, map.bossSpawn].filter(Boolean).length,
+    echoCount: getMapEchoes(map).length,
+    uncollectedEchoCount: getMapEchoes(map).filter((echo) => !isDiscoveryEchoCollected(echo)).length,
   };
 }
 
@@ -5966,6 +6148,40 @@ function drawMapLandmarkSeal(point, label, color, code) {
   drawSmallText(code, point.x - 19, point.y + 5, color, 13);
   drawMarkerTag(label, point.x, point.y + 46, color);
   ctx.restore();
+}
+
+function drawDiscoveryEchoes(map, visual) {
+  for (const [index, echo] of getMapEchoes(map).entries()) {
+    if (isDiscoveryEchoCollected(echo)) {
+      continue;
+    }
+    drawDiscoveryEcho(echo, visual, index);
+  }
+}
+
+function drawDiscoveryEcho(echo, visual, index = 0) {
+  const color = echo.color ?? visual.accent ?? visualColorFallback(index);
+  const radius = echo.radius ?? 66;
+  const pulse = 1 + Math.sin(world.animTime * 3.2 + index * 0.9) * 0.09;
+
+  ctx.save();
+  ctx.globalAlpha = 0.16;
+  fillCircle(echo.x, echo.y, radius * pulse, color);
+  ctx.globalAlpha = 0.42;
+  strokeCircle(echo.x, echo.y, (radius * 0.68) * pulse, color, 3);
+  ctx.globalAlpha = 0.88;
+  ctx.translate(echo.x, echo.y);
+  ctx.rotate(Math.PI / 4 + Math.sin(world.animTime * 1.4 + index) * 0.04);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.86)";
+  ctx.fillRect(-13, -13, 26, 26);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(-13, -13, 26, 26);
+  ctx.rotate(-Math.PI / 4);
+  drawSmallText("回", -8, 5, color, 15);
+  ctx.restore();
+
+  drawMarkerTag(`回声 · ${shortenText(echo.label ?? "线索", 8)}`, echo.x, echo.y + 50, color);
 }
 
 function drawZoneSignal(zone, visual) {
@@ -8759,6 +8975,8 @@ function installAutomationTestHooks() {
         taskMarkerCount: discovery.taskMarkers.length,
         hazardSignalCount: discovery.hazardSignals,
         landmarkMarkerCount: discovery.landmarkMarkers,
+        echoCount: discovery.echoCount,
+        uncollectedEchoCount: discovery.uncollectedEchoCount,
       },
       mode: world.mode,
       objective: getCurrentObjectiveText(),
@@ -8777,6 +8995,7 @@ function installAutomationTestHooks() {
         chapterIndex: chapterState?.chapterIndex ?? null,
         stepIndex: chapterState?.stepIndex ?? null,
         resolvedTotal: chapterState?.resolvedTotal ?? null,
+        echoesCollected: cloneForSave(chapterState?.echoesCollected, []),
         bossCleared: Boolean(chapterState?.bossCleared),
         finished: Boolean(chapterState?.finished),
       },
@@ -8991,6 +9210,9 @@ function installAutomationTestHooks() {
         addPoint(target, `step-${stepKey}`);
       }
     }
+    for (const [index, echo] of getMapEchoes(map).entries()) {
+      addPoint(echo, `echo-${index}`);
+    }
     addPoint(map.bossSpawn, "bossSpawn");
     for (const [index, point] of (map.spawnPoints ?? []).entries()) {
       if (index === 0 || index === (map.spawnPoints?.length ?? 0) - 1) {
@@ -9000,6 +9222,30 @@ function installAutomationTestHooks() {
     addPoint({ x: world.width - 88, y: 112 }, "far-east-north");
     addPoint({ x: world.width - 96, y: world.height - 88 }, "far-east-south");
     return points;
+  }
+
+  function runDiscoveryEchoProbe(chapterIndex) {
+    const echo = getMapEchoes()[0];
+    if (!echo) {
+      return { ok: false, reason: "missing echo" };
+    }
+
+    const beforeBugPoints = player.bugPoints;
+    const sample = movePlayerTo(echo.x, echo.y, `echo-probe-${chapterIndex}`);
+    checkDiscoveryEchoCollision();
+    const collected = getCollectedEchoIds().includes(echo.id);
+    const bugReward = Math.max(0, Number(echo.bugPoints) || 0);
+
+    return {
+      ok: collected && player.bugPoints >= beforeBugPoints + bugReward,
+      echoId: echo.id,
+      label: echo.label ?? null,
+      sample,
+      expectedBugReward: bugReward,
+      beforeBugPoints,
+      afterBugPoints: player.bugPoints,
+      collected: cloneForSave(chapterState?.echoesCollected, []),
+    };
   }
 
   function startBossForChapter(chapterIndex) {
@@ -9062,6 +9308,7 @@ function installAutomationTestHooks() {
 
     for (let index = 0; index < chapters.length; index += 1) {
       const entry = enterChapter(index);
+      const echoProbe = runDiscoveryEchoProbe(index);
       const routeSamples = collectRoutePoints().map((point) => movePlayerTo(point.x, point.y, point.label));
       const badRoute = routeSamples.filter((sample) => !sample.inBounds || sample.blocked);
       const bossSnapshot = startBossForChapter(index);
@@ -9085,6 +9332,12 @@ function installAutomationTestHooks() {
       if (entry.map.landmarkMarkerCount < 2) {
         failures.push(`Chapter ${index + 1} is missing start or boss landmark markers`);
       }
+      if (entry.map.echoCount < 2) {
+        failures.push(`Chapter ${index + 1} has too few discovery echoes`);
+      }
+      if (!echoProbe.ok) {
+        failures.push(`Chapter ${index + 1} discovery echo probe failed`);
+      }
       if (badRoute.length > 0) {
         failures.push(`Chapter ${index + 1} has blocked route sample: ${badRoute[0].label}`);
       }
@@ -9099,6 +9352,7 @@ function installAutomationTestHooks() {
         index,
         title: chapters[index]?.title ?? `Chapter ${index + 1}`,
         map: entry.map,
+        echoProbe,
         routeSamples,
         boss: bossSnapshot.boss,
         saveRestoreOk: saveRestore.ok,
