@@ -127,7 +127,7 @@ const ARCHIVE_STORAGE_KEY = "variableCityArchive";
 const RUN_SAVE_STORAGE_KEY = "variableCityRunSave";
 const SETTINGS_STORAGE_KEY = "variableCitySettings";
 const ACHIEVEMENT_STORAGE_KEY = "variableCityAchievements";
-const ARCHIVE_VERSION = 5;
+const ARCHIVE_VERSION = 6;
 const RUN_SAVE_VERSION = 2;
 const achievements = window.variableCityAchievementCatalog ?? [];
 const urlParams = new URLSearchParams(window.location.search);
@@ -1834,6 +1834,7 @@ function createRunStats() {
     damageTaken: 0,
     distanceTraveled: 0,
     activeHook: null,
+    mapInteractivesActivated: [],
     tempo: createCombatTempoState(),
     openingSprint: null,
     starterBuild: null,
@@ -1864,6 +1865,9 @@ function createArchiveFallback() {
     discoveredMapCaches: [],
     completedMapCacheChapters: [],
     lastMapCacheDiscovery: null,
+    activatedMapInteractives: [],
+    completedMapInteractiveChapters: [],
+    lastMapInteractiveDiscovery: null,
     metaUpgrades: Object.fromEntries(metaProgressNodes.map((node) => [node.id, 0])),
     lastRunShardGain: null,
     lastRunReview: null,
@@ -1945,6 +1949,45 @@ function normalizeLastMapCacheDiscovery(value) {
   };
 }
 
+function getAllMapInteractives() {
+  return chapterMaps.flatMap((map, chapterIndex) => getMapInteractives(map).map((device) => ({
+    ...device,
+    chapterIndex,
+    chapterId: map.id,
+    chapterTitle: chapters[chapterIndex]?.title ?? map.name ?? `第 ${chapterIndex + 1} 章`,
+  })));
+}
+
+function normalizeMapInteractiveIds(savedDeviceIds = []) {
+  const validDeviceIds = new Set(getAllMapInteractives().map((device) => device.id));
+  return [...new Set(Array.isArray(savedDeviceIds) ? savedDeviceIds : [])]
+    .filter((id) => typeof id === "string" && validDeviceIds.has(id));
+}
+
+function normalizeMapInteractiveChapterIds(savedChapterIds = []) {
+  const validChapterIds = new Set(chapterMaps
+    .filter((map) => getMapInteractives(map).length > 0)
+    .map((map) => map.id)
+    .filter(Boolean));
+  return [...new Set(Array.isArray(savedChapterIds) ? savedChapterIds : [])]
+    .filter((id) => typeof id === "string" && validChapterIds.has(id));
+}
+
+function normalizeLastMapInteractiveDiscovery(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  return {
+    id: typeof value.id === "string" ? value.id : "",
+    label: typeof value.label === "string" ? value.label : "互动装置",
+    chapterId: typeof value.chapterId === "string" ? value.chapterId : "",
+    chapterTitle: typeof value.chapterTitle === "string" ? value.chapterTitle : "未知章节",
+    completedChapter: Boolean(value.completedChapter),
+    shardReward: Math.max(0, Math.trunc(Number(value.shardReward) || 0)),
+    at: Number(value.at) || Date.now(),
+  };
+}
+
 function normalizeMetaUpgrades(savedUpgrades = {}) {
   const normalized = {};
   for (const node of metaProgressNodes) {
@@ -2005,6 +2048,9 @@ function loadArchive() {
       discoveredMapCaches: normalizeMapCacheIds(saved.discoveredMapCaches),
       completedMapCacheChapters: normalizeMapCacheChapterIds(saved.completedMapCacheChapters),
       lastMapCacheDiscovery: normalizeLastMapCacheDiscovery(saved.lastMapCacheDiscovery),
+      activatedMapInteractives: normalizeMapInteractiveIds(saved.activatedMapInteractives),
+      completedMapInteractiveChapters: normalizeMapInteractiveChapterIds(saved.completedMapInteractiveChapters),
+      lastMapInteractiveDiscovery: normalizeLastMapInteractiveDiscovery(saved.lastMapInteractiveDiscovery),
     };
     normalized.archiveVersion = ARCHIVE_VERSION;
     normalized.bestChapter = clamp(Number(normalized.bestChapter) || 1, 1, chapters.length);
@@ -2123,6 +2169,10 @@ function getMapCacheChapterReward(chapterIndex = currentChapterIndex) {
   return 1 + Math.max(0, Math.trunc(Number(chapterIndex) || 0));
 }
 
+function getMapInteractiveChapterReward(chapterIndex = currentChapterIndex) {
+  return 1 + Math.max(0, Math.trunc(Number(chapterIndex) || 0));
+}
+
 function getEchoArchiveSummary(archive = archiveState) {
   const discovered = new Set(normalizeEchoIds(archive?.discoveredEchoes));
   const completedChapters = new Set(normalizeEchoChapterIds(archive?.completedEchoChapters));
@@ -2182,6 +2232,37 @@ function getMapCacheArchiveSummary(archive = archiveState) {
     chapterCount: chaptersSummary.length,
     chapters: chaptersSummary,
     last: normalizeLastMapCacheDiscovery(archive?.lastMapCacheDiscovery),
+  };
+}
+
+function getMapInteractiveArchiveSummary(archive = archiveState) {
+  const activated = new Set(normalizeMapInteractiveIds(archive?.activatedMapInteractives));
+  const completedChapters = new Set(normalizeMapInteractiveChapterIds(archive?.completedMapInteractiveChapters));
+  const chaptersSummary = chapterMaps.map((map, chapterIndex) => {
+    const devices = getMapInteractives(map);
+    const activatedInChapter = devices.filter((device) => activated.has(device.id));
+    return {
+      chapterIndex,
+      chapterId: map.id,
+      title: chapters[chapterIndex]?.title ?? map.name ?? `第 ${chapterIndex + 1} 章`,
+      activated: activatedInChapter.length,
+      total: devices.length,
+      complete: devices.length > 0 && activatedInChapter.length === devices.length,
+      rewardClaimed: completedChapters.has(map.id),
+      devices: devices.map((device) => ({
+        id: device.id,
+        label: device.label ?? "互动装置",
+        activated: activated.has(device.id),
+      })),
+    };
+  });
+  return {
+    activated: activated.size,
+    total: getAllMapInteractives().length,
+    completedChapters: completedChapters.size,
+    chapterCount: chaptersSummary.length,
+    chapters: chaptersSummary,
+    last: normalizeLastMapInteractiveDiscovery(archive?.lastMapInteractiveDiscovery),
   };
 }
 
@@ -2280,6 +2361,55 @@ function recordMapCacheInArchive(cache) {
     chapterCompleted: chapterComplete && !chapterAlreadyRewarded,
     shardReward,
     summary: getMapCacheArchiveSummary(),
+  };
+}
+
+function recordMapInteractiveInArchive(device) {
+  if (!device?.id) {
+    return { wasNew: false, chapterCompleted: false, shardReward: 0, summary: getMapInteractiveArchiveSummary() };
+  }
+
+  if (!archiveState) {
+    archiveState = loadArchive();
+  }
+  archiveState.activatedMapInteractives = normalizeMapInteractiveIds(archiveState.activatedMapInteractives);
+  archiveState.completedMapInteractiveChapters = normalizeMapInteractiveChapterIds(archiveState.completedMapInteractiveChapters);
+
+  const map = currentMap();
+  const chapterId = map?.id ?? "";
+  const chapterDevices = getMapInteractives(map);
+  const activatedSet = new Set(archiveState.activatedMapInteractives);
+  const wasNew = !activatedSet.has(device.id);
+  if (wasNew) {
+    archiveState.activatedMapInteractives.push(device.id);
+    activatedSet.add(device.id);
+  }
+
+  const chapterComplete = Boolean(chapterId)
+    && chapterDevices.length > 0
+    && chapterDevices.every((chapterDevice) => activatedSet.has(chapterDevice.id));
+  const chapterAlreadyRewarded = archiveState.completedMapInteractiveChapters.includes(chapterId);
+  let shardReward = 0;
+  if (chapterComplete && !chapterAlreadyRewarded) {
+    archiveState.completedMapInteractiveChapters.push(chapterId);
+    shardReward = grantCalibrationShards(getMapInteractiveChapterReward(currentChapterIndex), `装置档案：${currentChapter().title}`);
+  }
+
+  archiveState.lastMapInteractiveDiscovery = {
+    id: device.id,
+    label: device.label ?? "互动装置",
+    chapterId,
+    chapterTitle: currentChapter().title,
+    completedChapter: chapterComplete && !chapterAlreadyRewarded,
+    shardReward,
+    at: Date.now(),
+  };
+  saveArchive();
+  return {
+    wasNew,
+    chapterCompleted: chapterComplete && !chapterAlreadyRewarded,
+    shardReward,
+    summary: getMapInteractiveArchiveSummary(),
   };
 }
 
@@ -3064,6 +3194,7 @@ function restoreRunSave(save) {
     relicsChosen: cloneForSave(save.runStats?.relicsChosen, []),
     conceptsChosen: cloneForSave(save.runStats?.conceptsChosen, []),
     synergiesUnlocked: cloneForSave(save.runStats?.synergiesUnlocked, []),
+    mapInteractivesActivated: cloneForSave(save.runStats?.mapInteractivesActivated, []),
     distanceTraveled: Math.max(0, Number(save.runStats?.distanceTraveled) || 0),
     tempo: normalizeCombatTempoState(save.runStats?.tempo),
   };
@@ -3174,6 +3305,7 @@ function createRunReview(victory) {
   const defeats = runStats?.enemiesDefeated ?? 0;
   const openingComplete = Boolean(runStats?.openingSprint?.completed);
   const starterComplete = Boolean(runStats?.starterIgnition?.completed);
+  const deviceCount = runStats?.mapInteractivesActivated?.length ?? 0;
   const build = chooseReviewStarterBuild(victory);
   const weapon = getWeaponById(build?.weaponId);
 
@@ -3184,6 +3316,9 @@ function createRunReview(victory) {
   if (starterComplete) {
     highlightTitle = "流派已经起火";
     highlightText = "推荐流派完成启动超频，下一把可以直接围绕它拿强化。";
+  } else if (deviceCount > 0) {
+    highlightTitle = `装置启动 x${deviceCount}`;
+    highlightText = "本局已经把地图装置转化成战斗收益，探索路线开始反哺构筑节奏。";
   } else if (bestStreak >= combatTempoConfig.rewardEvery) {
     highlightTitle = `连段 x${bestStreak}`;
     highlightText = "战斗节奏已经点亮，保持移动就能把补给滚起来。";
@@ -3194,6 +3329,9 @@ function createRunReview(victory) {
   if ((runStats?.damageTaken ?? 0) >= 110) {
     pressureTitle = "伤害吃得偏多";
     pressureText = "把闪避留给红色危险区和冲刺怪，先用控场流换更多容错。";
+  } else if (currentChapterIndex > 0 && deviceCount <= 0) {
+    pressureTitle = "装置还没吃到";
+    pressureText = "第二章以后留意地图上的“互动”标记，靠近一次就能换冷却、回复或削弱窗口。";
   } else if (bestStreak < combatTempoConfig.rewardEvery) {
     pressureTitle = "连段还没滚起来";
     pressureText = `尽量把击破间隔压进 ${combatTempoConfig.window.toFixed(1)} 秒窗口，先吃到第一份连段补给。`;
@@ -3514,6 +3652,8 @@ function createStoreArchiveState() {
     bestTempoStreak: 18,
     discoveredEchoes: getAllDiscoveryEchoes().slice(0, 7).map((echo) => echo.id),
     completedEchoChapters: chapterMaps.slice(0, 3).map((map) => map.id),
+    activatedMapInteractives: getAllMapInteractives().slice(0, 3).map((device) => device.id),
+    completedMapInteractiveChapters: chapterMaps.slice(1, 4).map((map) => map.id),
     lastEchoDiscovery: {
       id: "pledge-null-contract",
       label: "空值合同",
@@ -3521,6 +3661,15 @@ function createStoreArchiveState() {
       chapterTitle: chapters[3]?.title ?? "第四章",
       completedChapter: false,
       shardReward: 0,
+      at: Date.now(),
+    },
+    lastMapInteractiveDiscovery: {
+      id: "pledge-branch-relay",
+      label: "叶灯中继",
+      chapterId: "promise-tower",
+      chapterTitle: chapters[3]?.title ?? "第四章",
+      completedChapter: true,
+      shardReward: getMapInteractiveChapterReward(3),
       at: Date.now(),
     },
     metaUpgrades: {
@@ -3547,6 +3696,7 @@ function resetStoreRun(chapterIndex = 0, options = {}) {
     relicsChosen: ["冷掉配送单", "迟到者车票"],
     conceptsChosen: ["数组", "队列", "哈希", "时间"],
     synergiesUnlocked: ["队列共鸣", "哈希共鸣"],
+    mapInteractivesActivated: ["metro-time-gate", "hash-salt-lantern"].slice(0, Math.max(0, chapterIndex)),
     damageTaken: 32,
     tempo: {
       ...createCombatTempoState(),
@@ -4715,11 +4865,15 @@ function renderEchoArchive() {
 
   const summary = getEchoArchiveSummary();
   const cacheSummary = getMapCacheArchiveSummary();
+  const interactiveSummary = getMapInteractiveArchiveSummary();
   const last = summary.last?.id
     ? `最近：${summary.last.label}${summary.last.shardReward ? ` +${summary.last.shardReward}碎片` : ""}`
     : "最近：暂无记录";
   const cacheLast = cacheSummary.last?.id
     ? `最近：${cacheSummary.last.label}${cacheSummary.last.shardReward ? ` +${cacheSummary.last.shardReward}碎片` : ""}`
+    : "最近：暂无记录";
+  const interactiveLast = interactiveSummary.last?.id
+    ? `最近：${interactiveSummary.last.label}${interactiveSummary.last.shardReward ? ` +${interactiveSummary.last.shardReward}碎片` : ""}`
     : "最近：暂无记录";
   const chapterCards = summary.chapters.map((chapter) => {
     const unlocked = chapter.chapterIndex === 0 || archiveState?.unlockedChapters?.includes(chapter.chapterIndex);
@@ -4780,6 +4934,38 @@ function renderEchoArchive() {
       </div>
     `;
   }).join("");
+  const interactiveCards = interactiveSummary.chapters.map((chapter) => {
+    const unlocked = chapter.chapterIndex === 0 || archiveState?.unlockedChapters?.includes(chapter.chapterIndex);
+    const labels = chapter.devices.map((device) => {
+      if (device.activated) {
+        return device.label;
+      }
+      return unlocked ? "未启动" : "锁定";
+    }).join(" / ");
+    const className = [
+      "echo-chapter",
+      "is-device",
+      chapter.complete ? "is-complete" : "",
+      unlocked ? "" : "is-locked",
+    ].filter(Boolean).join(" ");
+    const rewardText = chapter.total <= 0
+      ? "本章暂无装置"
+      : chapter.rewardClaimed
+        ? "奖励已归档"
+        : chapter.complete
+          ? `可归档 +${getMapInteractiveChapterReward(chapter.chapterIndex)}碎片`
+          : `启动 +${getMapInteractiveChapterReward(chapter.chapterIndex)}碎片`;
+    return `
+      <div class="${className}">
+        <div class="echo-chapter-top">
+          <span>${chapter.title}</span>
+          <strong>${chapter.activated}/${chapter.total}</strong>
+        </div>
+        <p>${labels || "暂无装置"}</p>
+        <em>${rewardText}</em>
+      </div>
+    `;
+  }).join("");
 
   ui.echoArchive.innerHTML = `
     <section class="echo-archive-section">
@@ -4803,6 +4989,17 @@ function renderEchoArchive() {
       </div>
       <div class="echo-archive-last">${cacheLast}</div>
       <div class="echo-archive-grid">${cacheCards}</div>
+    </section>
+    <section class="echo-archive-section">
+      <div class="echo-archive-head is-device">
+        <div>
+          <p class="event-kicker">装置档案</p>
+          <h3>章节策略开关</h3>
+        </div>
+        <strong>${interactiveSummary.activated}/${interactiveSummary.total}</strong>
+      </div>
+      <div class="echo-archive-last">${interactiveLast}</div>
+      <div class="echo-archive-grid">${interactiveCards}</div>
     </section>
   `;
 }
@@ -4846,6 +5043,7 @@ function renderStartMenu() {
   const bestChapter = Math.min(archiveState.bestChapter ?? 1, chapters.length);
   const echoSummary = getEchoArchiveSummary();
   const cacheSummary = getMapCacheArchiveSummary();
+  const interactiveSummary = getMapInteractiveArchiveSummary();
   const lastReview = normalizeLastRunReview(archiveState.lastRunReview);
   ui.startSummary.textContent = runSave
     ? `检测到 ${formatSaveTime(runSave.savedAt)} 的跑局存档：${chapters[runSave.currentChapterIndex]?.title ?? "未知章节"}，${runSave.objective ?? "继续夜巡"}。`
@@ -4863,6 +5061,7 @@ function renderStartMenu() {
     ["档案节点", `${metaProgressNodes.reduce((sum, node) => sum + getMetaLevel(node.id), 0)}/${metaProgressNodes.reduce((sum, node) => sum + node.maxLevel, 0)}`],
     ["回声档案", `${echoSummary.discovered}/${echoSummary.total}`],
     ["地标档案", `${cacheSummary.discovered}/${cacheSummary.total}`],
+    ["装置档案", `${interactiveSummary.activated}/${interactiveSummary.total}`],
     ["平台", getPlatformDisplayLabel()],
     ["存档", getStorageDisplayLabel()],
     ["爆点委托", `${archiveState.nightHookCompletions ?? 0} 次`],
@@ -7049,6 +7248,9 @@ function activateMapInteractive(device) {
 
   const activated = getActivatedMapInteractiveIds();
   activated.push(device.id);
+  if (runStats && !runStats.mapInteractivesActivated?.includes(device.id)) {
+    runStats.mapInteractivesActivated = [...(runStats.mapInteractivesActivated ?? []), device.id];
+  }
   const bugReward = Math.max(0, Math.trunc(Number(device.bugPoints) || 0));
   const xpReward = Math.max(0, Math.trunc(Number(device.xp) || 0));
   const healReward = Math.max(0, Math.trunc(Number(device.hp) || 0));
@@ -7079,6 +7281,7 @@ function activateMapInteractive(device) {
     }
   }
   const weakened = applyMapInteractiveWeaken(device);
+  const archiveReward = recordMapInteractiveInArchive(device);
 
   burst(device.x, device.y, device.color ?? "#72a5ff", 24);
   burst(player.x, player.y, "#5de2d1", 14);
@@ -7092,6 +7295,8 @@ function activateMapInteractive(device) {
     device.cooldownReset ? "闪避/脉冲冷却归零" : null,
     device.spawnPickups > 0 ? `缓存补给 x${device.spawnPickups}` : null,
     weakened > 0 ? `削弱周围实体 x${weakened}` : null,
+    archiveReward.wasNew ? `装置档案 ${archiveReward.summary.activated}/${archiveReward.summary.total}` : null,
+    archiveReward.shardReward > 0 ? `章节归档 +${archiveReward.shardReward} 校准碎片` : null,
   ].filter(Boolean).join("，");
   setLog(`${device.message ?? `互动地标启动：${device.label ?? "地图装置"}。`}${rewards ? ` ${rewards}。` : ""}`);
   syncHud();
@@ -10550,6 +10755,7 @@ function installAutomationTestHooks() {
     const discovery = getMapDiscoverySummary(map);
     const echoArchive = getEchoArchiveSummary();
     const mapCacheArchive = getMapCacheArchiveSummary();
+    const mapInteractiveArchive = getMapInteractiveArchiveSummary();
     return {
       ...extra,
       build: getBuildSummary(),
@@ -10613,6 +10819,9 @@ function installAutomationTestHooks() {
         discoveredMapCaches: mapCacheArchive.discovered,
         totalMapCaches: mapCacheArchive.total,
         completedMapCacheChapters: mapCacheArchive.completedChapters,
+        activatedMapInteractives: mapInteractiveArchive.activated,
+        totalMapInteractives: mapInteractiveArchive.total,
+        completedMapInteractiveChapters: mapInteractiveArchive.completedChapters,
       },
       nightHook: runStats?.activeHook ? {
         id: runStats.activeHook.id,
@@ -11180,11 +11389,19 @@ function installAutomationTestHooks() {
   }
 
   function runMapInteractiveProbe(chapterIndex) {
+    const previousArchive = cloneForSave(archiveState, null);
     const device = getMapInteractives()[0];
     if (!device) {
       return { ok: chapterIndex === 0, reason: "missing optional interactive" };
     }
 
+    archiveState = {
+      ...createArchiveFallback(),
+      calibrationShards: 0,
+      activatedMapInteractives: [],
+      completedMapInteractiveChapters: [],
+      lastMapInteractiveDiscovery: null,
+    };
     if (device.weakenRadius) {
       spawnEnemyNear(device.x + 44, device.y + 24, "stress", { hpMultiplier: 0.45, speedMultiplier: 0.8 });
     }
@@ -11204,9 +11421,11 @@ function installAutomationTestHooks() {
     const healReward = Math.max(0, Math.trunc(Number(device.hp) || 0));
     const backlashReward = Math.max(0, Math.trunc(Number(device.backlash) || 0));
     const pickupReward = Math.max(0, Math.trunc(Number(device.spawnPickups) || 0));
+    const expectedShardReward = getMapInteractiveChapterReward(chapterIndex);
+    const archiveSummary = getMapInteractiveArchiveSummary();
     const savedAfterInteractive = loadRunSave();
 
-    return {
+    const result = {
       ok: activated
         && player.bugPoints >= beforeBugPoints + bugReward
         && player.hp >= Math.min(player.maxHp, beforeHp + healReward)
@@ -11215,10 +11434,16 @@ function installAutomationTestHooks() {
         && (!device.invulnerable || (player.invulnerable ?? 0) >= Math.max(beforeInvulnerable, device.invulnerable))
         && (!pickupReward || bugPickups.length >= beforePickups + pickupReward)
         && (!device.weakenRadius || (runStats.enemiesDefeated ?? 0) > beforeDefeats || enemies.some((enemy) => enemy.slowTimer > 0))
+        && archiveSummary.activated === 1
+        && archiveSummary.completedChapters === 1
+        && archiveState.activatedMapInteractives.includes(device.id)
+        && archiveState.completedMapInteractiveChapters.includes(currentMap().id)
+        && archiveState.calibrationShards === expectedShardReward
         && savedAfterInteractive?.reason === "map-interactive",
       deviceId: device.id,
       label: device.label ?? null,
       sample,
+      expectedShardReward,
       beforeBugPoints,
       afterBugPoints: player.bugPoints,
       beforeHp: round(beforeHp),
@@ -11233,8 +11458,18 @@ function installAutomationTestHooks() {
       pickupsAdded: bugPickups.length - beforePickups,
       defeatsAdded: (runStats.enemiesDefeated ?? 0) - beforeDefeats,
       savedReason: savedAfterInteractive?.reason ?? null,
+      archiveSummary: {
+        activated: archiveSummary.activated,
+        total: archiveSummary.total,
+        completedChapters: archiveSummary.completedChapters,
+        calibrationShards: archiveState.calibrationShards,
+        lastMapInteractiveDiscovery: cloneForSave(archiveState.lastMapInteractiveDiscovery, null),
+      },
       activated: cloneForSave(chapterState?.mapInteractivesActivated, []),
     };
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
+    return result;
   }
 
   function startBossForChapter(chapterIndex) {

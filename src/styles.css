@@ -758,6 +758,10 @@ h1 {
   color: var(--amber);
 }
 
+.echo-archive-head.is-device strong {
+  color: var(--teal-dark);
+}
+
 .echo-archive-last {
   overflow: hidden;
   color: var(--muted);
@@ -795,6 +799,16 @@ h1 {
 .echo-chapter.is-landmark.is-complete {
   border-color: rgba(201, 132, 22, 0.34);
   background: rgba(255, 236, 181, 0.52);
+}
+
+.echo-chapter.is-device {
+  border-color: rgba(15, 159, 149, 0.2);
+  background: rgba(239, 250, 249, 0.72);
+}
+
+.echo-chapter.is-device.is-complete {
+  border-color: rgba(15, 159, 149, 0.36);
+  background: rgba(218, 246, 243, 0.64);
 }
 
 .echo-chapter.is-locked {
