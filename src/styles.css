@@ -309,6 +309,16 @@ h1 {
   background: rgba(239, 250, 249, 0.84);
 }
 
+.opening-tracker.is-surge {
+  border-color: rgba(201, 132, 22, 0.34);
+  background: rgba(255, 248, 232, 0.84);
+  box-shadow: 0 10px 28px rgba(201, 132, 22, 0.14);
+}
+
+.opening-tracker.is-surge::after {
+  background: linear-gradient(90deg, var(--amber), var(--cyan));
+}
+
 .opening-tracker.hidden,
 .hook-tracker.hidden {
   display: none;

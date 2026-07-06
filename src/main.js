@@ -1284,6 +1284,22 @@ const openingSprintSteps = [
     log: "开场牵引完成：武器、目标和补给连成一条可继续推进的路线。",
   },
 ];
+const openingSurgeConfig = {
+  id: "delivery-rift",
+  label: "快递裂隙",
+  spawnDelay: 0.65,
+  timeLimit: 28,
+  targetDefeats: 4,
+  rewardBugPoints: 1,
+  rewardHp: 5,
+  rewardXp: 4,
+  enemyPattern: [
+    { type: "deadline", dx: 230, dy: -88, hpMultiplier: 0.5, speedMultiplier: 0.82, scale: 0.84 },
+    { type: "stress", dx: 270, dy: 18, hpMultiplier: 0.46, speedMultiplier: 0.82, scale: 0.78, mechanicDepth: 1 },
+    { type: "deadline", dx: 228, dy: 104, hpMultiplier: 0.5, speedMultiplier: 0.82, scale: 0.84 },
+    { type: "stress", dx: 304, dy: -6, hpMultiplier: 0.42, speedMultiplier: 0.8, scale: 0.72, mechanicDepth: 1 },
+  ],
+};
 const starterBuilds = [
   {
     id: "precision-breakpoint",
@@ -2505,6 +2521,53 @@ function createOpeningSprintState() {
     startDefeats: runStats?.enemiesDefeated ?? 0,
     startUpgrades: runStats?.upgradesChosen?.length ?? 0,
     startTempoRewards: runStats?.tempo?.rewardsClaimed ?? 0,
+    surge: createOpeningSurgeState(),
+  };
+}
+
+function createOpeningSurgeState() {
+  return {
+    id: openingSurgeConfig.id,
+    active: currentChapterIndex === 0,
+    spawned: false,
+    completed: false,
+    failed: false,
+    elapsed: 0,
+    delayRemaining: openingSurgeConfig.spawnDelay,
+    targetDefeats: openingSurgeConfig.targetDefeats,
+    defeats: 0,
+    spawnedCount: 0,
+    x: null,
+    y: null,
+  };
+}
+
+function normalizeOpeningSurgeState(savedSurge = null) {
+  const fallback = createOpeningSurgeState();
+  if (!savedSurge || typeof savedSurge !== "object") {
+    return fallback;
+  }
+  const defeats = clamp(
+    Math.trunc(Number(savedSurge.defeats) || 0),
+    0,
+    openingSurgeConfig.targetDefeats,
+  );
+  const completed = Boolean(savedSurge.completed) || defeats >= openingSurgeConfig.targetDefeats;
+  return {
+    ...fallback,
+    ...savedSurge,
+    id: openingSurgeConfig.id,
+    active: Boolean(savedSurge.active) && !completed && !savedSurge.failed,
+    spawned: Boolean(savedSurge.spawned),
+    completed,
+    failed: Boolean(savedSurge.failed) && !completed,
+    elapsed: Math.max(0, Number(savedSurge.elapsed) || 0),
+    delayRemaining: Math.max(0, Number(savedSurge.delayRemaining) || 0),
+    targetDefeats: openingSurgeConfig.targetDefeats,
+    defeats,
+    spawnedCount: Math.max(0, Math.trunc(Number(savedSurge.spawnedCount) || 0)),
+    x: Number.isFinite(savedSurge.x) ? savedSurge.x : null,
+    y: Number.isFinite(savedSurge.y) ? savedSurge.y : null,
   };
 }
 
@@ -2534,6 +2597,7 @@ function normalizeOpeningSprintState(savedSprint = null) {
     startDefeats: Math.max(0, Math.trunc(Number(savedSprint.startDefeats) || 0)),
     startUpgrades: Math.max(0, Math.trunc(Number(savedSprint.startUpgrades) || 0)),
     startTempoRewards: Math.max(0, Math.trunc(Number(savedSprint.startTempoRewards) || 0)),
+    surge: normalizeOpeningSurgeState(savedSprint.surge),
   };
 }
 
@@ -2585,6 +2649,133 @@ function completeOpeningSprintStep(sprint, step) {
   playAudioCue(isFinal ? "upgrade-select" : "pickup");
   setLog(`${step.log} +${step.rewardBugPoints ?? 0} bug点数${step.rewardXp ? `，+${step.rewardXp} 经验` : ""}${step.rewardHp ? `，+${step.rewardHp} 生命` : ""}。`);
   saveRunCheckpoint(isFinal ? "opening-sprint-complete" : "opening-sprint-step");
+}
+
+function canSpawnOpeningSurge(sprint = runStats?.openingSprint) {
+  const surge = sprint?.surge;
+  return Boolean(sprint && surge)
+    && currentChapterIndex === 0
+    && chapterState?.stepIndex === 0
+    && world.mode === "playing"
+    && Boolean(player?.weapon)
+    && !boss
+    && sprint.active
+    && !sprint.completed
+    && surge.active
+    && !surge.spawned
+    && !surge.completed
+    && !surge.failed;
+}
+
+function spawnOpeningSurge(sprint = runStats?.openingSprint) {
+  const surge = sprint?.surge;
+  if (!canSpawnOpeningSurge(sprint)) {
+    return false;
+  }
+
+  const anchor = currentMap().stepTargets?.[0]?.[0] ?? {
+    x: player.x + 260,
+    y: player.y,
+  };
+  const center = findNearestFreePoint(
+    clamp((player.x + anchor.x) / 2 + 42, player.radius + 72, world.width - player.radius - 72),
+    clamp((player.y + anchor.y) / 2, 112, world.height - player.radius - 72),
+    64,
+  );
+  let spawnedCount = 0;
+  for (const pattern of openingSurgeConfig.enemyPattern) {
+    const point = findNearestFreePoint(center.x + pattern.dx - 260, center.y + pattern.dy, 28);
+    spawnEnemyNear(point.x, point.y, pattern.type, {
+      hpMultiplier: pattern.hpMultiplier,
+      speedMultiplier: pattern.speedMultiplier,
+      scale: pattern.scale,
+      mechanicDepth: pattern.mechanicDepth ?? 0,
+      openingSurge: true,
+    });
+    spawnedCount += 1;
+  }
+
+  surge.spawned = true;
+  surge.active = true;
+  surge.elapsed = 0;
+  surge.delayRemaining = 0;
+  surge.spawnedCount = spawnedCount;
+  surge.x = center.x;
+  surge.y = center.y;
+  world.spawnTimer = 0;
+  world.cameraShake = Math.max(world.cameraShake ?? 0, 0.12);
+  burst(center.x, center.y, "#f1c15b", 26);
+  playAudioCue("boss-phase");
+  setLog(`开场快递裂隙出现：${openingSurgeConfig.targetDefeats} 个低血量异常正在靠近，打穿它们就能立刻接上第一波爽点。`);
+  saveRunCheckpoint("opening-surge-spawn");
+  return true;
+}
+
+function completeOpeningSurge(surge = runStats?.openingSprint?.surge) {
+  if (!surge || surge.completed || surge.failed) {
+    return;
+  }
+
+  surge.completed = true;
+  surge.active = false;
+  surge.defeats = Math.max(surge.defeats ?? 0, openingSurgeConfig.targetDefeats);
+  player.bugPoints += Math.max(0, Math.trunc(Number(openingSurgeConfig.rewardBugPoints) || 0));
+  if (openingSurgeConfig.rewardHp > 0) {
+    player.hp = clamp(player.hp + openingSurgeConfig.rewardHp, 1, player.maxHp);
+  }
+  if (openingSurgeConfig.rewardXp > 0) {
+    addExperience(openingSurgeConfig.rewardXp);
+  }
+  world.spawnTimer = Math.min(world.spawnTimer ?? 0, 0.25);
+  burst(player.x, player.y, "#f1c15b", 18);
+  playAudioCue("upgrade-select");
+  setLog(`开场快递裂隙清场：+${openingSurgeConfig.rewardBugPoints} bug点数，+${openingSurgeConfig.rewardXp} 经验，第一波追击已经进入可控节奏。`);
+  saveRunCheckpoint("opening-surge-complete");
+}
+
+function registerOpeningSurgeDefeat(enemy) {
+  const surge = runStats?.openingSprint?.surge;
+  if (!enemy?.openingSurge || !surge || !surge.spawned || surge.completed || surge.failed) {
+    return;
+  }
+
+  surge.defeats = clamp((surge.defeats ?? 0) + 1, 0, openingSurgeConfig.targetDefeats);
+  if (surge.defeats >= openingSurgeConfig.targetDefeats) {
+    completeOpeningSurge(surge);
+  }
+}
+
+function updateOpeningSurge(dt = 0) {
+  const sprint = runStats?.openingSprint;
+  const surge = sprint?.surge;
+  if (!sprint || !surge || sprint.completed || !sprint.active || currentChapterIndex !== 0 || world.mode !== "playing") {
+    return;
+  }
+
+  if (!surge.spawned) {
+    surge.delayRemaining = Math.max(0, (surge.delayRemaining ?? 0) - Math.max(0, dt));
+    if (surge.delayRemaining <= 0) {
+      spawnOpeningSurge(sprint);
+    }
+    return;
+  }
+
+  if (surge.completed || surge.failed) {
+    return;
+  }
+
+  surge.elapsed = Math.max(0, (surge.elapsed ?? 0) + Math.max(0, dt));
+  if ((surge.defeats ?? 0) >= openingSurgeConfig.targetDefeats) {
+    completeOpeningSurge(surge);
+    return;
+  }
+
+  if (surge.elapsed > openingSurgeConfig.timeLimit) {
+    surge.failed = true;
+    surge.active = false;
+    setLog("开场快递裂隙超时散开，但夜巡路线仍可继续：先处理最近的异常信标。");
+    saveRunCheckpoint("opening-surge-timeout");
+  }
 }
 
 function updateOpeningSprint(dt = 0) {
@@ -3583,6 +3774,7 @@ function spawnEnemyNear(x, y, type = "stress", overrides = {}) {
     trailTimer: random(0.1, 0.42),
     phaseAlpha: 0,
     scanPulse: 0,
+    openingSurge: Boolean(overrides.openingSurge),
     animPhase: random(0, Math.PI * 2),
     hitFlash: 0,
     slowTimer: 0,
@@ -4800,16 +4992,23 @@ function renderOpeningSprintTracker() {
   const rewardText = sprint.completed
     ? "开场目标链完成"
     : `${progress.value}/${progress.target} · 奖励 +${step.rewardBugPoints ?? 0} bug点数`;
+  const surge = sprint.surge;
+  const surgeText = surge?.spawned && !surge.completed && !surge.failed
+    ? `${openingSurgeConfig.label} ${surge.defeats ?? 0}/${openingSurgeConfig.targetDefeats} · ${formatHookTime(openingSurgeConfig.timeLimit - (surge.elapsed ?? 0))}`
+    : surge?.completed
+      ? `${openingSurgeConfig.label}已清场 · 第一波提速`
+      : null;
 
   ui.openingTracker.style.setProperty("--opening-progress", `${Math.round(totalProgress * 100)}%`);
   ui.openingTracker.className = [
     "opening-tracker",
     sprint.completed ? "is-completed" : "",
+    surge?.spawned && !surge.completed && !surge.failed ? "is-surge" : "",
   ].filter(Boolean).join(" ");
   ui.openingTracker.innerHTML = `
     <span>开场牵引</span>
     <strong>${sprint.completed ? "第一条路线已接通" : step.title}</strong>
-    <small>${rewardText}</small>
+    <small>${surgeText ?? rewardText}</small>
   `;
 }
 
@@ -5000,6 +5199,7 @@ function updatePlaying(dt) {
   updateNightHook(dt);
   updateCombatTempo(dt);
   updateStarterIgnition(dt);
+  updateOpeningSurge(dt);
   updateOpeningSprint(dt);
   if (world.mode !== "playing") {
     return;
@@ -5419,6 +5619,7 @@ function defeatEnemy(enemy, particleCount, deferredSpawns = null) {
   runStats.enemiesDefeated += 1;
   updateNightHook(0);
   registerCombatTempoHit(enemy);
+  registerOpeningSurgeDefeat(enemy);
   evaluateRunAchievements("enemy_defeated");
   burst(enemy.x, enemy.y, enemy.deathColor, particleCount);
   playAudioCue("enemy-down");
@@ -10204,6 +10405,7 @@ function installAutomationTestHooks() {
         completed: Boolean(runStats.openingSprint.completed),
         stepIndex: runStats.openingSprint.stepIndex,
         completedStepIds: cloneForSave(runStats.openingSprint.completedStepIds, []),
+        surge: cloneForSave(runStats.openingSprint.surge, null),
       } : null,
       counts: {
         bugNodes: bugNodes?.length ?? 0,
@@ -10417,6 +10619,50 @@ function installAutomationTestHooks() {
         bugPoints: player.bugPoints - startBugPoints,
         hp: round(player.hp - startHp),
         savedReason: savedAfterSprint?.reason ?? null,
+      },
+    };
+    deleteRunSave();
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
+    return result;
+  }
+
+  function runOpeningSurgeProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 74, xp: 0, weaponIndex: 1 });
+    runStats.openingSprint = createOpeningSprintState();
+    runStats.openingSprint.surge.delayRemaining = 0;
+    player.xp = 0;
+    player.xpToNext = 99;
+    world.mode = "playing";
+
+    const startBugPoints = player.bugPoints;
+    const startHp = player.hp;
+    const startXp = player.xp;
+    updateOpeningSurge(0.8);
+    const spawned = enemies.filter((enemy) => enemy.openingSurge);
+    for (const enemy of spawned.slice(0, openingSurgeConfig.targetDefeats)) {
+      enemy.hp = 0;
+    }
+    clearDefeatedHostiles();
+    updateOpeningSurge(0.1);
+    const surge = runStats.openingSprint?.surge;
+    const savedAfterSurge = loadRunSave();
+    const result = {
+      ok: spawned.length >= openingSurgeConfig.targetDefeats
+        && Boolean(surge?.completed)
+        && (surge?.defeats ?? 0) >= openingSurgeConfig.targetDefeats
+        && player.bugPoints >= startBugPoints + openingSurgeConfig.rewardBugPoints
+        && player.hp >= Math.min(player.maxHp, startHp + openingSurgeConfig.rewardHp)
+        && player.xp >= startXp + openingSurgeConfig.rewardXp
+        && savedAfterSurge?.reason === "opening-surge-complete",
+      spawnedCount: spawned.length,
+      surge: cloneForSave(surge, null),
+      reward: {
+        bugPoints: player.bugPoints - startBugPoints,
+        hp: round(player.hp - startHp),
+        xp: player.xp - startXp,
+        savedReason: savedAfterSurge?.reason ?? null,
       },
     };
     deleteRunSave();
@@ -10754,6 +11000,7 @@ function installAutomationTestHooks() {
     const combatTempo = runCombatTempoProbe();
     const echoArchive = runEchoArchiveProbe();
     const openingSprint = runOpeningSprintProbe();
+    const openingSurge = runOpeningSurgeProbe();
     const resultReview = runResultReviewProbe();
     const starterBuild = runStarterBuildProbe();
 
@@ -10771,6 +11018,9 @@ function installAutomationTestHooks() {
     }
     if (!openingSprint.ok) {
       failures.push("opening sprint guidance failed");
+    }
+    if (!openingSurge.ok) {
+      failures.push("opening surge first wave failed");
     }
     if (!resultReview.ok) {
       failures.push("result review recommendation failed");
@@ -10852,6 +11102,7 @@ function installAutomationTestHooks() {
       combatTempo,
       echoArchive,
       openingSprint,
+      openingSurge,
       resultReview,
       starterBuild,
       chapters: chaptersCovered,
@@ -10870,6 +11121,7 @@ function installAutomationTestHooks() {
     runCombatTempoProbe,
     runEchoArchiveProbe,
     runOpeningSprintProbe,
+    runOpeningSurgeProbe,
     runResultReviewProbe,
     runStarterBuildProbe,
     runRoutePressureTest,
