@@ -24,6 +24,7 @@ const ui = {
   resonance: document.querySelector("#resonanceValue"),
   defeat: document.querySelector("#defeatValue"),
   hookTracker: document.querySelector("#hookTracker"),
+  tempoTracker: document.querySelector("#tempoTracker"),
   storyPanel: document.querySelector("#storyPanel"),
   storySpeaker: document.querySelector("#storySpeaker"),
   storyTitle: document.querySelector("#storyTitle"),
@@ -318,6 +319,15 @@ const nightwatchHooks = [
     failLog: "今晚委托失败：白箱暂时归档了反例，但最终提交仍然有效。",
   },
 ];
+
+const combatTempoConfig = {
+  window: 4.2,
+  rewardEvery: 5,
+  maxRewardsPerRun: 12,
+  bugPointReward: 1,
+  healReward: 4,
+  pickupXpReward: 2,
+};
 
 let player;
 let bugNodes;
@@ -1459,6 +1469,7 @@ function createRunStats() {
     damageTaken: 0,
     distanceTraveled: 0,
     activeHook: null,
+    tempo: createCombatTempoState(),
     highestLevel: 1,
     bestChapterReached: 0,
   };
@@ -1478,6 +1489,7 @@ function createArchiveFallback() {
     totalCalibrationEarned: 0,
     completedNightHooks: [],
     nightHookCompletions: 0,
+    bestTempoStreak: 0,
     metaUpgrades: Object.fromEntries(metaProgressNodes.map((node) => [node.id, 0])),
     lastRunShardGain: null,
   };
@@ -1529,6 +1541,7 @@ function loadArchive() {
       normalized.completedNightHooks.length,
       Math.trunc(Number(normalized.nightHookCompletions) || 0),
     );
+    normalized.bestTempoStreak = Math.max(0, Math.trunc(Number(normalized.bestTempoStreak) || 0));
     if (!normalized.unlockedChapters.includes(0)) {
       normalized.unlockedChapters.unshift(0);
     }
@@ -1818,6 +1831,103 @@ function getRunHookResultText() {
   return getNightHookProgressText(hook, config);
 }
 
+function createCombatTempoState() {
+  return {
+    streak: 0,
+    bestStreak: 0,
+    timer: 0,
+    rewardLevel: 0,
+    rewardsClaimed: 0,
+    hotFlash: 0,
+  };
+}
+
+function normalizeCombatTempoState(savedTempo = {}) {
+  return {
+    ...createCombatTempoState(),
+    streak: Math.max(0, Math.trunc(Number(savedTempo?.streak) || 0)),
+    bestStreak: Math.max(0, Math.trunc(Number(savedTempo?.bestStreak) || 0)),
+    timer: clamp(Number(savedTempo?.timer) || 0, 0, combatTempoConfig.window),
+    rewardLevel: Math.max(0, Math.trunc(Number(savedTempo?.rewardLevel) || 0)),
+    rewardsClaimed: Math.max(0, Math.trunc(Number(savedTempo?.rewardsClaimed) || 0)),
+    hotFlash: Math.max(0, Number(savedTempo?.hotFlash) || 0),
+  };
+}
+
+function ensureCombatTempoState() {
+  if (!runStats) {
+    return null;
+  }
+  runStats.tempo = normalizeCombatTempoState(runStats.tempo);
+  return runStats.tempo;
+}
+
+function updateCombatTempo(dt = 0) {
+  const tempo = runStats?.tempo;
+  if (!tempo) {
+    return;
+  }
+  tempo.hotFlash = Math.max(0, (tempo.hotFlash ?? 0) - dt);
+  if (tempo.streak <= 0) {
+    tempo.timer = 0;
+    tempo.rewardLevel = 0;
+    return;
+  }
+  tempo.timer = Math.max(0, (tempo.timer ?? 0) - dt);
+  if (tempo.timer <= 0) {
+    tempo.streak = 0;
+    tempo.rewardLevel = 0;
+  }
+}
+
+function breakCombatTempo() {
+  const tempo = runStats?.tempo;
+  if (!tempo) {
+    return;
+  }
+  tempo.streak = 0;
+  tempo.timer = 0;
+  tempo.rewardLevel = 0;
+}
+
+function registerCombatTempoHit(enemy) {
+  const tempo = ensureCombatTempoState();
+  if (!tempo || world.mode !== "playing") {
+    return;
+  }
+  const wasActive = tempo.timer > 0 && tempo.streak > 0;
+  tempo.streak = wasActive ? tempo.streak + 1 : 1;
+  tempo.timer = combatTempoConfig.window;
+  tempo.bestStreak = Math.max(tempo.bestStreak ?? 0, tempo.streak);
+  tempo.hotFlash = 0.42;
+
+  const nextRewardLevel = Math.floor(tempo.streak / combatTempoConfig.rewardEvery);
+  const canReward = nextRewardLevel > (tempo.rewardLevel ?? 0)
+    && (tempo.rewardsClaimed ?? 0) < combatTempoConfig.maxRewardsPerRun;
+  if (!canReward) {
+    return;
+  }
+
+  tempo.rewardLevel = nextRewardLevel;
+  tempo.rewardsClaimed += 1;
+  player.bugPoints += combatTempoConfig.bugPointReward;
+  player.hp = clamp(player.hp + combatTempoConfig.healReward, 1, player.maxHp);
+  spawnBugPickup(enemy.x, enemy.y, 0, combatTempoConfig.pickupXpReward);
+  burst(enemy.x, enemy.y, "#f1c15b", 18);
+  burst(player.x, player.y, "#5de2d1", 16);
+  playAudioCue("upgrade-select");
+  setLog(`战斗节奏 x${tempo.streak}：连段补给 +${combatTempoConfig.bugPointReward} bug点数，稳住这一波。`);
+}
+
+function getCombatTempoText() {
+  const tempo = runStats?.tempo;
+  if (!tempo || tempo.streak <= 0) {
+    return "尚未点燃";
+  }
+  const next = Math.max(combatTempoConfig.rewardEvery, (Math.floor(tempo.streak / combatTempoConfig.rewardEvery) + 1) * combatTempoConfig.rewardEvery);
+  return `x${tempo.streak} · ${formatHookTime(tempo.timer)} · 下次补给 ${Math.min(tempo.streak, next)}/${next}`;
+}
+
 function getMetaProgressionBonuses(chapterIndex = 0) {
   const steadyHeart = getMetaLevel("steady-heart");
   const warmCache = getMetaLevel("warm-cache");
@@ -2022,6 +2132,7 @@ function restoreRunSave(save) {
     conceptsChosen: cloneForSave(save.runStats?.conceptsChosen, []),
     synergiesUnlocked: cloneForSave(save.runStats?.synergiesUnlocked, []),
     distanceTraveled: Math.max(0, Number(save.runStats?.distanceTraveled) || 0),
+    tempo: normalizeCombatTempoState(save.runStats?.tempo),
   };
   runStats.activeHook = normalizeNightHookState(save.runStats?.activeHook, currentChapterIndex);
   player = {
@@ -2113,6 +2224,7 @@ function recordRunEnd(victory) {
   archiveState.bestChapter = Math.max(archiveState.bestChapter ?? 1, currentChapterIndex + 1);
   archiveState.totalEnemiesDefeated = (archiveState.totalEnemiesDefeated ?? 0) + (runStats?.enemiesDefeated ?? 0);
   archiveState.totalEventsResolved = (archiveState.totalEventsResolved ?? 0) + (runStats?.eventsResolved ?? 0);
+  archiveState.bestTempoStreak = Math.max(archiveState.bestTempoStreak ?? 0, runStats?.tempo?.bestStreak ?? 0);
   archiveState.lastBuild = getBuildSummary();
   grantCalibrationShards(shardReward, victory ? "五章通关奖励" : `${currentChapter().title} 结算`);
   if (victory) {
@@ -2248,6 +2360,7 @@ function createStoreArchiveState() {
     totalCalibrationEarned: 168,
     completedNightHooks: ["delivery-save-90", "metro-fast-line"],
     nightHookCompletions: 7,
+    bestTempoStreak: 18,
     metaUpgrades: {
       "steady-heart": 3,
       "warm-cache": 2,
@@ -2273,6 +2386,15 @@ function resetStoreRun(chapterIndex = 0, options = {}) {
     conceptsChosen: ["数组", "队列", "哈希", "时间"],
     synergiesUnlocked: ["队列共鸣", "哈希共鸣"],
     damageTaken: 32,
+    tempo: {
+      ...createCombatTempoState(),
+      streak: 7,
+      bestStreak: 14,
+      timer: 3.1,
+      rewardLevel: 1,
+      rewardsClaimed: 2,
+      hotFlash: 0.28,
+    },
     highestLevel: 6 + chapterIndex,
     bestChapterReached: chapterIndex,
   };
@@ -3442,6 +3564,7 @@ function renderStartMenu() {
     ["平台", getPlatformDisplayLabel()],
     ["存档", getStorageDisplayLabel()],
     ["爆点委托", `${archiveState.nightHookCompletions ?? 0} 次`],
+    ["最佳连段", `x${archiveState.bestTempoStreak ?? 0}`],
     ["成就", `${readUnlockedAchievements().length}/${achievements.length}`],
   ];
   ui.startStats.innerHTML = "";
@@ -3537,6 +3660,33 @@ function renderNightHookTracker() {
   `;
 }
 
+function renderCombatTempoTracker() {
+  if (!ui.tempoTracker) {
+    return;
+  }
+
+  const tempo = runStats?.tempo;
+  if (!tempo || tempo.streak <= 0 || world.mode === "menu") {
+    ui.tempoTracker.className = "tempo-tracker hidden";
+    ui.tempoTracker.innerHTML = "";
+    ui.tempoTracker.style.removeProperty("--tempo-progress");
+    return;
+  }
+
+  const progress = clamp((tempo.timer ?? 0) / combatTempoConfig.window, 0, 1);
+  ui.tempoTracker.style.setProperty("--tempo-progress", `${Math.round(progress * 100)}%`);
+  ui.tempoTracker.className = [
+    "tempo-tracker",
+    tempo.streak >= combatTempoConfig.rewardEvery ? "is-hot" : "",
+    tempo.hotFlash > 0 ? "is-flashing" : "",
+  ].filter(Boolean).join(" ");
+  ui.tempoTracker.innerHTML = `
+    <span>战斗节奏</span>
+    <strong>${getCombatTempoText()}</strong>
+    <small>连续击破会补给 bug点数和少量回复</small>
+  `;
+}
+
 function openStartMenu() {
   world.mode = "menu";
   hidePanels();
@@ -3576,6 +3726,7 @@ function renderRunPanel() {
   ui.resonance.textContent = getResonanceSummary();
   ui.defeat.textContent = runStats?.enemiesDefeated ?? 0;
   renderNightHookTracker();
+  renderCombatTempoTracker();
 }
 
 function syncHud() {
@@ -3727,6 +3878,7 @@ function updatePlaying(dt) {
   updateAllyAssist(dt);
   updateBugPickups(dt);
   updateNightHook(dt);
+  updateCombatTempo(dt);
   if (world.mode !== "playing") {
     return;
   }
@@ -4144,6 +4296,7 @@ function clearDefeatedHostiles() {
 function defeatEnemy(enemy, particleCount, deferredSpawns = null) {
   runStats.enemiesDefeated += 1;
   updateNightHook(0);
+  registerCombatTempoHit(enemy);
   evaluateRunAchievements("enemy_defeated");
   burst(enemy.x, enemy.y, enemy.deathColor, particleCount);
   playAudioCue("enemy-down");
@@ -5287,6 +5440,7 @@ function damagePlayer(amount, message) {
   burst(player.x, player.y, "#ef6a70", 10);
   playAudioCue("damage", { intensity: Math.min(1.8, Math.max(0.7, amount / 16)) });
   setLog(message);
+  breakCombatTempo();
   updateNightHook(0);
   return true;
 }
@@ -5551,6 +5705,7 @@ function renderResultStats(victory) {
     ["异常", `${runStats?.eventsResolved ?? 0}`],
     ["升级", `${runStats?.upgradesChosen?.length ?? 0} / 信物 ${runStats?.relicsChosen?.length ?? 0}`],
     ["共鸣", `${runStats?.synergiesUnlocked?.length ?? 0} 次`],
+    ["最佳连段", `x${runStats?.tempo?.bestStreak ?? 0}`],
     ["耗时", `${minutes}:${String(seconds).padStart(2, "0")}`],
     ["构筑", getBuildSummary()],
     ["委托", getRunHookResultText()],
@@ -8471,6 +8626,12 @@ function installAutomationTestHooks() {
         failed: Boolean(runStats.activeHook.failed),
         progress: getNightHookProgressText(runStats.activeHook, getNightHookConfigById(runStats.activeHook.id)),
       } : null,
+      combatTempo: runStats?.tempo ? {
+        streak: runStats.tempo.streak,
+        bestStreak: runStats.tempo.bestStreak,
+        timer: round(runStats.tempo.timer),
+        rewardsClaimed: runStats.tempo.rewardsClaimed,
+      } : null,
       counts: {
         bugNodes: bugNodes?.length ?? 0,
         enemies: enemies?.length ?? 0,
@@ -8577,6 +8738,35 @@ function installAutomationTestHooks() {
     archiveState = previousArchive ?? loadArchive();
     saveArchive();
     world.mode = previousMode;
+    return result;
+  }
+
+  function runCombatTempoProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 80 });
+    runStats.tempo = createCombatTempoState();
+    const startBugPoints = player.bugPoints;
+    const startHp = player.hp;
+    const fakeEnemy = { x: player.x + 72, y: player.y, radius: 16 };
+    for (let index = 0; index < combatTempoConfig.rewardEvery; index += 1) {
+      registerCombatTempoHit(fakeEnemy);
+    }
+    const tempo = runStats.tempo;
+    const result = {
+      ok: Boolean(tempo)
+        && tempo.streak === combatTempoConfig.rewardEvery
+        && tempo.bestStreak === combatTempoConfig.rewardEvery
+        && tempo.rewardsClaimed >= 1
+        && player.bugPoints === startBugPoints + combatTempoConfig.bugPointReward
+        && player.hp === Math.min(player.maxHp, startHp + combatTempoConfig.healReward),
+      tempo: cloneForSave(tempo, null),
+      player: {
+        bugPoints: player.bugPoints,
+        hp: round(player.hp),
+      },
+    };
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
     return result;
   }
 
@@ -8691,12 +8881,16 @@ function installAutomationTestHooks() {
     const chaptersCovered = [];
     const metaProgression = runMetaProgressionProbe();
     const nightHook = runNightHookProbe();
+    const combatTempo = runCombatTempoProbe();
 
     if (!metaProgression.ok) {
       failures.push("meta progression bonuses failed");
     }
     if (!nightHook.ok) {
       failures.push("night hook completion failed");
+    }
+    if (!combatTempo.ok) {
+      failures.push("combat tempo reward failed");
     }
 
     for (let index = 0; index < chapters.length; index += 1) {
@@ -8744,6 +8938,7 @@ function installAutomationTestHooks() {
       failures,
       metaProgression,
       nightHook,
+      combatTempo,
       chapters: chaptersCovered,
       finalSnapshot: snapshot({ action: "routePressureComplete" }),
     };
@@ -8757,6 +8952,7 @@ function installAutomationTestHooks() {
     saveAndRestoreProbe,
     runMetaProgressionProbe,
     runNightHookProbe,
+    runCombatTempoProbe,
     runRoutePressureTest,
   };
 }
