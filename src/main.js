@@ -25,6 +25,7 @@ const ui = {
   defeat: document.querySelector("#defeatValue"),
   hookTracker: document.querySelector("#hookTracker"),
   tempoTracker: document.querySelector("#tempoTracker"),
+  starterTracker: document.querySelector("#starterTracker"),
   storyPanel: document.querySelector("#storyPanel"),
   storySpeaker: document.querySelector("#storySpeaker"),
   storyTitle: document.querySelector("#storyTitle"),
@@ -1191,6 +1192,14 @@ const starterBuilds = [
     tags: ["远距", "精英击穿", "低风险"],
     perkText: "开局提示：优先拿伤害、穿透和弹速强化。",
     log: "推荐流派：断点点杀流。保持距离，先打掉最快的异常实体。",
+    ignition: {
+      targetDefeats: 4,
+      timeLimit: 40,
+      rewardBugPoints: 2,
+      rewardHp: 8,
+      rewardXp: 4,
+      completeLog: "断点点杀流启动：第一批异常被干净点掉，武器开始进入手感区。",
+    },
   },
   {
     id: "queue-barrage",
@@ -1201,6 +1210,14 @@ const starterBuilds = [
     tags: ["覆盖", "连段", "新手友好"],
     perkText: "开局提示：优先拿冷却、多线程和队列共鸣。",
     log: "推荐流派：键盘弹幕流。把第一波敌人压在屏幕外，尽快点燃战斗节奏。",
+    ignition: {
+      targetDefeats: 5,
+      timeLimit: 42,
+      rewardBugPoints: 2,
+      rewardHp: 6,
+      rewardXp: 5,
+      completeLog: "键盘弹幕流启动：按键弹铺开安全区，连段补给准备接上。",
+    },
   },
   {
     id: "close-control",
@@ -1211,6 +1228,14 @@ const starterBuilds = [
     tags: ["近战", "减速", "容错"],
     perkText: "开局提示：优先拿生命、范围和核心特性过载。",
     log: "推荐流派：修正控场流。贴身绕圈，用减速把压力怪拆开。",
+    ignition: {
+      targetDefeats: 4,
+      timeLimit: 44,
+      rewardBugPoints: 3,
+      rewardHp: 10,
+      rewardXp: 3,
+      completeLog: "修正控场流启动：贴脸压力被压慢，下一波可以更大胆地绕。",
+    },
   },
 ];
 const bossPhaseTuning = {
@@ -1615,6 +1640,7 @@ function createRunStats() {
     activeHook: null,
     tempo: createCombatTempoState(),
     starterBuild: null,
+    starterIgnition: null,
     highestLevel: 1,
     bestChapterReached: 0,
   };
@@ -2406,6 +2432,8 @@ function restoreRunSave(save) {
     tempo: normalizeCombatTempoState(save.runStats?.tempo),
   };
   runStats.activeHook = normalizeNightHookState(save.runStats?.activeHook, currentChapterIndex);
+  runStats.starterBuild = getStarterBuildById(save.runStats?.starterBuild)?.id ?? null;
+  runStats.starterIgnition = normalizeStarterIgnitionState(save.runStats?.starterIgnition, runStats.starterBuild);
   player = {
     ...playerBase,
     ...cloneForSave(save.player, {}),
@@ -2533,6 +2561,105 @@ function getWeaponById(id) {
   return weaponDefinitions.find((weapon) => weapon.id === id) ?? null;
 }
 
+function createStarterIgnitionState(build) {
+  if (!build?.id) {
+    return null;
+  }
+  const ignition = build.ignition ?? {};
+  return {
+    id: build.id,
+    startDefeats: runStats?.enemiesDefeated ?? 0,
+    defeats: 0,
+    targetDefeats: Math.max(1, Math.trunc(Number(ignition.targetDefeats) || 4)),
+    elapsed: 0,
+    timeLimit: Math.max(12, Number(ignition.timeLimit) || 40),
+    completed: false,
+    failed: false,
+    rewardClaimed: false,
+  };
+}
+
+function normalizeStarterIgnitionState(savedIgnition, starterBuildId = null) {
+  if (!savedIgnition || typeof savedIgnition !== "object") {
+    return null;
+  }
+  const build = getStarterBuildById(savedIgnition.id) ?? getStarterBuildById(starterBuildId);
+  if (!build) {
+    return null;
+  }
+  const fallback = createStarterIgnitionState(build) ?? {};
+  return {
+    ...fallback,
+    ...savedIgnition,
+    id: build.id,
+    startDefeats: Math.max(0, Math.trunc(Number(savedIgnition.startDefeats) || 0)),
+    defeats: Math.max(0, Math.trunc(Number(savedIgnition.defeats) || 0)),
+    targetDefeats: Math.max(1, Math.trunc(Number(savedIgnition.targetDefeats ?? fallback.targetDefeats) || fallback.targetDefeats || 4)),
+    elapsed: Math.max(0, Number(savedIgnition.elapsed) || 0),
+    timeLimit: Math.max(12, Number(savedIgnition.timeLimit ?? fallback.timeLimit) || fallback.timeLimit || 40),
+    completed: Boolean(savedIgnition.completed),
+    failed: Boolean(savedIgnition.failed),
+    rewardClaimed: Boolean(savedIgnition.rewardClaimed),
+  };
+}
+
+function refreshStarterIgnitionProgress(ignition = runStats?.starterIgnition) {
+  if (!ignition || !runStats) {
+    return null;
+  }
+  const build = getStarterBuildById(ignition.id);
+  if (!build) {
+    return null;
+  }
+  ignition.defeats = Math.max(0, (runStats.enemiesDefeated ?? 0) - (ignition.startDefeats ?? 0));
+  return { ignition, build };
+}
+
+function getStarterIgnitionText(ignition = runStats?.starterIgnition) {
+  const state = refreshStarterIgnitionProgress(ignition);
+  if (!state) {
+    return "";
+  }
+  const remaining = Math.max(0, Math.ceil((state.ignition.timeLimit ?? 0) - (state.ignition.elapsed ?? 0)));
+  return `击破 ${Math.min(state.ignition.defeats, state.ignition.targetDefeats)}/${state.ignition.targetDefeats} · ${remaining}s`;
+}
+
+function completeStarterIgnition(ignition, build) {
+  if (!ignition || !build || ignition.completed || ignition.failed) {
+    return;
+  }
+  const reward = build.ignition ?? {};
+  ignition.completed = true;
+  ignition.rewardClaimed = true;
+  player.bugPoints += Math.max(0, Math.trunc(Number(reward.rewardBugPoints) || 0));
+  player.hp = clamp(player.hp + Math.max(0, Number(reward.rewardHp) || 0), 1, player.maxHp);
+  const xpReward = Math.max(0, Math.trunc(Number(reward.rewardXp) || 0));
+  if (xpReward > 0) {
+    addExperience(xpReward);
+  }
+  burst(player.x, player.y, "#f1c15b", 22);
+  burst(player.x, player.y, "#5de2d1", 18);
+  playAudioCue("upgrade-select");
+  setLog(`${reward.completeLog ?? `${build.title}启动完成。`} +${reward.rewardBugPoints ?? 0} bug点数，+${xpReward} 经验。`);
+  saveRunCheckpoint("starter-ignition-complete");
+}
+
+function updateStarterIgnition(dt = 0) {
+  const state = refreshStarterIgnitionProgress();
+  if (!state || state.ignition.completed || state.ignition.failed) {
+    return;
+  }
+  const { ignition, build } = state;
+  ignition.elapsed = Math.max(0, (ignition.elapsed ?? 0) + Math.max(0, dt));
+  if (ignition.defeats >= ignition.targetDefeats) {
+    completeStarterIgnition(ignition, build);
+    return;
+  }
+  if (ignition.elapsed > ignition.timeLimit) {
+    ignition.failed = true;
+  }
+}
+
 function startNewRun(chapterIndex = 0, options = {}) {
   playAudioCue("run-start");
   deleteRunSave();
@@ -2582,6 +2709,7 @@ function startNewRun(chapterIndex = 0, options = {}) {
     if (weapon) {
       equipWeapon(weapon);
       runStats.starterBuild = starterBuild.id;
+      runStats.starterIgnition = createStarterIgnitionState(starterBuild);
       setLog(`${starterBuild.log} ${starterBuild.perkText}`);
       saveRunCheckpoint("starter-build");
       openStory(currentChapter().opening);
@@ -4076,6 +4204,39 @@ function renderCombatTempoTracker() {
   `;
 }
 
+function renderStarterIgnitionTracker() {
+  if (!ui.starterTracker) {
+    return;
+  }
+
+  const state = refreshStarterIgnitionProgress();
+  if (!state || world.mode === "menu") {
+    ui.starterTracker.className = "starter-tracker hidden";
+    ui.starterTracker.innerHTML = "";
+    ui.starterTracker.style.removeProperty("--starter-progress");
+    return;
+  }
+
+  const { ignition, build } = state;
+  const progress = clamp((ignition.defeats ?? 0) / Math.max(1, ignition.targetDefeats ?? 1), 0, 1);
+  const stateText = ignition.completed
+    ? "启动完成 · 已发放补给"
+    : ignition.failed
+      ? "启动窗口结束"
+      : getStarterIgnitionText(ignition);
+  ui.starterTracker.style.setProperty("--starter-progress", `${Math.round(progress * 100)}%`);
+  ui.starterTracker.className = [
+    "starter-tracker",
+    ignition.completed ? "is-completed" : "",
+    ignition.failed ? "is-failed" : "",
+  ].filter(Boolean).join(" ");
+  ui.starterTracker.innerHTML = `
+    <span>流派启动</span>
+    <strong>${build.title}</strong>
+    <small>${stateText}</small>
+  `;
+}
+
 function openStartMenu() {
   world.mode = "menu";
   hidePanels();
@@ -4116,6 +4277,7 @@ function renderRunPanel() {
   ui.defeat.textContent = runStats?.enemiesDefeated ?? 0;
   renderNightHookTracker();
   renderCombatTempoTracker();
+  renderStarterIgnitionTracker();
 }
 
 function syncHud() {
@@ -4269,6 +4431,7 @@ function updatePlaying(dt) {
   checkDiscoveryEchoCollision();
   updateNightHook(dt);
   updateCombatTempo(dt);
+  updateStarterIgnition(dt);
   if (world.mode !== "playing") {
     return;
   }
@@ -9488,18 +9651,36 @@ function installAutomationTestHooks() {
     const previousArchive = cloneForSave(archiveState, null);
     const build = starterBuilds[0];
     startNewRun(build?.chapterIndex ?? 0, { starterBuildId: build?.id });
-    const saved = loadRunSave();
+    const savedBeforeIgnition = loadRunSave();
+    const startBugPoints = player.bugPoints;
+    const startHp = player.hp;
+    const ignition = runStats.starterIgnition;
+    world.mode = "playing";
+    if (ignition) {
+      runStats.enemiesDefeated += ignition.targetDefeats;
+      updateStarterIgnition(0.1);
+    }
+    const savedAfterIgnition = loadRunSave();
     const result = {
       ok: Boolean(build)
         && player.weapon?.id === build.weaponId
         && runStats.starterBuild === build.id
-        && world.mode === "story"
-        && Boolean(saved?.player?.weapon?.id === build.weaponId),
+        && Boolean(savedBeforeIgnition?.player?.weapon?.id === build.weaponId)
+        && Boolean(runStats.starterIgnition?.completed)
+        && player.bugPoints > startBugPoints
+        && player.hp >= startHp
+        && savedAfterIgnition?.reason === "starter-ignition-complete",
       buildId: build?.id ?? null,
       weaponId: player.weapon?.id ?? null,
       mode: world.mode,
-      savedReason: saved?.reason ?? null,
-      savedWeaponId: saved?.player?.weapon?.id ?? null,
+      savedReason: savedBeforeIgnition?.reason ?? null,
+      savedWeaponId: savedBeforeIgnition?.player?.weapon?.id ?? null,
+      ignition: cloneForSave(runStats.starterIgnition, null),
+      reward: {
+        bugPoints: player.bugPoints - startBugPoints,
+        hp: round(player.hp - startHp),
+        savedReason: savedAfterIgnition?.reason ?? null,
+      },
     };
     deleteRunSave();
     archiveState = previousArchive ?? loadArchive();

@@ -388,6 +388,76 @@ h1 {
   animation: tempo-pop 260ms ease-out;
 }
 
+.starter-tracker {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 9px 10px 11px;
+  border: 1px solid rgba(201, 132, 22, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 248, 232, 0.78);
+}
+
+.starter-tracker.hidden {
+  display: none;
+}
+
+.starter-tracker::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--starter-progress, 0%);
+  height: 3px;
+  background: linear-gradient(90deg, var(--amber), var(--cyan));
+  transition: width 120ms linear;
+}
+
+.starter-tracker span {
+  color: var(--amber);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.starter-tracker strong,
+.starter-tracker small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.starter-tracker strong {
+  color: var(--text);
+  font-size: 0.84rem;
+}
+
+.starter-tracker small {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.starter-tracker.is-completed {
+  border-color: rgba(15, 159, 149, 0.34);
+  background: rgba(239, 250, 249, 0.84);
+}
+
+.starter-tracker.is-completed::after {
+  background: linear-gradient(90deg, var(--cyan), var(--blue));
+}
+
+.starter-tracker.is-failed {
+  border-color: rgba(217, 79, 92, 0.28);
+  background: rgba(255, 239, 241, 0.74);
+}
+
+.starter-tracker.is-failed::after {
+  background: rgba(217, 79, 92, 0.6);
+}
+
 @keyframes tempo-pop {
   0% {
     transform: translateY(-1px) scale(1.012);
