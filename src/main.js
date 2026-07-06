@@ -1198,6 +1198,11 @@ const starterBuilds = [
       rewardBugPoints: 2,
       rewardHp: 8,
       rewardXp: 4,
+      overclockText: "精准弹加粗：伤害 +5，穿透 +1。",
+      overclock: [
+        { stat: "damage", add: 5 },
+        { stat: "pierce", add: 1, max: 4 },
+      ],
       completeLog: "断点点杀流启动：第一批异常被干净点掉，武器开始进入手感区。",
     },
   },
@@ -1216,6 +1221,11 @@ const starterBuilds = [
       rewardBugPoints: 2,
       rewardHp: 6,
       rewardXp: 5,
+      overclockText: "宏队列预热：冷却 -8%，射程 +45。",
+      overclock: [
+        { stat: "cooldown", multiply: 0.92, min: 0.08 },
+        { stat: "range", add: 45 },
+      ],
       completeLog: "键盘弹幕流启动：按键弹铺开安全区，连段补给准备接上。",
     },
   },
@@ -1234,6 +1244,11 @@ const starterBuilds = [
       rewardBugPoints: 3,
       rewardHp: 10,
       rewardXp: 3,
+      overclockText: "雾化阀门打开：射程 +55，弹体 +2。",
+      overclock: [
+        { stat: "range", add: 55 },
+        { stat: "bulletSize", add: 2, max: 14 },
+      ],
       completeLog: "修正控场流启动：贴脸压力被压慢，下一波可以更大胆地绕。",
     },
   },
@@ -2576,6 +2591,8 @@ function createStarterIgnitionState(build) {
     completed: false,
     failed: false,
     rewardClaimed: false,
+    overclockApplied: false,
+    overclockText: ignition.overclockText ?? "",
   };
 }
 
@@ -2600,6 +2617,8 @@ function normalizeStarterIgnitionState(savedIgnition, starterBuildId = null) {
     completed: Boolean(savedIgnition.completed),
     failed: Boolean(savedIgnition.failed),
     rewardClaimed: Boolean(savedIgnition.rewardClaimed),
+    overclockApplied: Boolean(savedIgnition.overclockApplied),
+    overclockText: typeof savedIgnition.overclockText === "string" ? savedIgnition.overclockText : (fallback.overclockText ?? ""),
   };
 }
 
@@ -2624,6 +2643,22 @@ function getStarterIgnitionText(ignition = runStats?.starterIgnition) {
   return `击破 ${Math.min(state.ignition.defeats, state.ignition.targetDefeats)}/${state.ignition.targetDefeats} · ${remaining}s`;
 }
 
+function applyStarterOverclock(ignition, build) {
+  if (!player.weapon || !ignition || !build || ignition.overclockApplied) {
+    return "";
+  }
+  const overclock = build.ignition?.overclock ?? [];
+  for (const upgrade of overclock) {
+    modifyWeapon(upgrade);
+  }
+  if (overclock.length > 0) {
+    player.weapon.level += 0.35;
+  }
+  ignition.overclockApplied = overclock.length > 0;
+  ignition.overclockText = build.ignition?.overclockText ?? "";
+  return ignition.overclockText;
+}
+
 function completeStarterIgnition(ignition, build) {
   if (!ignition || !build || ignition.completed || ignition.failed) {
     return;
@@ -2637,10 +2672,11 @@ function completeStarterIgnition(ignition, build) {
   if (xpReward > 0) {
     addExperience(xpReward);
   }
+  const overclockText = applyStarterOverclock(ignition, build);
   burst(player.x, player.y, "#f1c15b", 22);
   burst(player.x, player.y, "#5de2d1", 18);
   playAudioCue("upgrade-select");
-  setLog(`${reward.completeLog ?? `${build.title}启动完成。`} +${reward.rewardBugPoints ?? 0} bug点数，+${xpReward} 经验。`);
+  setLog(`${reward.completeLog ?? `${build.title}启动完成。`} ${overclockText ? `${overclockText} ` : ""}+${reward.rewardBugPoints ?? 0} bug点数，+${xpReward} 经验。`);
   saveRunCheckpoint("starter-ignition-complete");
 }
 
@@ -3768,6 +3804,10 @@ function getBuildSummary() {
   const weaponName = player?.weapon?.name ?? "未选择武器";
   const picked = runStats?.upgradesChosen ?? [];
   const relics = runStats?.relicsChosen ?? [];
+  const ignition = runStats?.starterIgnition;
+  if (ignition?.overclockApplied && picked.length === 0 && relics.length === 0) {
+    return `${weaponName} / 启动超频`;
+  }
   if (picked.length === 0 && relics.length === 0) {
     return weaponName;
   }
@@ -4220,7 +4260,7 @@ function renderStarterIgnitionTracker() {
   const { ignition, build } = state;
   const progress = clamp((ignition.defeats ?? 0) / Math.max(1, ignition.targetDefeats ?? 1), 0, 1);
   const stateText = ignition.completed
-    ? "启动完成 · 已发放补给"
+    ? `启动完成 · ${ignition.overclockText || "已发放补给"}`
     : ignition.failed
       ? "启动窗口结束"
       : getStarterIgnitionText(ignition);
@@ -9655,18 +9695,31 @@ function installAutomationTestHooks() {
     const startBugPoints = player.bugPoints;
     const startHp = player.hp;
     const ignition = runStats.starterIgnition;
+    const beforeWeapon = cloneForSave(player.weapon, {});
     world.mode = "playing";
     if (ignition) {
       runStats.enemiesDefeated += ignition.targetDefeats;
       updateStarterIgnition(0.1);
     }
     const savedAfterIgnition = loadRunSave();
+    const afterWeapon = cloneForSave(player.weapon, {});
+    const overclockApplied = Boolean(runStats.starterIgnition?.overclockApplied);
+    const overclockChanged = [
+      "damage",
+      "pierce",
+      "cooldown",
+      "range",
+      "bulletSize",
+      "projectileCount",
+    ].some((stat) => afterWeapon?.[stat] !== beforeWeapon?.[stat]);
     const result = {
       ok: Boolean(build)
         && player.weapon?.id === build.weaponId
         && runStats.starterBuild === build.id
         && Boolean(savedBeforeIgnition?.player?.weapon?.id === build.weaponId)
         && Boolean(runStats.starterIgnition?.completed)
+        && overclockApplied
+        && overclockChanged
         && player.bugPoints > startBugPoints
         && player.hp >= startHp
         && savedAfterIgnition?.reason === "starter-ignition-complete",
@@ -9680,6 +9733,24 @@ function installAutomationTestHooks() {
         bugPoints: player.bugPoints - startBugPoints,
         hp: round(player.hp - startHp),
         savedReason: savedAfterIgnition?.reason ?? null,
+      },
+      overclock: {
+        applied: overclockApplied,
+        text: runStats.starterIgnition?.overclockText ?? "",
+        before: {
+          damage: round(beforeWeapon?.damage),
+          pierce: beforeWeapon?.pierce ?? 0,
+          cooldown: round(beforeWeapon?.cooldown),
+          range: round(beforeWeapon?.range),
+          bulletSize: round(beforeWeapon?.bulletSize),
+        },
+        after: {
+          damage: round(afterWeapon?.damage),
+          pierce: afterWeapon?.pierce ?? 0,
+          cooldown: round(afterWeapon?.cooldown),
+          range: round(afterWeapon?.range),
+          bulletSize: round(afterWeapon?.bulletSize),
+        },
       },
     };
     deleteRunSave();
