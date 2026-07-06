@@ -8,6 +8,15 @@ module.exports = {
       assetKey: "chapterBadgeMetroLoop",
       title: "第二章：环线影子",
       file: "src/assets/maps/chapter-badge-metro-loop-v1.png",
+      shotTitle: "CH2 LOOPLINE SHADOW",
+      shotFocus: "Lost-frame rails, crowd slows, time-gate reset",
+      deviceLabel: "TIME GATE RESET",
+      compositionTags: ["rail chase", "slow crowd", "turnback boss"],
+      callouts: [
+        { x: 252, y: 70, label: "TIME GATE" },
+        { x: 68, y: 108, label: "LOST RAIL" },
+        { x: 222, y: 134, label: "TERMINAL" },
+      ],
       palette: {
         background: [20, 37, 55],
         primary: [114, 165, 255],
@@ -21,6 +30,15 @@ module.exports = {
       assetKey: "chapterBadgeHashMarket",
       title: "第三章：夜市哈希雨",
       file: "src/assets/maps/chapter-badge-hash-market-v1.png",
+      shotTitle: "CH3 HASH RAIN MARKET",
+      shotFocus: "Salt rain, duplicate stalls, cache-burst lantern",
+      deviceLabel: "SALT LANTERN BURST",
+      compositionTags: ["salt rain", "duplicate codes", "cache burst"],
+      callouts: [
+        { x: 128, y: 44, label: "SALT RAIN" },
+        { x: 78, y: 132, label: "STALL LOOP" },
+        { x: 238, y: 80, label: "LANTERN" },
+      ],
       palette: {
         background: [44, 31, 45],
         primary: [247, 180, 216],
@@ -34,6 +52,15 @@ module.exports = {
       assetKey: "chapterBadgePromiseTower",
       title: "第四章：承诺塔递归",
       file: "src/assets/maps/chapter-badge-promise-tower-v1.png",
+      shotTitle: "CH4 PROMISE ROOT TOWER",
+      shotFocus: "Branch lanes, recursion pools, safety relay",
+      deviceLabel: "BRANCH RELAY WINDOW",
+      compositionTags: ["root lanes", "weak window", "debt stack"],
+      callouts: [
+        { x: 164, y: 56, label: "ROOT HUB" },
+        { x: 68, y: 88, label: "RECURSION" },
+        { x: 268, y: 46, label: "RELAY" },
+      ],
       palette: {
         background: [30, 35, 61],
         primary: [151, 126, 255],
@@ -47,6 +74,15 @@ module.exports = {
       assetKey: "chapterBadgeWhiteboxCore",
       title: "第五章：白箱之外",
       file: "src/assets/maps/chapter-badge-whitebox-core-v1.png",
+      shotTitle: "CH5 WHITEBOX CORE",
+      shotFocus: "Scan lanes, diff console, final rule reveal",
+      deviceLabel: "DIFF CONSOLE REVEAL",
+      compositionTags: ["scan lanes", "diff console", "final rule"],
+      callouts: [
+        { x: 162, y: 86, label: "CORE" },
+        { x: 64, y: 58, label: "SCAN LANE" },
+        { x: 248, y: 116, label: "DIFF" },
+      ],
       palette: {
         background: [230, 235, 242],
         primary: [72, 94, 122],

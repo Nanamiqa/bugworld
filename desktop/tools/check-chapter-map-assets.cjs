@@ -27,6 +27,27 @@ function readPngSize(relativePath) {
 }
 
 for (const map of maps) {
+  for (const field of ["shotTitle", "shotFocus", "deviceLabel"]) {
+    if (typeof map[field] !== "string" || map[field].trim().length < 8) {
+      errors.push(`${map.id} is missing a useful ${field}`);
+    }
+  }
+  if (!Array.isArray(map.compositionTags) || map.compositionTags.length < 3) {
+    errors.push(`${map.id} needs at least 3 compositionTags for screenshot planning`);
+  }
+  if (!Array.isArray(map.callouts) || map.callouts.length < 3) {
+    errors.push(`${map.id} needs at least 3 map callouts`);
+  } else {
+    for (const callout of map.callouts) {
+      if (typeof callout.label !== "string" || callout.label.trim().length < 3) {
+        errors.push(`${map.id} has an unnamed callout`);
+      }
+      if (typeof callout.x !== "number" || typeof callout.y !== "number") {
+        errors.push(`${map.id} callout ${callout.label ?? "unknown"} needs numeric coordinates`);
+      }
+    }
+  }
+
   const dimensions = readPngSize(map.file);
   if (dimensions) {
     if (dimensions.width !== badgeSize.width || dimensions.height !== badgeSize.height) {
