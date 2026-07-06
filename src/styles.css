@@ -722,6 +722,17 @@ h1 {
   justify-content: space-between;
 }
 
+.echo-archive-section {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.echo-archive-section + .echo-archive-section {
+  padding-top: 10px;
+  border-top: 1px solid rgba(26, 42, 68, 0.1);
+}
+
 .echo-archive-head h3 {
   margin: 2px 0 0;
   font-size: 1rem;
@@ -731,6 +742,10 @@ h1 {
   flex: 0 0 auto;
   color: var(--blue);
   font-size: 0.94rem;
+}
+
+.echo-archive-head.is-landmark strong {
+  color: var(--amber);
 }
 
 .echo-archive-last {
@@ -760,6 +775,16 @@ h1 {
 .echo-chapter.is-complete {
   border-color: rgba(15, 159, 149, 0.34);
   background: rgba(15, 159, 149, 0.09);
+}
+
+.echo-chapter.is-landmark {
+  border-color: rgba(201, 132, 22, 0.18);
+  background: rgba(255, 248, 232, 0.72);
+}
+
+.echo-chapter.is-landmark.is-complete {
+  border-color: rgba(201, 132, 22, 0.34);
+  background: rgba(255, 236, 181, 0.52);
 }
 
 .echo-chapter.is-locked {
