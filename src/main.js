@@ -5799,6 +5799,7 @@ function drawOffice() {
   drawMapZones(map, visual);
   drawChapterBackdrop(visual);
   drawMapDecorations(map, visual);
+  drawMapDiscoveryLayer(map, visual);
 
   ctx.fillStyle = visual.wall;
   ctx.fillRect(0, 0, world.width, 68);
@@ -5888,6 +5889,168 @@ function drawMapZones(map, visual) {
     drawSmallText(zone.label, zone.x + 12, zone.y + 24, "#26364d", 13);
     ctx.restore();
   }
+}
+
+function getMapDiscoverySummary(map = currentMap()) {
+  const taskMarkers = [];
+  for (const [stepKey, targets] of Object.entries(map.stepTargets ?? {})) {
+    const stepIndex = Number(stepKey);
+    for (const target of targets ?? []) {
+      const event = getEventById(target.eventId);
+      taskMarkers.push({
+        ...target,
+        stepIndex,
+        color: event?.color ?? target.color ?? visualColorFallback(stepIndex),
+        title: event?.title ?? "异常信标",
+      });
+    }
+  }
+
+  return {
+    taskMarkers,
+    hazardSignals: (map.zones ?? []).filter((zone) => ["hazard", "backlash", "slow", "focus"].includes(zone.type)).length,
+    landmarkMarkers: [map.start, map.bossSpawn].filter(Boolean).length,
+  };
+}
+
+function visualColorFallback(index = 0) {
+  return ["#5de2d1", "#72a5ff", "#f1c15b", "#96e072", "#ef6a70"][Math.abs(index) % 5];
+}
+
+function getTaskMarkerState(stepIndex) {
+  const currentStep = chapterState?.stepIndex ?? -1;
+  if (chapterState?.finished || stepIndex < currentStep) {
+    return "cleared";
+  }
+  if (stepIndex === currentStep) {
+    return "active";
+  }
+  if (stepIndex === currentStep + 1 || (currentStep < 0 && stepIndex === 0)) {
+    return "next";
+  }
+  return "locked";
+}
+
+function drawMapDiscoveryLayer(map, visual) {
+  drawMapLandmarkSeal(map.start, "起点", visual.accent, "SAFE");
+
+  for (const zone of map.zones ?? []) {
+    drawZoneSignal(zone, visual);
+  }
+
+  const { taskMarkers } = getMapDiscoverySummary(map);
+  for (const marker of taskMarkers) {
+    drawTaskBeacon(marker, visual);
+  }
+
+  if (map.bossSpawn) {
+    drawMapLandmarkSeal(map.bossSpawn, "Boss 区", "#ef6a70", "BOSS");
+  }
+}
+
+function drawMapLandmarkSeal(point, label, color, code) {
+  if (!point) {
+    return;
+  }
+  const pulse = 1 + Math.sin(world.animTime * 2.4 + point.x * 0.01) * 0.08;
+  ctx.save();
+  ctx.globalAlpha = 0.16;
+  fillCircle(point.x, point.y, 58 * pulse, color);
+  ctx.globalAlpha = 0.48;
+  strokeCircle(point.x, point.y, 44 * pulse, color, 3);
+  ctx.globalAlpha = 0.88;
+  ctx.fillStyle = "rgba(255, 255, 255, 0.82)";
+  ctx.fillRect(point.x - 38, point.y - 12, 76, 24);
+  ctx.strokeStyle = color;
+  ctx.strokeRect(point.x - 38, point.y - 12, 76, 24);
+  drawSmallText(code, point.x - 19, point.y + 5, color, 13);
+  drawMarkerTag(label, point.x, point.y + 46, color);
+  ctx.restore();
+}
+
+function drawZoneSignal(zone, visual) {
+  const color = zone.color ?? visual.accent;
+  const centerX = zone.x + zone.w / 2;
+  const centerY = zone.y + zone.h / 2;
+  const label = zone.type === "hazard"
+    ? "危险"
+    : zone.type === "backlash"
+      ? (zone.backlashPerSecond < 0 ? "净化" : "反噬")
+      : zone.type === "slow"
+        ? "慢行"
+        : "线索";
+  const alpha = zone.type === "hazard" ? 0.92 : 0.66;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const corners = [
+    { x: zone.x + 18, y: zone.y + 18, angle: -Math.PI / 4 },
+    { x: zone.x + zone.w - 18, y: zone.y + 18, angle: Math.PI / 4 },
+    { x: zone.x + zone.w - 18, y: zone.y + zone.h - 18, angle: (Math.PI * 3) / 4 },
+    { x: zone.x + 18, y: zone.y + zone.h - 18, angle: (-Math.PI * 3) / 4 },
+  ];
+  for (const corner of corners) {
+    drawSignalChevron(corner.x, corner.y, corner.angle, color, zone.type === "hazard" ? 18 : 12);
+  }
+  ctx.globalAlpha = zone.type === "hazard" ? 0.9 : 0.72;
+  drawMarkerTag(`${label} · ${zone.label}`, centerX, centerY, color);
+  ctx.restore();
+}
+
+function drawSignalChevron(x, y, angle, color, size = 14) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-size, -size * 0.55);
+  ctx.lineTo(0, 0);
+  ctx.lineTo(-size, size * 0.55);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawTaskBeacon(marker, visual) {
+  const state = getTaskMarkerState(marker.stepIndex);
+  const color = state === "cleared" ? "#0f9f95" : state === "locked" ? "rgba(92, 104, 120, 0.62)" : marker.color ?? visual.accent;
+  const pulse = 1 + Math.sin(world.animTime * 4.2 + marker.x * 0.01) * (state === "active" ? 0.16 : 0.08);
+  const ring = state === "active" ? 42 : state === "next" ? 34 : 26;
+  const status = {
+    active: "当前",
+    next: "下一处",
+    cleared: "稳定",
+    locked: "未巡",
+  }[state] ?? "目标";
+
+  ctx.save();
+  ctx.globalAlpha = state === "locked" ? 0.38 : state === "cleared" ? 0.52 : 0.86;
+  strokeCircle(marker.x, marker.y, ring * pulse, color, state === "active" ? 4 : 2.5);
+  ctx.globalAlpha *= 0.5;
+  fillCircle(marker.x, marker.y, 18, color);
+  ctx.globalAlpha = state === "active" ? 0.92 : 0.72;
+  drawSmallText(String(marker.stepIndex + 1), marker.x - 4, marker.y + 5, "#ffffff", 14);
+  drawMarkerTag(`${status} · ${shortenText(marker.title, 9)}`, marker.x, marker.y - ring - 12, color);
+  ctx.restore();
+}
+
+function shortenText(text = "", maxLength = 8) {
+  return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
+}
+
+function drawMarkerTag(text, x, y, color) {
+  const safeText = String(text ?? "");
+  ctx.save();
+  ctx.font = "12px Microsoft YaHei, Segoe UI, sans-serif";
+  const width = Math.min(190, ctx.measureText(safeText).width + 18);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.84)";
+  ctx.fillRect(x - width / 2, y - 14, width, 22);
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.86;
+  ctx.strokeRect(x - width / 2, y - 14, width, 22);
+  ctx.globalAlpha = 1;
+  drawSmallText(safeText, x - width / 2 + 9, y + 2, "#26364d", 12);
+  ctx.restore();
 }
 
 function drawMapObjects(map, visual) {
@@ -8574,6 +8737,7 @@ function installAutomationTestHooks() {
 
   function snapshot(extra = {}) {
     const map = currentMap() ?? {};
+    const discovery = getMapDiscoverySummary(map);
     return {
       ...extra,
       build: getBuildSummary(),
@@ -8592,6 +8756,9 @@ function installAutomationTestHooks() {
         largerThanView: world.width > world.viewWidth || world.height > world.viewHeight,
         obstacleCount: (map.obstacles ?? desks).length,
         zoneCount: (map.zones ?? []).length,
+        taskMarkerCount: discovery.taskMarkers.length,
+        hazardSignalCount: discovery.hazardSignals,
+        landmarkMarkerCount: discovery.landmarkMarkers,
       },
       mode: world.mode,
       objective: getCurrentObjectiveText(),
@@ -8908,6 +9075,15 @@ function installAutomationTestHooks() {
       }
       if (routeSamples.length < 3) {
         failures.push(`Chapter ${index + 1} has too few route samples`);
+      }
+      if (entry.map.taskMarkerCount < 4) {
+        failures.push(`Chapter ${index + 1} has too few discovery task markers`);
+      }
+      if (entry.map.hazardSignalCount < 2) {
+        failures.push(`Chapter ${index + 1} has too few zone warning markers`);
+      }
+      if (entry.map.landmarkMarkerCount < 2) {
+        failures.push(`Chapter ${index + 1} is missing start or boss landmark markers`);
       }
       if (badRoute.length > 0) {
         failures.push(`Chapter ${index + 1} has blocked route sample: ${badRoute[0].label}`);
