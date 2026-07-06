@@ -76,6 +76,7 @@ const ui = {
   resultTitle: document.querySelector("#resultTitle"),
   resultText: document.querySelector("#resultText"),
   resultStats: document.querySelector("#resultStats"),
+  resultInsights: document.querySelector("#resultInsights"),
   restartButton: document.querySelector("#restartButton"),
 };
 
@@ -126,7 +127,7 @@ const ARCHIVE_STORAGE_KEY = "variableCityArchive";
 const RUN_SAVE_STORAGE_KEY = "variableCityRunSave";
 const SETTINGS_STORAGE_KEY = "variableCitySettings";
 const ACHIEVEMENT_STORAGE_KEY = "variableCityAchievements";
-const ARCHIVE_VERSION = 3;
+const ARCHIVE_VERSION = 4;
 const RUN_SAVE_VERSION = 2;
 const achievements = window.variableCityAchievementCatalog ?? [];
 const urlParams = new URLSearchParams(window.location.search);
@@ -356,6 +357,7 @@ let gamepadState;
 let audioSystem;
 let lastInputMethod = "keyboard";
 let metaUnlockPulseNodeId = null;
+let resultRetryStarterBuildId = null;
 
 const desks = [
   { x: 84, y: 104, w: 136, h: 54, tag: "Q3报表", assetKey: "propWorkstationA" },
@@ -1712,6 +1714,7 @@ function createArchiveFallback() {
     lastEchoDiscovery: null,
     metaUpgrades: Object.fromEntries(metaProgressNodes.map((node) => [node.id, 0])),
     lastRunShardGain: null,
+    lastRunReview: null,
   };
 }
 
@@ -1771,6 +1774,25 @@ function normalizeLastRunShardGain(value) {
   };
 }
 
+function normalizeLastRunReview(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const build = getStarterBuildById(value.recommendedStarterBuildId) ?? starterBuilds[0] ?? null;
+  return {
+    outcome: value.outcome === "victory" ? "victory" : "defeat",
+    chapterTitle: typeof value.chapterTitle === "string" ? value.chapterTitle : "未知章节",
+    highlightTitle: typeof value.highlightTitle === "string" ? value.highlightTitle : "本局亮点",
+    highlightText: typeof value.highlightText === "string" ? value.highlightText : "已经推进了一段路线。",
+    pressureTitle: typeof value.pressureTitle === "string" ? value.pressureTitle : "下次注意",
+    pressureText: typeof value.pressureText === "string" ? value.pressureText : "保持移动，先追最近的目标信标。",
+    nextTitle: typeof value.nextTitle === "string" ? value.nextTitle : "下一把建议",
+    nextText: typeof value.nextText === "string" ? value.nextText : "用推荐流派更快进入第一波爽点。",
+    recommendedStarterBuildId: build?.id ?? null,
+    at: Number(value.at) || Date.now(),
+  };
+}
+
 function loadArchive() {
   const fallback = createArchiveFallback();
   try {
@@ -1784,6 +1806,7 @@ function loadArchive() {
       unlockedChapters: Array.isArray(saved.unlockedChapters) ? saved.unlockedChapters : fallback.unlockedChapters,
       metaUpgrades: normalizeMetaUpgrades(saved.metaUpgrades),
       lastRunShardGain: normalizeLastRunShardGain(saved.lastRunShardGain),
+      lastRunReview: normalizeLastRunReview(saved.lastRunReview),
       completedNightHooks: Array.isArray(saved.completedNightHooks) ? [...new Set(saved.completedNightHooks)] : fallback.completedNightHooks,
       discoveredEchoes: normalizeEchoIds(saved.discoveredEchoes),
       completedEchoChapters: normalizeEchoChapterIds(saved.completedEchoChapters),
@@ -2677,6 +2700,72 @@ function recordChapterProgress(clearedChapterIndex) {
   saveArchive();
 }
 
+function chooseReviewStarterBuild(victory) {
+  if (victory) {
+    return getStarterBuildById("precision-breakpoint") ?? starterBuilds[0] ?? null;
+  }
+  if ((runStats?.damageTaken ?? 0) >= 110 || player.hp <= Math.ceil(player.maxHp * 0.34)) {
+    return getStarterBuildById("close-control") ?? starterBuilds[0] ?? null;
+  }
+  if ((runStats?.tempo?.bestStreak ?? 0) < combatTempoConfig.rewardEvery) {
+    return getStarterBuildById("queue-barrage") ?? starterBuilds[0] ?? null;
+  }
+  return getStarterBuildById("precision-breakpoint") ?? starterBuilds[0] ?? null;
+}
+
+function createRunReview(victory) {
+  const bestStreak = runStats?.tempo?.bestStreak ?? 0;
+  const eventsResolved = runStats?.eventsResolved ?? 0;
+  const defeats = runStats?.enemiesDefeated ?? 0;
+  const openingComplete = Boolean(runStats?.openingSprint?.completed);
+  const starterComplete = Boolean(runStats?.starterIgnition?.completed);
+  const build = chooseReviewStarterBuild(victory);
+  const weapon = getWeaponById(build?.weaponId);
+
+  let highlightTitle = "第一条路线已接通";
+  let highlightText = openingComplete
+    ? "开场牵引链完整完成，玩家已经经历了目标、击破和构筑成型。"
+    : `本局处理 ${eventsResolved} 个异常、击破 ${defeats} 个实体，已经留下局外收益。`;
+  if (starterComplete) {
+    highlightTitle = "流派已经起火";
+    highlightText = "推荐流派完成启动超频，下一把可以直接围绕它拿强化。";
+  } else if (bestStreak >= combatTempoConfig.rewardEvery) {
+    highlightTitle = `连段 x${bestStreak}`;
+    highlightText = "战斗节奏已经点亮，保持移动就能把补给滚起来。";
+  }
+
+  let pressureTitle = "先追最近信标";
+  let pressureText = "下一把优先跟着右侧目标和地图指针走，别在开场走廊里被刷怪拖住。";
+  if ((runStats?.damageTaken ?? 0) >= 110) {
+    pressureTitle = "伤害吃得偏多";
+    pressureText = "把闪避留给红色危险区和冲刺怪，先用控场流换更多容错。";
+  } else if (bestStreak < combatTempoConfig.rewardEvery) {
+    pressureTitle = "连段还没滚起来";
+    pressureText = `尽量把击破间隔压进 ${combatTempoConfig.window.toFixed(1)} 秒窗口，先吃到第一份连段补给。`;
+  } else if (!starterComplete) {
+    pressureTitle = "构筑差一步成型";
+    pressureText = "按推荐流派目标打完第一波，武器会获得一次明显超频。";
+  }
+
+  const nextTitle = victory ? "挑战低伤通关" : `推荐再来：${build?.title ?? "推荐流派"}`;
+  const nextText = victory
+    ? "已经通关，下一把可以追低伤成就和未收集回声。"
+    : `${weapon?.name ?? "初始武器"}开局，目标是更快完成开场牵引和第一次超频。`;
+
+  return {
+    outcome: victory ? "victory" : "defeat",
+    chapterTitle: currentChapter().title,
+    highlightTitle,
+    highlightText,
+    pressureTitle,
+    pressureText,
+    nextTitle,
+    nextText,
+    recommendedStarterBuildId: build?.id ?? null,
+    at: Date.now(),
+  };
+}
+
 function recordRunEnd(victory) {
   deleteRunSave();
   const shardReward = calculateRunShardReward(victory);
@@ -2687,6 +2776,7 @@ function recordRunEnd(victory) {
   archiveState.totalEventsResolved = (archiveState.totalEventsResolved ?? 0) + (runStats?.eventsResolved ?? 0);
   archiveState.bestTempoStreak = Math.max(archiveState.bestTempoStreak ?? 0, runStats?.tempo?.bestStreak ?? 0);
   archiveState.lastBuild = getBuildSummary();
+  archiveState.lastRunReview = createRunReview(victory);
   grantCalibrationShards(shardReward, victory ? "五章通关奖励" : `${currentChapter().title} 结算`);
   if (victory) {
     unlockLocalAchievement("ACH_FULL_CLEAR");
@@ -4250,9 +4340,12 @@ function renderStartMenu() {
   const runSave = isStoreShotMode ? null : loadRunSave();
   const bestChapter = Math.min(archiveState.bestChapter ?? 1, chapters.length);
   const echoSummary = getEchoArchiveSummary();
+  const lastReview = normalizeLastRunReview(archiveState.lastRunReview);
   ui.startSummary.textContent = runSave
     ? `检测到 ${formatSaveTime(runSave.savedAt)} 的跑局存档：${chapters[runSave.currentChapterIndex]?.title ?? "未知章节"}，${runSave.objective ?? "继续夜巡"}。`
-    : "档案已就绪。可以从第一章重新出发，也可以进入已解锁章节练习。";
+    : lastReview
+      ? `上轮复盘：${lastReview.highlightTitle}。下一把建议：${lastReview.nextTitle}。`
+      : "档案已就绪。可以从第一章重新出发，也可以进入已解锁章节练习。";
   renderTonightHook();
 
   const stats = [
@@ -6551,6 +6644,43 @@ function renderResultStats(victory) {
   }
 }
 
+function renderResultInsights(review = archiveState?.lastRunReview) {
+  if (!ui.resultInsights) {
+    return;
+  }
+  const normalized = normalizeLastRunReview(review);
+  if (!normalized) {
+    ui.resultInsights.innerHTML = "";
+    return;
+  }
+
+  const cards = [
+    ["本局亮点", normalized.highlightTitle, normalized.highlightText, ""],
+    ["下次注意", normalized.pressureTitle, normalized.pressureText, ""],
+    ["下一把", normalized.nextTitle, normalized.nextText, "is-next"],
+  ];
+  ui.resultInsights.innerHTML = cards.map(([kicker, title, text, className]) => `
+    <div class="result-insight ${className}">
+      <span>${kicker}</span>
+      <strong>${title}</strong>
+      <small>${text}</small>
+    </div>
+  `).join("");
+}
+
+function syncResultRetryButton(review = archiveState?.lastRunReview) {
+  const normalized = normalizeLastRunReview(review);
+  const build = getStarterBuildById(normalized?.recommendedStarterBuildId);
+  resultRetryStarterBuildId = build?.id ?? null;
+  if (!ui.restartButton) {
+    return;
+  }
+  const weapon = getWeaponById(build?.weaponId);
+  ui.restartButton.innerHTML = build
+    ? `<span class="choice-title">按推荐再来</span><span class="choice-effect">${build.title} · ${weapon?.name ?? "初始武器"}</span>`
+    : `<span class="choice-title">重开夜巡</span><span class="choice-effect">从第一章重新开始</span>`;
+}
+
 function endGame(victory) {
   if (world.mode === "result") {
     return;
@@ -6563,6 +6693,8 @@ function endGame(victory) {
     ? "变量城没有变得完美，但它第一次把“差异不等于错误”写进了主规则。"
     : "bug点数散落在工位缝里，白箱巡检员把凌晨重新归档为凌晨。";
   renderResultStats(victory);
+  renderResultInsights(archiveState.lastRunReview);
+  syncResultRetryButton(archiveState.lastRunReview);
   ui.resultPanel.classList.remove("hidden");
   playAudioCue(victory ? "victory" : "defeat");
 }
@@ -9915,6 +10047,48 @@ function installAutomationTestHooks() {
     return result;
   }
 
+  function runResultReviewProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    resetStoreRun(0, { stepIndex: 1, bugPoints: 0, hp: 20, level: 2 });
+    runStats.damageTaken = 142;
+    runStats.enemiesDefeated = 18;
+    runStats.eventsResolved = 2;
+    runStats.tempo = {
+      ...createCombatTempoState(),
+      streak: 1,
+      bestStreak: 2,
+      timer: 0.6,
+    };
+    runStats.openingSprint = {
+      ...createOpeningSprintState(),
+      completed: false,
+      active: true,
+      stepIndex: 1,
+      completedStepIds: ["first-anomaly"],
+    };
+
+    recordRunEnd(false);
+    const review = normalizeLastRunReview(archiveState.lastRunReview);
+    renderResultInsights(review);
+    syncResultRetryButton(review);
+    const result = {
+      ok: Boolean(review)
+        && review.outcome === "defeat"
+        && review.recommendedStarterBuildId === "close-control"
+        && resultRetryStarterBuildId === "close-control"
+        && ui.resultInsights?.textContent.includes("伤害吃得偏多"),
+      review,
+      retryStarterBuildId: resultRetryStarterBuildId,
+      insightsText: ui.resultInsights?.textContent ?? "",
+    };
+    ui.resultInsights.innerHTML = "";
+    resultRetryStarterBuildId = null;
+    syncResultRetryButton(null);
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
+    return result;
+  }
+
   function runStarterBuildProbe() {
     const previousArchive = cloneForSave(archiveState, null);
     const build = starterBuilds[0];
@@ -10137,6 +10311,7 @@ function installAutomationTestHooks() {
     const combatTempo = runCombatTempoProbe();
     const echoArchive = runEchoArchiveProbe();
     const openingSprint = runOpeningSprintProbe();
+    const resultReview = runResultReviewProbe();
     const starterBuild = runStarterBuildProbe();
 
     if (!metaProgression.ok) {
@@ -10153,6 +10328,9 @@ function installAutomationTestHooks() {
     }
     if (!openingSprint.ok) {
       failures.push("opening sprint guidance failed");
+    }
+    if (!resultReview.ok) {
+      failures.push("result review recommendation failed");
     }
     if (!starterBuild.ok) {
       failures.push("starter build quick start failed");
@@ -10223,6 +10401,7 @@ function installAutomationTestHooks() {
       combatTempo,
       echoArchive,
       openingSprint,
+      resultReview,
       starterBuild,
       chapters: chaptersCovered,
       finalSnapshot: snapshot({ action: "routePressureComplete" }),
@@ -10240,6 +10419,7 @@ function installAutomationTestHooks() {
     runCombatTempoProbe,
     runEchoArchiveProbe,
     runOpeningSprintProbe,
+    runResultReviewProbe,
     runStarterBuildProbe,
     runRoutePressureTest,
   };
@@ -10332,7 +10512,14 @@ ui.audioTestButton?.addEventListener("click", () => {
   playAudioCue("pulse");
 });
 
-ui.restartButton.addEventListener("click", resetGame);
+ui.restartButton.addEventListener("click", () => {
+  const build = getStarterBuildById(resultRetryStarterBuildId);
+  if (build) {
+    startNewRun(build.chapterIndex, { starterBuildId: build.id });
+    return;
+  }
+  resetGame();
+});
 ui.storyPanel.addEventListener("click", (event) => {
   if (event.target.closest("button")) {
     return;
