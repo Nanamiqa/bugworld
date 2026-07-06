@@ -40,6 +40,7 @@ const ui = {
   tonightHook: document.querySelector("#tonightHook"),
   startStats: document.querySelector("#startStats"),
   echoArchive: document.querySelector("#echoArchive"),
+  starterBuilds: document.querySelector("#starterBuilds"),
   metaSummary: document.querySelector("#metaSummary"),
   metaProgression: document.querySelector("#metaProgression"),
   startActions: document.querySelector("#startActions"),
@@ -1180,6 +1181,38 @@ const weaponDefinitions = gameData.weapons ?? [];
 const weaponUpgrades = gameData.weaponUpgrades ?? [];
 const chapterRelics = gameData.chapterRelics ?? [];
 const enemyTypes = gameData.enemyTypes ?? {};
+const starterBuilds = [
+  {
+    id: "precision-breakpoint",
+    title: "断点点杀流",
+    weaponId: "paperclip",
+    chapterIndex: 0,
+    promise: "用回形针高速点掉第一批追击怪，适合想看 Boss 弱点窗口的玩家。",
+    tags: ["远距", "精英击穿", "低风险"],
+    perkText: "开局提示：优先拿伤害、穿透和弹速强化。",
+    log: "推荐流派：断点点杀流。保持距离，先打掉最快的异常实体。",
+  },
+  {
+    id: "queue-barrage",
+    title: "键盘弹幕流",
+    weaponId: "keyboard",
+    chapterIndex: 0,
+    promise: "三枚按键弹快速铺开安全区，第一波就能看到连段补给亮起来。",
+    tags: ["覆盖", "连段", "新手友好"],
+    perkText: "开局提示：优先拿冷却、多线程和队列共鸣。",
+    log: "推荐流派：键盘弹幕流。把第一波敌人压在屏幕外，尽快点燃战斗节奏。",
+  },
+  {
+    id: "close-control",
+    title: "修正控场流",
+    weaponId: "correction-fluid",
+    chapterIndex: 0,
+    promise: "近距离高频减速，贴脸怪不再只会吓人，适合喜欢边躲边反打。",
+    tags: ["近战", "减速", "容错"],
+    perkText: "开局提示：优先拿生命、范围和核心特性过载。",
+    log: "推荐流派：修正控场流。贴身绕圈，用减速把压力怪拆开。",
+  },
+];
 const bossPhaseTuning = {
   1: {
     desiredDistance: 235,
@@ -1581,6 +1614,7 @@ function createRunStats() {
     distanceTraveled: 0,
     activeHook: null,
     tempo: createCombatTempoState(),
+    starterBuild: null,
     highestLevel: 1,
     bestChapterReached: 0,
   };
@@ -2491,7 +2525,15 @@ function resetGame(chapterIndex = 0) {
   startNewRun(Number.isFinite(chapterIndex) ? chapterIndex : 0);
 }
 
-function startNewRun(chapterIndex = 0) {
+function getStarterBuildById(id) {
+  return starterBuilds.find((build) => build.id === id) ?? null;
+}
+
+function getWeaponById(id) {
+  return weaponDefinitions.find((weapon) => weapon.id === id) ?? null;
+}
+
+function startNewRun(chapterIndex = 0, options = {}) {
   playAudioCue("run-start");
   deleteRunSave();
   archiveState = loadArchive();
@@ -2534,6 +2576,18 @@ function startNewRun(chapterIndex = 0) {
   activateNightHookForChapter(currentChapterIndex);
   evaluateRunAchievements("run_start");
   syncHud();
+  const starterBuild = getStarterBuildById(options.starterBuildId);
+  if (starterBuild) {
+    const weapon = getWeaponById(starterBuild.weaponId) ?? weaponDefinitions[0];
+    if (weapon) {
+      equipWeapon(weapon);
+      runStats.starterBuild = starterBuild.id;
+      setLog(`${starterBuild.log} ${starterBuild.perkText}`);
+      saveRunCheckpoint("starter-build");
+      openStory(currentChapter().opening);
+      return;
+    }
+  }
   openWeaponSelect();
 }
 
@@ -3843,6 +3897,35 @@ function renderEchoArchive() {
   `;
 }
 
+function renderStarterBuilds() {
+  if (!ui.starterBuilds) {
+    return;
+  }
+
+  ui.starterBuilds.innerHTML = "";
+  for (const build of starterBuilds) {
+    const weapon = getWeaponById(build.weaponId) ?? weaponDefinitions[0] ?? {};
+    const button = document.createElement("button");
+    button.className = "choice-button starter-build-card with-media";
+    const icon = weapon.assetKey ? `<img class="choice-icon weapon-icon" src="${assetUrl(weapon.assetKey)}" alt="" />` : "";
+    const tags = build.tags.map((tag) => `<span>${tag}</span>`).join("");
+    button.innerHTML = `
+      ${icon}
+      <span class="choice-copy">
+        <span class="choice-title">${build.title} · ${weapon.name ?? "初始武器"}</span>
+        <span class="choice-effect">${build.promise}</span>
+        <span class="starter-build-tags">${tags}</span>
+        <span class="specialization-line is-active">${build.perkText}</span>
+      </span>
+    `;
+    button.addEventListener("click", () => {
+      playAudioCue("ui-confirm");
+      startNewRun(build.chapterIndex, { starterBuildId: build.id });
+    });
+    ui.starterBuilds.appendChild(button);
+  }
+}
+
 function renderStartMenu() {
   if (!ui.startPanel) {
     return;
@@ -3881,6 +3964,7 @@ function renderStartMenu() {
 
   renderMetaProgression();
   renderEchoArchive();
+  renderStarterBuilds();
 
   ui.startActions.innerHTML = "";
   ui.startActions.appendChild(createMenuButton(
@@ -9400,6 +9484,29 @@ function installAutomationTestHooks() {
     return result;
   }
 
+  function runStarterBuildProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    const build = starterBuilds[0];
+    startNewRun(build?.chapterIndex ?? 0, { starterBuildId: build?.id });
+    const saved = loadRunSave();
+    const result = {
+      ok: Boolean(build)
+        && player.weapon?.id === build.weaponId
+        && runStats.starterBuild === build.id
+        && world.mode === "story"
+        && Boolean(saved?.player?.weapon?.id === build.weaponId),
+      buildId: build?.id ?? null,
+      weaponId: player.weapon?.id ?? null,
+      mode: world.mode,
+      savedReason: saved?.reason ?? null,
+      savedWeaponId: saved?.player?.weapon?.id ?? null,
+    };
+    deleteRunSave();
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
+    return result;
+  }
+
   function enterChapter(chapterIndex, options = {}) {
     const index = clamp(Number(chapterIndex) || 0, 0, chapters.length - 1);
     const stepCount = chapters[index]?.steps?.length ?? 0;
@@ -9549,6 +9656,7 @@ function installAutomationTestHooks() {
     const nightHook = runNightHookProbe();
     const combatTempo = runCombatTempoProbe();
     const echoArchive = runEchoArchiveProbe();
+    const starterBuild = runStarterBuildProbe();
 
     if (!metaProgression.ok) {
       failures.push("meta progression bonuses failed");
@@ -9561,6 +9669,9 @@ function installAutomationTestHooks() {
     }
     if (!echoArchive.ok) {
       failures.push("echo archive progression failed");
+    }
+    if (!starterBuild.ok) {
+      failures.push("starter build quick start failed");
     }
 
     for (let index = 0; index < chapters.length; index += 1) {
@@ -9627,6 +9738,7 @@ function installAutomationTestHooks() {
       nightHook,
       combatTempo,
       echoArchive,
+      starterBuild,
       chapters: chaptersCovered,
       finalSnapshot: snapshot({ action: "routePressureComplete" }),
     };
@@ -9642,6 +9754,7 @@ function installAutomationTestHooks() {
     runNightHookProbe,
     runCombatTempoProbe,
     runEchoArchiveProbe,
+    runStarterBuildProbe,
     runRoutePressureTest,
   };
 }

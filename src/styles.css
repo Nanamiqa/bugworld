@@ -659,6 +659,76 @@ h1 {
   white-space: nowrap;
 }
 
+.starter-builds {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(15, 159, 149, 0.16);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(15, 159, 149, 0.1), rgba(114, 165, 255, 0.1)),
+    rgba(247, 250, 255, 0.82);
+}
+
+.starter-builds-head {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.starter-builds-head h3 {
+  margin: 2px 0 0;
+  font-size: 1rem;
+}
+
+.starter-builds-head strong {
+  flex: 0 0 auto;
+  color: var(--teal-dark);
+  font-size: 0.94rem;
+}
+
+.starter-build-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.choice-button.starter-build-card {
+  min-height: 148px;
+  padding: 10px;
+  align-items: start;
+  border-color: rgba(15, 159, 149, 0.22);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(232, 248, 255, 0.72)),
+    rgba(247, 250, 255, 0.88);
+}
+
+.choice-button.starter-build-card .choice-effect {
+  display: -webkit-box;
+  min-height: 50px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  font-size: 0.78rem;
+}
+
+.starter-build-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.starter-build-tags span {
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(15, 159, 149, 0.11);
+  color: var(--teal-dark);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
 .meta-progress {
   display: grid;
   gap: 10px;
@@ -1235,6 +1305,7 @@ h1 {
   .start-stats,
   .start-actions,
   .echo-archive-grid,
+  .starter-build-grid,
   .meta-grid,
   .chapter-select {
     grid-template-columns: minmax(0, 1fr);
