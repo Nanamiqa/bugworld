@@ -23,6 +23,7 @@ const ui = {
   build: document.querySelector("#buildValue"),
   resonance: document.querySelector("#resonanceValue"),
   defeat: document.querySelector("#defeatValue"),
+  hookTracker: document.querySelector("#hookTracker"),
   storyPanel: document.querySelector("#storyPanel"),
   storySpeaker: document.querySelector("#storySpeaker"),
   storyTitle: document.querySelector("#storyTitle"),
@@ -35,6 +36,7 @@ const ui = {
   storyChoices: document.querySelector("#storyChoices"),
   startPanel: document.querySelector("#startPanel"),
   startSummary: document.querySelector("#startSummary"),
+  tonightHook: document.querySelector("#tonightHook"),
   startStats: document.querySelector("#startStats"),
   metaSummary: document.querySelector("#metaSummary"),
   metaProgression: document.querySelector("#metaProgression"),
@@ -119,7 +121,7 @@ const ARCHIVE_STORAGE_KEY = "variableCityArchive";
 const RUN_SAVE_STORAGE_KEY = "variableCityRunSave";
 const SETTINGS_STORAGE_KEY = "variableCitySettings";
 const ACHIEVEMENT_STORAGE_KEY = "variableCityAchievements";
-const ARCHIVE_VERSION = 2;
+const ARCHIVE_VERSION = 3;
 const RUN_SAVE_VERSION = 2;
 const achievements = window.variableCityAchievementCatalog ?? [];
 const urlParams = new URLSearchParams(window.location.search);
@@ -241,6 +243,79 @@ const metaProgressNodes = [
     iconKey: "metaCorrectionSpecialist",
     summary: "每级修正液射程 +22，减速更久",
     detail: "强化近距控场的容错，让 Boss 召唤物和高速敌人更容易被压住。",
+  },
+];
+
+const nightwatchHooks = [
+  {
+    id: "delivery-save-90",
+    chapterIndex: 0,
+    kicker: "首局钩子",
+    title: "90秒救下超时单",
+    promise: "先处理 1 个异常，再击破 8 个错误实体。完成后立刻拿碎片和补给，第一把就有成型感。",
+    criteria: { events: 1, defeats: 8, timeLimit: 90 },
+    rewardShards: 3,
+    rewardBugPoints: 2,
+    rewardHp: 10,
+    startLog: "今晚委托已接取：先处理 1 个异常，再击破 8 个错误实体。",
+    completeLog: "夜巡委托完成：超时单被抢回来了，档案柜吐出新的校准碎片。",
+    failLog: "今晚委托超时：超时单被重新派发，但本轮夜巡仍可继续。",
+  },
+  {
+    id: "metro-fast-line",
+    chapterIndex: 1,
+    kicker: "移动钩子",
+    title: "追上 03:32 末班车",
+    promise: "在限定时间内巡线 10 段并处理 1 个站台异常，逼玩家跑起来而不是站桩刷怪。",
+    criteria: { distance: 1000, events: 1, maxDamage: 70, timeLimit: 150 },
+    rewardShards: 4,
+    rewardBugPoints: 2,
+    rewardHp: 12,
+    startLog: "今晚委托已接取：沿环线跑起来，处理站台异常前别被末班车拖慢。",
+    completeLog: "夜巡委托完成：末班车停在正确帧上，车票背面多出一枚校准码。",
+    failLog: "今晚委托失败：末班车离站了，但时刻表管理员还在前方等你。",
+  },
+  {
+    id: "hash-no-duplicate",
+    chapterIndex: 2,
+    kicker: "探索钩子",
+    title: "夜市不留重复编号",
+    promise: "清掉 2 个摊位异常并击破 12 个追踪实体，让哈希夜市的探索目标更明确。",
+    criteria: { events: 2, defeats: 12, timeLimit: 190 },
+    rewardShards: 5,
+    rewardBugPoints: 3,
+    rewardHp: 12,
+    startLog: "今晚委托已接取：夜市编号开始重复，优先处理两个摊位信标。",
+    completeLog: "夜巡委托完成：重复编号被加盐拆开，夜市雨棚亮了一整排。",
+    failLog: "今晚委托失败：重复编号扩散到后街，继续推进主线仍可追回缓存。",
+  },
+  {
+    id: "pledge-no-debt",
+    chapterIndex: 3,
+    kicker: "低伤钩子",
+    title: "不欠新的承诺债",
+    promise: "在承诺塔里处理 2 个异常、击破 14 个敌人，并把受伤压在 80 以内。",
+    criteria: { events: 2, defeats: 14, maxDamage: 80, timeLimit: 210 },
+    rewardShards: 6,
+    rewardBugPoints: 3,
+    rewardHp: 14,
+    startLog: "今晚委托已接取：别让承诺债滚起来，低伤处理两个根层异常。",
+    completeLog: "夜巡委托完成：承诺债被截断，根层给你留出了一段安全窗口。",
+    failLog: "今晚委托失败：新债已经入账，但根节点仍有弱点窗口。",
+  },
+  {
+    id: "whitebox-counterexample",
+    chapterIndex: 4,
+    kicker: "终章钩子",
+    title: "提交第一份反例",
+    promise: "在白箱核心里巡线 12 段、处理 1 个证据点并保持低伤，开局就建立最终章目标。",
+    criteria: { distance: 1200, events: 1, maxDamage: 90, timeLimit: 220 },
+    rewardShards: 7,
+    rewardBugPoints: 4,
+    rewardHp: 16,
+    startLog: "今晚委托已接取：提交第一份反例前，别让白箱把差异清零。",
+    completeLog: "夜巡委托完成：第一份反例被写进核心日志，公共规则开始松动。",
+    failLog: "今晚委托失败：白箱暂时归档了反例，但最终提交仍然有效。",
   },
 ];
 
@@ -1382,6 +1457,8 @@ function createRunStats() {
     conceptsChosen: [],
     synergiesUnlocked: [],
     damageTaken: 0,
+    distanceTraveled: 0,
+    activeHook: null,
     highestLevel: 1,
     bestChapterReached: 0,
   };
@@ -1399,6 +1476,8 @@ function createArchiveFallback() {
     lastBuild: "未记录",
     calibrationShards: 0,
     totalCalibrationEarned: 0,
+    completedNightHooks: [],
+    nightHookCompletions: 0,
     metaUpgrades: Object.fromEntries(metaProgressNodes.map((node) => [node.id, 0])),
     lastRunShardGain: null,
   };
@@ -1437,6 +1516,7 @@ function loadArchive() {
       unlockedChapters: Array.isArray(saved.unlockedChapters) ? saved.unlockedChapters : fallback.unlockedChapters,
       metaUpgrades: normalizeMetaUpgrades(saved.metaUpgrades),
       lastRunShardGain: normalizeLastRunShardGain(saved.lastRunShardGain),
+      completedNightHooks: Array.isArray(saved.completedNightHooks) ? [...new Set(saved.completedNightHooks)] : fallback.completedNightHooks,
     };
     normalized.archiveVersion = ARCHIVE_VERSION;
     normalized.bestChapter = clamp(Number(normalized.bestChapter) || 1, 1, chapters.length);
@@ -1444,6 +1524,10 @@ function loadArchive() {
     normalized.totalCalibrationEarned = Math.max(
       normalized.calibrationShards,
       Math.trunc(Number(normalized.totalCalibrationEarned) || 0),
+    );
+    normalized.nightHookCompletions = Math.max(
+      normalized.completedNightHooks.length,
+      Math.trunc(Number(normalized.nightHookCompletions) || 0),
     );
     if (!normalized.unlockedChapters.includes(0)) {
       normalized.unlockedChapters.unshift(0);
@@ -1540,6 +1624,198 @@ function grantCalibrationShards(amount, reason) {
     at: Date.now(),
   };
   return reward;
+}
+
+function getNightHookConfigById(id) {
+  return nightwatchHooks.find((hook) => hook.id === id) ?? null;
+}
+
+function getNightHookConfigForChapter(chapterIndex = 0) {
+  return nightwatchHooks.find((hook) => hook.chapterIndex === chapterIndex) ?? null;
+}
+
+function getFeaturedNightHook() {
+  const unlocked = new Set(archiveState?.unlockedChapters?.length ? archiveState.unlockedChapters : [0]);
+  const completed = new Set(archiveState?.completedNightHooks ?? []);
+  return nightwatchHooks.find((hook) => unlocked.has(hook.chapterIndex) && !completed.has(hook.id))
+    ?? nightwatchHooks.find((hook) => unlocked.has(hook.chapterIndex))
+    ?? nightwatchHooks[0]
+    ?? null;
+}
+
+function createNightHookState(chapterIndex = currentChapterIndex) {
+  const config = getNightHookConfigForChapter(chapterIndex);
+  if (!config) {
+    return null;
+  }
+  return {
+    id: config.id,
+    chapterIndex,
+    elapsed: 0,
+    startDefeats: runStats?.enemiesDefeated ?? 0,
+    startEvents: runStats?.eventsResolved ?? 0,
+    startDamage: runStats?.damageTaken ?? 0,
+    startDistance: runStats?.distanceTraveled ?? 0,
+    defeats: 0,
+    events: 0,
+    damage: 0,
+    distance: 0,
+    completed: false,
+    failed: false,
+    rewardClaimed: false,
+  };
+}
+
+function normalizeNightHookState(savedHook, chapterIndex = currentChapterIndex) {
+  if (!savedHook || typeof savedHook !== "object") {
+    return null;
+  }
+  const config = getNightHookConfigById(savedHook.id) ?? getNightHookConfigForChapter(chapterIndex);
+  if (!config) {
+    return null;
+  }
+  const fallback = createNightHookState(config.chapterIndex) ?? {};
+  return {
+    ...fallback,
+    ...savedHook,
+    id: config.id,
+    chapterIndex: config.chapterIndex,
+    elapsed: Math.max(0, Number(savedHook.elapsed) || 0),
+    startDefeats: Math.max(0, Math.trunc(Number(savedHook.startDefeats) || 0)),
+    startEvents: Math.max(0, Math.trunc(Number(savedHook.startEvents) || 0)),
+    startDamage: Math.max(0, Number(savedHook.startDamage) || 0),
+    startDistance: Math.max(0, Number(savedHook.startDistance) || 0),
+    completed: Boolean(savedHook.completed),
+    failed: Boolean(savedHook.failed),
+    rewardClaimed: Boolean(savedHook.rewardClaimed),
+  };
+}
+
+function activateNightHookForChapter(chapterIndex = currentChapterIndex) {
+  if (!runStats) {
+    return;
+  }
+  runStats.activeHook = createNightHookState(chapterIndex);
+  const config = getNightHookConfigById(runStats.activeHook?.id);
+  if (config) {
+    setLog(config.startLog);
+  }
+}
+
+function refreshNightHookProgress(hook = runStats?.activeHook) {
+  const config = getNightHookConfigById(hook?.id);
+  if (!hook || !config || !runStats) {
+    return null;
+  }
+  hook.defeats = Math.max(0, (runStats.enemiesDefeated ?? 0) - (hook.startDefeats ?? 0));
+  hook.events = Math.max(0, (runStats.eventsResolved ?? 0) - (hook.startEvents ?? 0));
+  hook.damage = Math.max(0, (runStats.damageTaken ?? 0) - (hook.startDamage ?? 0));
+  hook.distance = Math.max(0, (runStats.distanceTraveled ?? 0) - (hook.startDistance ?? 0));
+  return { hook, config };
+}
+
+function nightHookCriteriaMet(hook, config) {
+  const criteria = config?.criteria ?? {};
+  if (criteria.defeats && hook.defeats < criteria.defeats) return false;
+  if (criteria.events && hook.events < criteria.events) return false;
+  if (criteria.distance && hook.distance < criteria.distance) return false;
+  if (criteria.maxDamage && hook.damage > criteria.maxDamage) return false;
+  if (criteria.timeLimit && hook.elapsed > criteria.timeLimit) return false;
+  return true;
+}
+
+function completeNightHook(hook, config) {
+  if (!hook || !config || hook.completed || hook.failed) {
+    return;
+  }
+
+  hook.completed = true;
+  hook.rewardClaimed = true;
+  grantCalibrationShards(config.rewardShards ?? 0, `夜巡委托：${config.title}`);
+  player.bugPoints += config.rewardBugPoints ?? 0;
+  player.hp = clamp(player.hp + (config.rewardHp ?? 0), 1, player.maxHp);
+  archiveState.completedNightHooks = [...new Set([...(archiveState.completedNightHooks ?? []), config.id])];
+  archiveState.nightHookCompletions = Math.max(archiveState.nightHookCompletions ?? 0, 0) + 1;
+  saveArchive();
+  burst(player.x, player.y, "#f1c15b", 34);
+  burst(player.x, player.y, "#5de2d1", 22);
+  playAudioCue("upgrade-select");
+  setLog(`${config.completeLog} +${config.rewardShards ?? 0} 校准碎片，+${config.rewardBugPoints ?? 0} bug点数。`);
+  saveRunCheckpoint("night-hook-complete");
+}
+
+function failNightHook(hook, config, reason = "") {
+  if (!hook || !config || hook.completed || hook.failed) {
+    return;
+  }
+  hook.failed = true;
+  setLog(reason || config.failLog);
+  saveRunCheckpoint("night-hook-failed");
+}
+
+function updateNightHook(dt = 0) {
+  const state = refreshNightHookProgress();
+  if (!state || state.hook.completed || state.hook.failed) {
+    return;
+  }
+
+  const { hook, config } = state;
+  hook.elapsed = Math.max(0, (hook.elapsed ?? 0) + Math.max(0, dt));
+  refreshNightHookProgress(hook);
+
+  if (nightHookCriteriaMet(hook, config)) {
+    completeNightHook(hook, config);
+    return;
+  }
+
+  const criteria = config.criteria ?? {};
+  if (criteria.maxDamage && hook.damage > criteria.maxDamage) {
+    failNightHook(hook, config, config.failLog);
+    return;
+  }
+  if (criteria.timeLimit && hook.elapsed > criteria.timeLimit) {
+    failNightHook(hook, config, config.failLog);
+  }
+}
+
+function formatHookTime(seconds) {
+  const safe = Math.max(0, Math.ceil(Number(seconds) || 0));
+  const minutes = Math.floor(safe / 60);
+  const rest = safe % 60;
+  return `${minutes}:${String(rest).padStart(2, "0")}`;
+}
+
+function formatHookDistance(distance) {
+  return Math.floor((Number(distance) || 0) / 100);
+}
+
+function getNightHookProgressText(hook, config) {
+  if (!hook || !config) {
+    return "";
+  }
+  const criteria = config.criteria ?? {};
+  const parts = [];
+  if (criteria.events) parts.push(`异常 ${Math.min(hook.events, criteria.events)}/${criteria.events}`);
+  if (criteria.defeats) parts.push(`击破 ${Math.min(hook.defeats, criteria.defeats)}/${criteria.defeats}`);
+  if (criteria.distance) parts.push(`巡线 ${Math.min(formatHookDistance(hook.distance), formatHookDistance(criteria.distance))}/${formatHookDistance(criteria.distance)} 段`);
+  if (criteria.maxDamage) parts.push(`受伤 ${Math.round(hook.damage)}/${criteria.maxDamage}`);
+  if (criteria.timeLimit) parts.push(`剩余 ${formatHookTime(criteria.timeLimit - hook.elapsed)}`);
+  return parts.join(" · ");
+}
+
+function getRunHookResultText() {
+  const hook = runStats?.activeHook;
+  const config = getNightHookConfigById(hook?.id);
+  if (!hook || !config) {
+    return "未接取";
+  }
+  if (hook.completed) {
+    return `${config.title} 已完成`;
+  }
+  if (hook.failed) {
+    return `${config.title} 未完成`;
+  }
+  return getNightHookProgressText(hook, config);
 }
 
 function getMetaProgressionBonuses(chapterIndex = 0) {
@@ -1745,7 +2021,9 @@ function restoreRunSave(save) {
     relicsChosen: cloneForSave(save.runStats?.relicsChosen, []),
     conceptsChosen: cloneForSave(save.runStats?.conceptsChosen, []),
     synergiesUnlocked: cloneForSave(save.runStats?.synergiesUnlocked, []),
+    distanceTraveled: Math.max(0, Number(save.runStats?.distanceTraveled) || 0),
   };
+  runStats.activeHook = normalizeNightHookState(save.runStats?.activeHook, currentChapterIndex);
   player = {
     ...playerBase,
     ...cloneForSave(save.player, {}),
@@ -1902,6 +2180,7 @@ function startNewRun(chapterIndex = 0) {
   seedOfficeBugPickups();
   setChapterObjective(currentChapter().initialObjective ?? "调查办公室异常");
   setLog(currentChapter().startLog ?? "凌晨 03:32，安渡从键盘上醒来。手机显示：外卖订单已超时 999 分钟。");
+  activateNightHookForChapter(currentChapterIndex);
   evaluateRunAchievements("run_start");
   syncHud();
   openWeaponSelect();
@@ -1967,6 +2246,8 @@ function createStoreArchiveState() {
     lastBuild: "键盘宏飞弹 + 队列自动机 + 哈希弱点表",
     calibrationShards: 42,
     totalCalibrationEarned: 168,
+    completedNightHooks: ["delivery-save-90", "metro-fast-line"],
+    nightHookCompletions: 7,
     metaUpgrades: {
       "steady-heart": 3,
       "warm-cache": 2,
@@ -2010,6 +2291,7 @@ function resetStoreRun(chapterIndex = 0, options = {}) {
     unlockedSynergies: ["queue-2", "hash-2"],
   };
   currentChapterIndex = clamp(chapterIndex, 0, chapters.length - 1);
+  runStats.activeHook = createNightHookState(currentChapterIndex);
   chapterState = createChapterState(options.allies ?? ["qiao-you"]);
   chapterState.stepIndex = options.stepIndex ?? 2;
   chapterState.resolvedInStep = options.resolvedInStep ?? 1;
@@ -2744,6 +3026,7 @@ function beginNextChapter(allies) {
   seedOfficeBugPickups();
   setChapterObjective(currentChapter().initialObjective ?? "继续夜巡");
   setLog(currentChapter().startLog ?? `${currentChapter().title}开始。`);
+  activateNightHookForChapter(currentChapterIndex);
   openStory(currentChapter().opening);
   saveRunCheckpoint("next-chapter");
 }
@@ -3103,6 +3386,39 @@ function renderMetaProgression() {
   metaUnlockPulseNodeId = null;
 }
 
+function renderTonightHook() {
+  if (!ui.tonightHook) {
+    return;
+  }
+
+  const hook = getFeaturedNightHook();
+  if (!hook) {
+    ui.tonightHook.classList.add("hidden");
+    return;
+  }
+
+  const completed = archiveState?.completedNightHooks?.includes(hook.id);
+  const chapterTitle = chapters[hook.chapterIndex]?.title ?? `第 ${hook.chapterIndex + 1} 章`;
+  const reward = `奖励 +${hook.rewardShards ?? 0} 碎片 · +${hook.rewardBugPoints ?? 0} bug点数`;
+  ui.tonightHook.className = `tonight-hook${completed ? " is-completed" : ""}`;
+  ui.tonightHook.innerHTML = `
+    <div>
+      <p class="event-kicker">${hook.kicker}</p>
+      <h3>${hook.title}</h3>
+      <p>${hook.promise}</p>
+    </div>
+    <div class="hook-side">
+      <span>${chapterTitle}</span>
+      <strong>${completed ? "已完成，可重复挑战" : reward}</strong>
+      <button class="hook-start-button" type="button">${completed ? "再刷一把" : "接受委托"}</button>
+    </div>
+  `;
+  ui.tonightHook.querySelector(".hook-start-button")?.addEventListener("click", () => {
+    playAudioCue("ui-confirm");
+    startNewRun(hook.chapterIndex);
+  });
+}
+
 function renderStartMenu() {
   if (!ui.startPanel) {
     return;
@@ -3114,6 +3430,7 @@ function renderStartMenu() {
   ui.startSummary.textContent = runSave
     ? `检测到 ${formatSaveTime(runSave.savedAt)} 的跑局存档：${chapters[runSave.currentChapterIndex]?.title ?? "未知章节"}，${runSave.objective ?? "继续夜巡"}。`
     : "档案已就绪。可以从第一章重新出发，也可以进入已解锁章节练习。";
+  renderTonightHook();
 
   const stats = [
     ["最远章节", `${bestChapter}/${chapters.length}`],
@@ -3124,6 +3441,7 @@ function renderStartMenu() {
     ["档案节点", `${metaProgressNodes.reduce((sum, node) => sum + getMetaLevel(node.id), 0)}/${metaProgressNodes.reduce((sum, node) => sum + node.maxLevel, 0)}`],
     ["平台", getPlatformDisplayLabel()],
     ["存档", getStorageDisplayLabel()],
+    ["爆点委托", `${archiveState.nightHookCompletions ?? 0} 次`],
     ["成就", `${readUnlockedAchievements().length}/${achievements.length}`],
   ];
   ui.startStats.innerHTML = "";
@@ -3188,6 +3506,37 @@ function renderStartMenu() {
   }
 }
 
+function renderNightHookTracker() {
+  if (!ui.hookTracker) {
+    return;
+  }
+
+  const hook = runStats?.activeHook;
+  const config = getNightHookConfigById(hook?.id);
+  if (!hook || !config || world.mode === "menu") {
+    ui.hookTracker.className = "hook-tracker hidden";
+    ui.hookTracker.innerHTML = "";
+    return;
+  }
+
+  refreshNightHookProgress(hook);
+  const stateText = hook.completed
+    ? `完成 · +${config.rewardShards ?? 0} 碎片`
+    : hook.failed
+      ? "本轮未完成"
+      : getNightHookProgressText(hook, config);
+  ui.hookTracker.className = [
+    "hook-tracker",
+    hook.completed ? "is-completed" : "",
+    hook.failed ? "is-failed" : "",
+  ].filter(Boolean).join(" ");
+  ui.hookTracker.innerHTML = `
+    <span>${config.kicker}</span>
+    <strong>${config.title}</strong>
+    <small>${stateText}</small>
+  `;
+}
+
 function openStartMenu() {
   world.mode = "menu";
   hidePanels();
@@ -3226,6 +3575,7 @@ function renderRunPanel() {
   ui.build.textContent = getBuildSummary();
   ui.resonance.textContent = getResonanceSummary();
   ui.defeat.textContent = runStats?.enemiesDefeated ?? 0;
+  renderNightHookTracker();
 }
 
 function syncHud() {
@@ -3376,6 +3726,7 @@ function updatePlaying(dt) {
   updateEnemies(dt);
   updateAllyAssist(dt);
   updateBugPickups(dt);
+  updateNightHook(dt);
   if (world.mode !== "playing") {
     return;
   }
@@ -3425,6 +3776,7 @@ function movePlayer(dt) {
   if (dx || dy) {
     const len = Math.hypot(dx, dy);
     const speedMultiplier = getMapMoveMultiplier(player, true);
+    const before = { x: player.x, y: player.y };
     const next = {
       x: player.x + (dx / len) * player.speed * speedMultiplier * dt,
       y: player.y + (dy / len) * player.speed * speedMultiplier * dt,
@@ -3432,6 +3784,9 @@ function movePlayer(dt) {
     player.x = clamp(next.x, player.radius, world.width - player.radius);
     player.y = clamp(next.y, 76, world.height - player.radius);
     resolveDeskCollision(player);
+    if (runStats) {
+      runStats.distanceTraveled = Math.max(0, (runStats.distanceTraveled ?? 0) + distance(before, player));
+    }
   }
 }
 
@@ -3788,6 +4143,7 @@ function clearDefeatedHostiles() {
 
 function defeatEnemy(enemy, particleCount, deferredSpawns = null) {
   runStats.enemiesDefeated += 1;
+  updateNightHook(0);
   evaluateRunAchievements("enemy_defeated");
   burst(enemy.x, enemy.y, enemy.deathColor, particleCount);
   playAudioCue("enemy-down");
@@ -4931,6 +5287,7 @@ function damagePlayer(amount, message) {
   burst(player.x, player.y, "#ef6a70", 10);
   playAudioCue("damage", { intensity: Math.min(1.8, Math.max(0.7, amount / 16)) });
   setLog(message);
+  updateNightHook(0);
   return true;
 }
 
@@ -5075,6 +5432,7 @@ function resolveEvent(choice) {
   playAudioCue("ui-confirm");
   applyActions(choice.actions);
   runStats.eventsResolved += 1;
+  updateNightHook(0);
   evaluateRunAchievements("event_resolved");
   const removed = bugNodes.splice(activeEvent.index, 1)[0];
   burst(removed.x, removed.y, removed.event.color, 28);
@@ -5195,6 +5553,7 @@ function renderResultStats(victory) {
     ["共鸣", `${runStats?.synergiesUnlocked?.length ?? 0} 次`],
     ["耗时", `${minutes}:${String(seconds).padStart(2, "0")}`],
     ["构筑", getBuildSummary()],
+    ["委托", getRunHookResultText()],
     ["校准碎片", `+${archiveState?.lastRunShardGain?.amount ?? 0} / 持有 ${archiveState?.calibrationShards ?? 0}`],
     ["档案", victory ? `通关 ${archiveState.wins} 次` : `最远 ${archiveState.bestChapter}/${chapters.length}`],
   ];
@@ -8102,8 +8461,16 @@ function installAutomationTestHooks() {
       archive: {
         bestChapter: archiveState?.bestChapter ?? null,
         calibrationShards: archiveState?.calibrationShards ?? null,
+        completedNightHooks: cloneForSave(archiveState?.completedNightHooks, []),
+        nightHookCompletions: archiveState?.nightHookCompletions ?? 0,
         metaLevels: cloneForSave(archiveState?.metaUpgrades, {}),
       },
+      nightHook: runStats?.activeHook ? {
+        id: runStats.activeHook.id,
+        completed: Boolean(runStats.activeHook.completed),
+        failed: Boolean(runStats.activeHook.failed),
+        progress: getNightHookProgressText(runStats.activeHook, getNightHookConfigById(runStats.activeHook.id)),
+      } : null,
       counts: {
         bugNodes: bugNodes?.length ?? 0,
         enemies: enemies?.length ?? 0,
@@ -8170,6 +8537,47 @@ function installAutomationTestHooks() {
         correction: { range: correction.range, slowFactor: round(correction.trait.factor) },
       },
     };
+  }
+
+  function runNightHookProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    const previousMode = world.mode;
+    archiveState = {
+      ...createArchiveFallback(),
+      calibrationShards: 0,
+      completedNightHooks: [],
+      nightHookCompletions: 0,
+    };
+    resetStoreRun(0, { stepIndex: 0 });
+    archiveState = {
+      ...createArchiveFallback(),
+      calibrationShards: 0,
+      completedNightHooks: [],
+      nightHookCompletions: 0,
+    };
+    runStats.activeHook = createNightHookState(0);
+    const hook = runStats.activeHook;
+    const config = getNightHookConfigById(hook?.id);
+    runStats.enemiesDefeated += config?.criteria?.defeats ?? 0;
+    runStats.eventsResolved += config?.criteria?.events ?? 0;
+    runStats.distanceTraveled += config?.criteria?.distance ?? 0;
+    updateNightHook(0.1);
+    const result = {
+      ok: Boolean(runStats.activeHook?.completed)
+        && archiveState.calibrationShards === (config?.rewardShards ?? 0)
+        && archiveState.completedNightHooks.includes(config?.id)
+        && (archiveState.nightHookCompletions ?? 0) >= 1,
+      hook: cloneForSave(runStats.activeHook, null),
+      archive: {
+        calibrationShards: archiveState.calibrationShards,
+        completedNightHooks: cloneForSave(archiveState.completedNightHooks, []),
+        nightHookCompletions: archiveState.nightHookCompletions,
+      },
+    };
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
+    world.mode = previousMode;
+    return result;
   }
 
   function enterChapter(chapterIndex, options = {}) {
@@ -8282,9 +8690,13 @@ function installAutomationTestHooks() {
     const failures = [];
     const chaptersCovered = [];
     const metaProgression = runMetaProgressionProbe();
+    const nightHook = runNightHookProbe();
 
     if (!metaProgression.ok) {
       failures.push("meta progression bonuses failed");
+    }
+    if (!nightHook.ok) {
+      failures.push("night hook completion failed");
     }
 
     for (let index = 0; index < chapters.length; index += 1) {
@@ -8331,6 +8743,7 @@ function installAutomationTestHooks() {
       chapterCount: chapters.length,
       failures,
       metaProgression,
+      nightHook,
       chapters: chaptersCovered,
       finalSnapshot: snapshot({ action: "routePressureComplete" }),
     };
@@ -8343,6 +8756,7 @@ function installAutomationTestHooks() {
     startBossForChapter,
     saveAndRestoreProbe,
     runMetaProgressionProbe,
+    runNightHookProbe,
     runRoutePressureTest,
   };
 }
