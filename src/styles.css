@@ -503,6 +503,78 @@ h1 {
   background: rgba(217, 79, 92, 0.6);
 }
 
+.device-tracker {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 9px 10px 11px;
+  border: 1px solid rgba(15, 159, 149, 0.24);
+  border-radius: 8px;
+  background: rgba(239, 250, 249, 0.78);
+}
+
+.device-tracker.hidden {
+  display: none;
+}
+
+.device-tracker::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--device-progress, 0%);
+  height: 3px;
+  background: linear-gradient(90deg, var(--cyan), var(--blue), var(--amber));
+  transition: width 120ms linear;
+}
+
+.device-tracker span {
+  color: var(--cyan);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.device-tracker strong,
+.device-tracker small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-tracker strong {
+  color: var(--text);
+  font-size: 0.84rem;
+}
+
+.device-tracker small {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.device-tracker.is-near {
+  border-color: rgba(201, 132, 22, 0.34);
+  background: rgba(255, 248, 232, 0.84);
+  box-shadow: 0 10px 28px rgba(201, 132, 22, 0.12);
+}
+
+.device-tracker.is-near span {
+  color: var(--amber);
+}
+
+.device-tracker.is-completed {
+  border-color: rgba(15, 159, 149, 0.38);
+  background: rgba(239, 250, 249, 0.9);
+}
+
+.device-tracker.is-completed::after {
+  width: 100%;
+  background: linear-gradient(90deg, var(--cyan), var(--blue));
+}
+
 @keyframes tempo-pop {
   0% {
     transform: translateY(-1px) scale(1.012);

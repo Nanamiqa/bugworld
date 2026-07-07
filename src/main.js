@@ -27,6 +27,7 @@ const ui = {
   hookTracker: document.querySelector("#hookTracker"),
   tempoTracker: document.querySelector("#tempoTracker"),
   starterTracker: document.querySelector("#starterTracker"),
+  deviceTracker: document.querySelector("#deviceTracker"),
   storyPanel: document.querySelector("#storyPanel"),
   storySpeaker: document.querySelector("#storySpeaker"),
   storyTitle: document.querySelector("#storyTitle"),
@@ -1835,6 +1836,7 @@ function createRunStats() {
     distanceTraveled: 0,
     activeHook: null,
     mapInteractivesActivated: [],
+    deviceGuide: null,
     tempo: createCombatTempoState(),
     openingSprint: null,
     starterBuild: null,
@@ -3195,6 +3197,7 @@ function restoreRunSave(save) {
     conceptsChosen: cloneForSave(save.runStats?.conceptsChosen, []),
     synergiesUnlocked: cloneForSave(save.runStats?.synergiesUnlocked, []),
     mapInteractivesActivated: cloneForSave(save.runStats?.mapInteractivesActivated, []),
+    deviceGuide: normalizeDeviceGuideState(save.runStats?.deviceGuide),
     distanceTraveled: Math.max(0, Number(save.runStats?.distanceTraveled) || 0),
     tempo: normalizeCombatTempoState(save.runStats?.tempo),
   };
@@ -3697,6 +3700,7 @@ function resetStoreRun(chapterIndex = 0, options = {}) {
     conceptsChosen: ["数组", "队列", "哈希", "时间"],
     synergiesUnlocked: ["队列共鸣", "哈希共鸣"],
     mapInteractivesActivated: ["metro-time-gate", "hash-salt-lantern"].slice(0, Math.max(0, chapterIndex)),
+    deviceGuide: null,
     damageTaken: 32,
     tempo: {
       ...createCombatTempoState(),
@@ -5223,6 +5227,37 @@ function renderStarterIgnitionTracker() {
   `;
 }
 
+function renderDeviceGuideTracker() {
+  if (!ui.deviceTracker) {
+    return;
+  }
+
+  const view = updateDeviceGuide(0);
+  if (!view || world.mode === "menu") {
+    ui.deviceTracker.className = "device-tracker hidden";
+    ui.deviceTracker.innerHTML = "";
+    ui.deviceTracker.style.removeProperty("--device-progress");
+    return;
+  }
+
+  const { guide, target, distance: guideDistance, progress, rewardText } = view;
+  const completed = Boolean(guide?.completed && guide.flash > 0);
+  const distanceText = target
+    ? `距 ${Math.max(0, Math.round(guideDistance))} · ${rewardText}`
+    : rewardText;
+  ui.deviceTracker.style.setProperty("--device-progress", `${Math.round(progress * 100)}%`);
+  ui.deviceTracker.className = [
+    "device-tracker",
+    completed ? "is-completed" : "",
+    target && guideDistance <= DEVICE_GUIDE_NEAR_RADIUS ? "is-near" : "",
+  ].filter(Boolean).join(" ");
+  ui.deviceTracker.innerHTML = `
+    <span>${completed ? "装置已启动" : "装置扫描"}</span>
+    <strong>${shortenText(guide?.targetLabel ?? target?.label ?? "互动装置", 12)}</strong>
+    <small>${completed ? "已写入装置档案 · 章节奖励进度更新" : distanceText}</small>
+  `;
+}
+
 function openStartMenu() {
   world.mode = "menu";
   hidePanels();
@@ -5308,6 +5343,7 @@ function renderRunPanel() {
   renderNightHookTracker();
   renderCombatTempoTracker();
   renderStarterIgnitionTracker();
+  renderDeviceGuideTracker();
 }
 
 function syncHud() {
@@ -5460,6 +5496,7 @@ function updatePlaying(dt) {
   updateBugPickups(dt);
   checkDiscoveryEchoCollision();
   checkMapCacheCollision();
+  updateDeviceGuide(dt);
   checkMapInteractiveCollision();
   updateNightHook(dt);
   updateCombatTempo(dt);
@@ -7282,6 +7319,7 @@ function activateMapInteractive(device) {
   }
   const weakened = applyMapInteractiveWeaken(device);
   const archiveReward = recordMapInteractiveInArchive(device);
+  completeDeviceGuide(device);
 
   burst(device.x, device.y, device.color ?? "#72a5ff", 24);
   burst(player.x, player.y, "#5de2d1", 14);
@@ -7600,6 +7638,7 @@ function draw(dt) {
   drawParticles();
   ctx.restore();
   drawObjectiveCompass(camera);
+  drawDeviceGuideCompass(camera);
   drawExplorationMiniMap(camera);
   drawBossHud();
   ctx.restore();
@@ -7647,6 +7686,7 @@ function drawOffice() {
   drawDiscoveryEchoes(map, visual);
   drawMapCaches(map, visual);
   drawMapInteractives(map, visual);
+  drawDeviceGuidePath(visual);
 
   if ((chapterState?.stepIndex ?? -1) >= 3 || player.fixed >= 3) {
     drawLaoLiangSprite(1080, 118, 0.88);
@@ -7742,6 +7782,163 @@ function getMapCaches(map = currentMap()) {
 
 function getMapInteractives(map = currentMap()) {
   return Array.isArray(map?.interactives) ? map.interactives : [];
+}
+
+const DEVICE_GUIDE_SCAN_RADIUS = 1480;
+const DEVICE_GUIDE_NEAR_RADIUS = 420;
+const DEVICE_GUIDE_COMPLETE_FLASH = 4.2;
+
+function getPendingMapInteractives(map = currentMap()) {
+  return getMapInteractives(map).filter((device) => !isMapInteractiveActivated(device));
+}
+
+function getNearestPendingMapInteractive(map = currentMap()) {
+  const pending = getPendingMapInteractives(map);
+  if (!pending.length) {
+    return null;
+  }
+  if (!player) {
+    return pending[0];
+  }
+  return pending.reduce((nearest, device) => {
+    return distance(player, device) < distance(player, nearest) ? device : nearest;
+  }, pending[0]);
+}
+
+function createDeviceGuideState(device) {
+  if (!device?.id) {
+    return null;
+  }
+  return {
+    chapterIndex: currentChapterIndex,
+    targetId: device.id,
+    targetLabel: device.label ?? "互动装置",
+    elapsed: 0,
+    lastDistance: null,
+    bestDistance: null,
+    announced: false,
+    nearAnnounced: false,
+    completed: false,
+    completedAt: null,
+    flash: 0,
+  };
+}
+
+function normalizeDeviceGuideState(savedGuide) {
+  if (!savedGuide || typeof savedGuide !== "object") {
+    return null;
+  }
+  const chapterIndex = clamp(Math.trunc(Number(savedGuide.chapterIndex) || 0), 0, chapters.length - 1);
+  const map = chapterMaps[chapterIndex] ?? currentMap();
+  const target = getMapInteractives(map).find((device) => device.id === savedGuide.targetId);
+  if (!target) {
+    return null;
+  }
+  return {
+    chapterIndex,
+    targetId: target.id,
+    targetLabel: target.label ?? "互动装置",
+    elapsed: Math.max(0, Number(savedGuide.elapsed) || 0),
+    lastDistance: Number.isFinite(Number(savedGuide.lastDistance)) ? Math.max(0, Number(savedGuide.lastDistance)) : null,
+    bestDistance: Number.isFinite(Number(savedGuide.bestDistance)) ? Math.max(0, Number(savedGuide.bestDistance)) : null,
+    announced: Boolean(savedGuide.announced),
+    nearAnnounced: Boolean(savedGuide.nearAnnounced),
+    completed: Boolean(savedGuide.completed),
+    completedAt: Number(savedGuide.completedAt) || null,
+    flash: Math.max(0, Number(savedGuide.flash) || 0),
+  };
+}
+
+function formatDeviceGuideReward(device) {
+  if (!device) {
+    return "靠近启动";
+  }
+  const rewards = [
+    Number(device.bugPoints) > 0 ? `+${Math.trunc(Number(device.bugPoints))} bug点数` : null,
+    Number(device.xp) > 0 ? `+${Math.trunc(Number(device.xp))} 经验` : null,
+    Number(device.hp) > 0 ? `+${Math.trunc(Number(device.hp))} 生命` : null,
+    Number(device.backlash) > 0 ? `反噬 -${Math.trunc(Number(device.backlash))}` : null,
+    Number(device.invulnerable) > 0 ? `${Number(device.invulnerable).toFixed(1)}秒安全窗` : null,
+    device.cooldownReset ? "冷却归零" : null,
+    Number(device.spawnPickups) > 0 ? `补给 x${Math.trunc(Number(device.spawnPickups))}` : null,
+    Number(device.weakenDamage) > 0 ? "削弱周围实体" : null,
+  ].filter(Boolean);
+  return rewards.slice(0, 3).join(" · ") || "靠近启动";
+}
+
+function updateDeviceGuide(dt = 0) {
+  if (!runStats || world.mode !== "playing" || !player) {
+    return null;
+  }
+
+  if (runStats.deviceGuide?.completed && runStats.deviceGuide.flash > 0) {
+    runStats.deviceGuide.flash = Math.max(0, runStats.deviceGuide.flash - dt);
+  }
+
+  const target = getNearestPendingMapInteractive();
+  if (!target) {
+    return runStats.deviceGuide?.completed && runStats.deviceGuide.flash > 0
+      ? { guide: runStats.deviceGuide, target: null, distance: 0, progress: 1, rewardText: "已写入装置档案" }
+      : null;
+  }
+
+  if (
+    !runStats.deviceGuide
+    || runStats.deviceGuide.completed
+    || runStats.deviceGuide.chapterIndex !== currentChapterIndex
+    || runStats.deviceGuide.targetId !== target.id
+  ) {
+    runStats.deviceGuide = createDeviceGuideState(target);
+  }
+
+  const guide = runStats.deviceGuide;
+  const currentDistance = distance(player, target);
+  guide.elapsed += Math.max(0, Number(dt) || 0);
+  guide.lastDistance = currentDistance;
+  guide.bestDistance = guide.bestDistance === null
+    ? currentDistance
+    : Math.min(guide.bestDistance, currentDistance);
+
+  if (!guide.announced && guide.elapsed >= 0.25) {
+    guide.announced = true;
+    setLog(`装置扫描锁定：${target.label ?? "互动装置"}，靠近可获得 ${formatDeviceGuideReward(target)}。`);
+  }
+
+  if (!guide.nearAnnounced && currentDistance <= DEVICE_GUIDE_NEAR_RADIUS) {
+    guide.nearAnnounced = true;
+    setLog(`装置信号增强：${target.label ?? "互动装置"}就在附近，穿过危险区后贴近启动。`);
+  }
+
+  return {
+    guide,
+    target,
+    distance: currentDistance,
+    progress: clamp(1 - currentDistance / DEVICE_GUIDE_SCAN_RADIUS, 0, 1),
+    rewardText: formatDeviceGuideReward(target),
+  };
+}
+
+function completeDeviceGuide(device) {
+  if (!runStats || !device?.id) {
+    return;
+  }
+  const guide = runStats.deviceGuide?.targetId === device.id
+    ? runStats.deviceGuide
+    : createDeviceGuideState(device);
+  if (!guide) {
+    return;
+  }
+  guide.chapterIndex = currentChapterIndex;
+  guide.targetId = device.id;
+  guide.targetLabel = device.label ?? "互动装置";
+  guide.lastDistance = 0;
+  guide.bestDistance = 0;
+  guide.announced = true;
+  guide.nearAnnounced = true;
+  guide.completed = true;
+  guide.completedAt = Date.now();
+  guide.flash = DEVICE_GUIDE_COMPLETE_FLASH;
+  runStats.deviceGuide = guide;
 }
 
 function getCollectedEchoIds() {
@@ -7981,6 +8178,49 @@ function drawMapInteractive(device, visual, index = 0) {
   ctx.restore();
 
   drawMarkerTag(`互动 · ${shortenText(device.label ?? "装置", 8)}`, device.x, device.y + 56, color);
+}
+
+function drawDeviceGuidePath(visual) {
+  const target = getNearestPendingMapInteractive();
+  if (!target || !player || world.mode !== "playing") {
+    return;
+  }
+
+  const color = target.color ?? visual.accent ?? "#5de2d1";
+  const dx = target.x - player.x;
+  const dy = target.y - player.y;
+  const length = Math.hypot(dx, dy);
+  if (length < 92) {
+    return;
+  }
+
+  const angle = Math.atan2(dy, dx);
+  const midX = player.x + dx * 0.5;
+  const midY = player.y + dy * 0.5;
+  const phase = (world.animTime * 190) % 130;
+  ctx.save();
+  ctx.globalAlpha = 0.18;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 9;
+  ctx.setLineDash([26, 18]);
+  ctx.beginPath();
+  ctx.moveTo(player.x, player.y);
+  ctx.quadraticCurveTo(midX, midY - 42, target.x, target.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  for (let step = 120 + phase; step < length - 84; step += 130) {
+    const t = clamp(step / length, 0, 1);
+    const x = player.x + dx * t;
+    const y = player.y + dy * t - Math.sin(t * Math.PI) * 42;
+    ctx.globalAlpha = 0.72;
+    drawSignalChevron(x, y, angle, color, 16);
+  }
+
+  ctx.globalAlpha = 0.84;
+  strokeCircle(target.x, target.y, 76 + Math.sin(world.animTime * 5.4) * 7, color, 3);
+  drawMarkerTag("扫描目标", target.x, target.y - 66, color);
+  ctx.restore();
 }
 
 function drawZoneSignal(zone, visual) {
@@ -10022,6 +10262,61 @@ function drawObjectiveCompass(camera) {
   ctx.restore();
 }
 
+function drawDeviceGuideCompass(camera) {
+  const target = getNearestPendingMapInteractive();
+  if (!target || !player || world.mode !== "playing") {
+    return;
+  }
+
+  const screenX = target.x - camera.x;
+  const screenY = target.y - camera.y;
+  const margin = 58;
+  const visible = screenX > margin && screenX < world.viewWidth - margin && screenY > 92 && screenY < world.viewHeight - margin;
+  const color = target.color ?? "#5de2d1";
+  const pulse = 1 + Math.sin(world.animTime * 5.8) * 0.12;
+
+  ctx.save();
+  if (visible) {
+    ctx.globalAlpha = 0.72;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.setLineDash([10, 8]);
+    ctx.beginPath();
+    ctx.arc(screenX, screenY, 58 * pulse, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 0.92;
+    drawSmallText("装置", screenX - 16, screenY - 66, "#26364d", 13);
+    ctx.restore();
+    return;
+  }
+
+  const centerX = world.viewWidth / 2;
+  const centerY = world.viewHeight / 2;
+  const angle = Math.atan2(screenY - centerY, screenX - centerX);
+  const x = clamp(screenX, margin, world.viewWidth - margin);
+  const y = clamp(screenY, 104, world.viewHeight - margin);
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(20 * pulse, 0);
+  ctx.lineTo(-12, -11);
+  ctx.lineTo(-6, 0);
+  ctx.lineTo(-12, 11);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 0.18;
+  fillCircle(0, 0, 30, color);
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = 0.88;
+  drawSmallText(`装置 · ${shortenText(target.label ?? "启动", 7)}`, clamp(x - 52, 14, world.viewWidth - 168), clamp(y + 28, 116, world.viewHeight - 24), "#26364d", 12);
+  ctx.restore();
+}
+
 function drawExplorationMiniMap(camera) {
   if (world.width <= world.viewWidth && world.height <= world.viewHeight) {
     return;
@@ -10054,6 +10349,16 @@ function drawExplorationMiniMap(camera) {
   for (const target of getObjectiveTargets()) {
     ctx.globalAlpha = 0.92;
     fillCircle(x + target.x * scaleX, y + target.y * scaleY, 3.5, target.color ?? "#5de2d1");
+  }
+
+  for (const device of getPendingMapInteractives()) {
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = device.color ?? "#5de2d1";
+    const markerX = x + device.x * scaleX;
+    const markerY = y + device.y * scaleY;
+    ctx.fillRect(markerX - 3.5, markerY - 3.5, 7, 7);
+    ctx.globalAlpha = 0.34;
+    strokeCircle(markerX, markerY, 8, device.color ?? "#5de2d1", 1.5);
   }
 
   ctx.globalAlpha = 1;
@@ -10835,6 +11140,15 @@ function installAutomationTestHooks() {
         timer: round(runStats.tempo.timer),
         rewardsClaimed: runStats.tempo.rewardsClaimed,
       } : null,
+      deviceGuide: runStats?.deviceGuide ? {
+        chapterIndex: runStats.deviceGuide.chapterIndex,
+        targetId: runStats.deviceGuide.targetId,
+        targetLabel: runStats.deviceGuide.targetLabel,
+        lastDistance: round(runStats.deviceGuide.lastDistance),
+        bestDistance: round(runStats.deviceGuide.bestDistance),
+        completed: Boolean(runStats.deviceGuide.completed),
+        flash: round(runStats.deviceGuide.flash),
+      } : null,
       openingSprint: runStats?.openingSprint ? {
         completed: Boolean(runStats.openingSprint.completed),
         stepIndex: runStats.openingSprint.stepIndex,
@@ -11414,8 +11728,13 @@ function installAutomationTestHooks() {
     world.pulseCooldown = 1.1;
     world.dashCooldown = 1.2;
     world.mode = "playing";
+    runStats.deviceGuide = null;
+    const guideBefore = updateDeviceGuide(0.35);
+    syncHud();
+    const trackerBefore = ui.deviceTracker?.textContent ?? "";
     const sample = movePlayerTo(device.x, device.y, `interactive-probe-${chapterIndex}`);
     checkMapInteractiveCollision();
+    syncHud();
     const activated = getActivatedMapInteractiveIds().includes(device.id);
     const bugReward = Math.max(0, Math.trunc(Number(device.bugPoints) || 0));
     const healReward = Math.max(0, Math.trunc(Number(device.hp) || 0));
@@ -11424,9 +11743,13 @@ function installAutomationTestHooks() {
     const expectedShardReward = getMapInteractiveChapterReward(chapterIndex);
     const archiveSummary = getMapInteractiveArchiveSummary();
     const savedAfterInteractive = loadRunSave();
+    const guideAfter = cloneForSave(runStats.deviceGuide, null);
 
     const result = {
-      ok: activated
+      ok: Boolean(guideBefore?.target?.id === device.id)
+        && Boolean(guideBefore?.guide?.targetId === device.id)
+        && trackerBefore.includes(device.label ?? "互动装置")
+        && activated
         && player.bugPoints >= beforeBugPoints + bugReward
         && player.hp >= Math.min(player.maxHp, beforeHp + healReward)
         && player.backlash <= Math.max(0, beforeBacklash - backlashReward)
@@ -11439,9 +11762,19 @@ function installAutomationTestHooks() {
         && archiveState.activatedMapInteractives.includes(device.id)
         && archiveState.completedMapInteractiveChapters.includes(currentMap().id)
         && archiveState.calibrationShards === expectedShardReward
+        && Boolean(guideAfter?.completed)
+        && guideAfter?.targetId === device.id
         && savedAfterInteractive?.reason === "map-interactive",
       deviceId: device.id,
       label: device.label ?? null,
+      deviceGuide: {
+        before: {
+          targetId: guideBefore?.guide?.targetId ?? null,
+          distance: round(guideBefore?.distance),
+          trackerText: trackerBefore,
+        },
+        after: guideAfter,
+      },
       sample,
       expectedShardReward,
       beforeBugPoints,
