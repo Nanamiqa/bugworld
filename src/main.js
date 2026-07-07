@@ -1358,6 +1358,8 @@ const openingSurgeConfig = {
   rewardBugPoints: 1,
   rewardHp: 5,
   rewardXp: 4,
+  tempoKick: 1,
+  ignitionCredit: 1,
   enemyPattern: [
     { type: "deadline", dx: 230, dy: -88, hpMultiplier: 0.5, speedMultiplier: 0.82, scale: 0.84 },
     { type: "stress", dx: 270, dy: 18, hpMultiplier: 0.46, speedMultiplier: 0.82, scale: 0.78, mechanicDepth: 1 },
@@ -2761,6 +2763,8 @@ function createOpeningSurgeState() {
     targetDefeats: openingSurgeConfig.targetDefeats,
     defeats: 0,
     spawnedCount: 0,
+    tempoKickClaimed: false,
+    ignitionCreditClaimed: false,
     x: null,
     y: null,
   };
@@ -2790,6 +2794,8 @@ function normalizeOpeningSurgeState(savedSurge = null) {
     targetDefeats: openingSurgeConfig.targetDefeats,
     defeats,
     spawnedCount: Math.max(0, Math.trunc(Number(savedSurge.spawnedCount) || 0)),
+    tempoKickClaimed: Boolean(savedSurge.tempoKickClaimed),
+    ignitionCreditClaimed: Boolean(savedSurge.ignitionCreditClaimed),
     x: Number.isFinite(savedSurge.x) ? savedSurge.x : null,
     y: Number.isFinite(savedSurge.y) ? savedSurge.y : null,
   };
@@ -2913,7 +2919,7 @@ function spawnOpeningSurge(sprint = runStats?.openingSprint) {
     64,
   );
   let spawnedCount = 0;
-  for (const pattern of openingSurgeConfig.enemyPattern) {
+  for (const [index, pattern] of openingSurgeConfig.enemyPattern.entries()) {
     const point = findNearestFreePoint(center.x + pattern.dx - 260, center.y + pattern.dy, 28);
     spawnEnemyNear(point.x, point.y, pattern.type, {
       hpMultiplier: pattern.hpMultiplier,
@@ -2921,6 +2927,7 @@ function spawnOpeningSurge(sprint = runStats?.openingSprint) {
       scale: pattern.scale,
       mechanicDepth: pattern.mechanicDepth ?? 0,
       openingSurge: true,
+      openingSurgeIndex: index,
     });
     spawnedCount += 1;
   }
@@ -2941,6 +2948,45 @@ function spawnOpeningSurge(sprint = runStats?.openingSprint) {
   return true;
 }
 
+function applyOpeningSurgeMomentum(surge) {
+  if (!surge || !player || !runStats) {
+    return { tempoKicked: false, ignitionCredited: false };
+  }
+
+  let tempoKicked = false;
+  if (!surge.tempoKickClaimed && openingSurgeConfig.tempoKick > 0) {
+    surge.tempoKickClaimed = true;
+    for (let index = 0; index < openingSurgeConfig.tempoKick; index += 1) {
+      registerCombatTempoHit({
+        x: surge.x ?? player.x,
+        y: surge.y ?? player.y,
+      });
+    }
+    tempoKicked = true;
+  }
+
+  let ignitionCredited = false;
+  const ignition = runStats.starterIgnition;
+  if (
+    ignition
+    && !surge.ignitionCreditClaimed
+    && !ignition.completed
+    && !ignition.failed
+    && openingSurgeConfig.ignitionCredit > 0
+  ) {
+    surge.ignitionCreditClaimed = true;
+    ignition.surgeCredit = clamp(
+      Math.trunc(Number(ignition.surgeCredit) || 0) + openingSurgeConfig.ignitionCredit,
+      0,
+      3,
+    );
+    ignitionCredited = true;
+    updateStarterIgnition(0);
+  }
+
+  return { tempoKicked, ignitionCredited };
+}
+
 function completeOpeningSurge(surge = runStats?.openingSprint?.surge) {
   if (!surge || surge.completed || surge.failed) {
     return;
@@ -2956,10 +3002,16 @@ function completeOpeningSurge(surge = runStats?.openingSprint?.surge) {
   if (openingSurgeConfig.rewardXp > 0) {
     addExperience(openingSurgeConfig.rewardXp);
   }
+  const momentum = applyOpeningSurgeMomentum(surge);
   world.spawnTimer = Math.min(world.spawnTimer ?? 0, 0.25);
   burst(player.x, player.y, "#f1c15b", 18);
+  burst(player.x, player.y, "#72a5ff", momentum.ignitionCredited ? 18 : 10);
   playAudioCue("upgrade-select");
-  setLog(`开场快递裂隙清场：+${openingSurgeConfig.rewardBugPoints} bug点数，+${openingSurgeConfig.rewardXp} 经验，第一波追击已经进入可控节奏。`);
+  const momentumText = [
+    momentum.tempoKicked ? "连段补给已点亮" : "",
+    momentum.ignitionCredited ? "流派启动加速" : "",
+  ].filter(Boolean).join("，");
+  setLog(`开场快递裂隙清场：+${openingSurgeConfig.rewardBugPoints} bug点数，+${openingSurgeConfig.rewardXp} 经验${momentumText ? `，${momentumText}` : ""}。`);
   saveRunCheckpoint("opening-surge-complete");
 }
 
@@ -3542,6 +3594,7 @@ function createStarterIgnitionState(build) {
     failed: false,
     rewardClaimed: false,
     overclockApplied: false,
+    surgeCredit: 0,
     overclockText: ignition.overclockText ?? "",
   };
 }
@@ -3568,6 +3621,7 @@ function normalizeStarterIgnitionState(savedIgnition, starterBuildId = null) {
     failed: Boolean(savedIgnition.failed),
     rewardClaimed: Boolean(savedIgnition.rewardClaimed),
     overclockApplied: Boolean(savedIgnition.overclockApplied),
+    surgeCredit: clamp(Math.trunc(Number(savedIgnition.surgeCredit) || 0), 0, 3),
     overclockText: typeof savedIgnition.overclockText === "string" ? savedIgnition.overclockText : (fallback.overclockText ?? ""),
   };
 }
@@ -3580,7 +3634,8 @@ function refreshStarterIgnitionProgress(ignition = runStats?.starterIgnition) {
   if (!build) {
     return null;
   }
-  ignition.defeats = Math.max(0, (runStats.enemiesDefeated ?? 0) - (ignition.startDefeats ?? 0));
+  const surgeCredit = clamp(Math.trunc(Number(ignition.surgeCredit) || 0), 0, 3);
+  ignition.defeats = Math.max(0, (runStats.enemiesDefeated ?? 0) - (ignition.startDefeats ?? 0) + surgeCredit);
   return { ignition, build };
 }
 
@@ -4112,6 +4167,7 @@ function spawnEnemyNear(x, y, type = "stress", overrides = {}) {
     phaseAlpha: 0,
     scanPulse: 0,
     openingSurge: Boolean(overrides.openingSurge),
+    openingSurgeIndex: Math.max(0, Math.trunc(Number(overrides.openingSurgeIndex) || 0)),
     animPhase: random(0, Math.PI * 2),
     hitFlash: 0,
     slowTimer: 0,
@@ -5416,9 +5472,9 @@ function renderOpeningSprintTracker() {
     : `${progress.value}/${progress.target} · 奖励 +${stepRewardBugPoints} bug点数${retryBonusBugPoints ? "（复盘加成）" : ""}`;
   const surge = sprint.surge;
   const surgeText = surge?.spawned && !surge.completed && !surge.failed
-    ? `${openingSurgeConfig.label} ${surge.defeats ?? 0}/${openingSurgeConfig.targetDefeats} · ${formatHookTime(openingSurgeConfig.timeLimit - (surge.elapsed ?? 0))}`
+    ? `${openingSurgeConfig.label} ${surge.defeats ?? 0}/${openingSurgeConfig.targetDefeats} · 点燃连段 ${formatHookTime(openingSurgeConfig.timeLimit - (surge.elapsed ?? 0))}`
     : surge?.completed
-      ? `${openingSurgeConfig.label}已清场 · 第一波提速`
+      ? `${openingSurgeConfig.label}已清场 · 连段与流派提速`
       : null;
 
   ui.openingTracker.style.setProperty("--opening-progress", `${Math.round(totalProgress * 100)}%`);
@@ -10151,6 +10207,25 @@ function drawEnemyMechanicUnderlay(enemy) {
 }
 
 function drawEnemyMechanicOverlay(enemy) {
+  if (enemy.openingSurge) {
+    const pulse = 0.5 + Math.sin(world.animTime * 8 + (enemy.openingSurgeIndex ?? 0)) * 0.5;
+    const ring = enemy.radius + 10 + pulse * 5;
+    ctx.save();
+    ctx.globalAlpha = 0.78;
+    ctx.strokeStyle = "#f1c15b";
+    ctx.lineWidth = 3;
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath();
+    ctx.arc(enemy.x, enemy.y, ring, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 0.2 + pulse * 0.12;
+    fillCircle(enemy.x, enemy.y, enemy.radius + 18, "#f1c15b");
+    ctx.globalAlpha = 0.92;
+    drawMarkerTag(`裂隙 ${Math.trunc(enemy.openingSurgeIndex ?? 0) + 1}`, enemy.x, enemy.y - enemy.radius - 28, "#f1c15b");
+    ctx.restore();
+  }
+
   if (enemy.shieldActive || enemy.shieldFlash > 0) {
     ctx.save();
     const flash = enemy.shieldFlash ?? 0;
@@ -10695,11 +10770,12 @@ function drawEnemyAsset(enemy) {
   const scale = 1 + Math.sin(world.animTime * 4 + phase) * 0.035 + Math.abs(hurt);
   const rotate = Math.sin(world.animTime * 2.2 + phase) * (enemy.type === "inspectionProbe" ? 0.08 : 0.04);
   const phaseAlpha = enemy.phaseAlpha > 0 ? 0.48 + Math.sin(world.animTime * 18 + phase) * 0.08 : 1;
+  const surgeGlow = enemy.openingSurge ? 0.18 + Math.sin(world.animTime * 8 + phase) * 0.05 : 0;
   const drawn = drawSpriteAsset(enemy.assetKey, enemy.x, enemy.y, size, size, {
     alpha: phaseAlpha,
     bob,
-    glowAlpha: enemy.phaseAlpha > 0 ? 0.14 : enemy.slowTimer > 0 ? 0.07 : 0,
-    glowColor: enemy.phaseAlpha > 0 ? "#8edcff" : "#72a5ff",
+    glowAlpha: enemy.phaseAlpha > 0 ? 0.14 : Math.max(surgeGlow, enemy.slowTimer > 0 ? 0.07 : 0),
+    glowColor: enemy.openingSurge ? "#f1c15b" : enemy.phaseAlpha > 0 ? "#8edcff" : "#72a5ff",
     rotate,
     scale,
   });
@@ -11508,6 +11584,12 @@ function installAutomationTestHooks() {
     resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 74, xp: 0, weaponIndex: 1 });
     runStats.openingSprint = createOpeningSprintState();
     runStats.openingSprint.surge.delayRemaining = 0;
+    runStats.tempo = createCombatTempoState();
+    const build = getStarterBuildById("queue-barrage");
+    if (build) {
+      runStats.starterBuild = build.id;
+      runStats.starterIgnition = createStarterIgnitionState(build);
+    }
     player.xp = 0;
     player.xpToNext = 99;
     world.mode = "playing";
@@ -11524,16 +11606,24 @@ function installAutomationTestHooks() {
     updateOpeningSurge(0.1);
     const surge = runStats.openingSprint?.surge;
     const savedAfterSurge = loadRunSave();
+    const tempoRewardClaimed = (runStats.tempo?.rewardsClaimed ?? 0) >= 1;
+    const ignitionCompleted = Boolean(runStats.starterIgnition?.completed);
     const result = {
       ok: spawned.length >= openingSurgeConfig.targetDefeats
         && Boolean(surge?.completed)
         && (surge?.defeats ?? 0) >= openingSurgeConfig.targetDefeats
-        && player.bugPoints >= startBugPoints + openingSurgeConfig.rewardBugPoints
+        && Boolean(surge?.tempoKickClaimed)
+        && Boolean(surge?.ignitionCreditClaimed)
+        && tempoRewardClaimed
+        && ignitionCompleted
+        && player.bugPoints >= startBugPoints + openingSurgeConfig.rewardBugPoints + combatTempoConfig.bugPointReward
         && player.hp >= Math.min(player.maxHp, startHp + openingSurgeConfig.rewardHp)
         && player.xp >= startXp + openingSurgeConfig.rewardXp
         && savedAfterSurge?.reason === "opening-surge-complete",
       spawnedCount: spawned.length,
       surge: cloneForSave(surge, null),
+      tempo: cloneForSave(runStats.tempo, null),
+      ignition: cloneForSave(runStats.starterIgnition, null),
       reward: {
         bugPoints: player.bugPoints - startBugPoints,
         hp: round(player.hp - startHp),
