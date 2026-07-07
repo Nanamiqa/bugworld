@@ -1462,6 +1462,86 @@ const weaponOpeningHooks = {
     tag: "适合边躲边反打",
   },
 };
+const weaponImpactProfiles = {
+  paperclip: {
+    id: "paperclip",
+    label: "断点",
+    chargedLabel: "精准断点",
+    textPrefix: "断点",
+    cue: "weapon-hit-paperclip",
+    color: "#f1c15b",
+    chargedColor: "#ffe58a",
+    shape: "slash",
+    count: 9,
+    sizeMin: 2,
+    sizeMax: 4,
+    speedMin: 80,
+    speedMax: 230,
+    lengthMin: 10,
+    lengthMax: 24,
+    lifeMin: 0.18,
+    lifeMax: 0.44,
+    ring: true,
+    shake: 0.018,
+  },
+  keyboard: {
+    id: "keyboard",
+    label: "键帽",
+    textPrefix: "键帽",
+    cue: "weapon-hit-keyboard",
+    color: "#72a5ff",
+    shape: "keycap",
+    count: 8,
+    sizeMin: 4,
+    sizeMax: 7,
+    speedMin: 60,
+    speedMax: 170,
+    lengthMin: 7,
+    lengthMax: 13,
+    lifeMin: 0.22,
+    lifeMax: 0.5,
+    ring: false,
+    shake: 0.012,
+  },
+  "correction-fluid": {
+    id: "correction-fluid",
+    label: "减速",
+    textPrefix: "雾化",
+    cue: "weapon-hit-correction",
+    color: "#f7b4d8",
+    shape: "mist",
+    count: 10,
+    sizeMin: 5,
+    sizeMax: 11,
+    speedMin: 36,
+    speedMax: 125,
+    lengthMin: 8,
+    lengthMax: 16,
+    lifeMin: 0.28,
+    lifeMax: 0.66,
+    ring: true,
+    shake: 0.006,
+  },
+  default: {
+    id: "default",
+    label: "命中",
+    textPrefix: "",
+    cue: "weapon",
+    color: "#f1c15b",
+    shape: "square",
+    count: 7,
+    sizeMin: 2,
+    sizeMax: 5,
+    speedMin: 45,
+    speedMax: 160,
+    lengthMin: 8,
+    lengthMax: 18,
+    lifeMin: 0.22,
+    lifeMax: 0.52,
+    ring: false,
+    shake: 0.008,
+  },
+};
 const bossPhaseTuning = {
   1: {
     desiredDistance: 235,
@@ -5859,6 +5939,83 @@ function findNearestHostile(range) {
   return nearest;
 }
 
+function getWeaponImpactProfile(weaponId, charged = false) {
+  const base = weaponImpactProfiles[weaponId] ?? weaponImpactProfiles.default;
+  return {
+    ...base,
+    label: charged && base.chargedLabel ? base.chargedLabel : base.label,
+    color: charged ? (base.chargedColor ?? base.color) : base.color,
+    count: (base.count ?? 7) + (charged ? 5 : 0),
+    charged: Boolean(charged),
+  };
+}
+
+function spawnWeaponImpactParticles(x, y, profile, bullet = null) {
+  const count = Math.max(4, Math.round(profile.count ?? 7));
+  const pushX = (bullet?.vx ?? 0) * 0.025;
+  const pushY = (bullet?.vy ?? 0) * 0.025;
+
+  for (let index = 0; index < count; index += 1) {
+    const angle = random(0, Math.PI * 2);
+    const speed = random(profile.speedMin ?? 45, profile.speedMax ?? 160);
+    const life = random(profile.lifeMin ?? 0.22, profile.lifeMax ?? 0.52);
+    particles.push({
+      type: "impact",
+      impactProfile: profile.id,
+      shape: profile.shape ?? "square",
+      x,
+      y,
+      vx: Math.cos(angle) * speed + pushX,
+      vy: Math.sin(angle) * speed + pushY,
+      size: random(profile.sizeMin ?? 2, profile.sizeMax ?? 5),
+      length: random(profile.lengthMin ?? 8, profile.lengthMax ?? 18),
+      rotation: angle + random(-0.35, 0.35),
+      color: profile.color,
+      life,
+      maxLife: life,
+    });
+  }
+
+  if (profile.ring) {
+    const ringLife = profile.charged ? 0.34 : 0.26;
+    particles.push({
+      type: "impact",
+      impactProfile: profile.id,
+      shape: "ring",
+      x,
+      y,
+      vx: 0,
+      vy: -4,
+      size: profile.charged ? 28 : 19,
+      length: 0,
+      rotation: 0,
+      color: profile.color,
+      life: ringLife,
+      maxLife: ringLife,
+    });
+  }
+}
+
+function spawnWeaponImpactFeedback(enemy, bullet, finalDamage) {
+  const profile = bullet?.impactProfile ?? getWeaponImpactProfile(bullet?.weaponId, bullet?.charged);
+  const roundedDamage = Math.max(1, Math.round(finalDamage));
+  const label = profile.textPrefix ? `${profile.textPrefix} ${roundedDamage}` : `${roundedDamage}`;
+  spawnWeaponImpactParticles(enemy.x, enemy.y, profile, bullet);
+  spawnFloatingText(
+    enemy.x + random(-10, 10),
+    enemy.y - (enemy.radius ?? 18) - 12,
+    label,
+    profile.color,
+    {
+      size: profile.charged ? 16 : 14,
+      life: profile.charged ? 0.72 : 0.58,
+      vy: profile.charged ? -54 : -44,
+    },
+  );
+  playAudioCue(profile.cue, { intensity: clamp(roundedDamage / 24, 0.52, 1.45) });
+  world.cameraShake = Math.max(world.cameraShake, profile.shake ?? 0);
+}
+
 function fireWeaponAt(target) {
   const weapon = player.weapon;
   const count = Math.max(1, Math.round(weapon.projectileCount));
@@ -5867,6 +6024,7 @@ function fireWeaponAt(target) {
   weapon.shotsFired += 1;
   const trait = weapon.trait;
   const charged = trait?.type === "chargedShot" && weapon.shotsFired % trait.every === 0;
+  const impactProfile = getWeaponImpactProfile(weapon.id, charged);
 
   for (let index = 0; index < count; index += 1) {
     const centered = index - (count - 1) / 2;
@@ -5877,6 +6035,9 @@ function fireWeaponAt(target) {
       vx: Math.cos(angle) * weapon.bulletSpeed,
       vy: Math.sin(angle) * weapon.bulletSpeed,
       angle,
+      weaponId: weapon.id,
+      charged,
+      impactProfile,
       radius: weapon.bulletSize + (charged ? trait.bulletSizeAdd : 0),
       damage: weapon.damage * (charged ? trait.damageMultiplier : 1),
       color: charged ? trait.color : weapon.color,
@@ -6022,7 +6183,7 @@ function applyEnemyDamage(enemy, amount, source = "weapon") {
 
   enemy.hp -= finalDamage;
   enemy.hitFlash = Math.max(enemy.hitFlash ?? 0, 0.14);
-  if (["weapon", "pulse", "ally"].includes(source)) {
+  if (["pulse", "ally"].includes(source)) {
     const color = source === "pulse" ? "#72a5ff" : source === "ally" ? "#96e072" : "#f1c15b";
     spawnFloatingText(enemy.x + random(-10, 10), enemy.y - enemy.radius - 12, `${Math.max(1, Math.round(finalDamage))}`, color);
   }
@@ -6096,9 +6257,9 @@ function updateBullets(dt) {
         continue;
       }
 
-      applyEnemyDamage(enemy, bullet.damage, "weapon");
+      const dealt = applyEnemyDamage(enemy, bullet.damage, "weapon");
       bullet.hitTargets.add(enemy);
-      burst(enemy.x, enemy.y, bullet.color, 7);
+      spawnWeaponImpactFeedback(enemy, bullet, dealt);
       if (bullet.knockback > 0) {
         const angle = Math.atan2(enemy.y - player.y, enemy.x - player.x);
         enemy.x = clamp(enemy.x + Math.cos(angle) * bullet.knockback, enemy.radius, world.width - enemy.radius);
@@ -6127,7 +6288,7 @@ function updateBullets(dt) {
       hazard.hp -= bullet.damage;
       hazard.hitFlash = 0.14;
       bullet.hitTargets.add(hazard);
-      burst(hazard.x, hazard.y, bullet.color, 7);
+      spawnWeaponImpactParticles(hazard.x, hazard.y, bullet.impactProfile ?? getWeaponImpactProfile(bullet.weaponId, bullet.charged), bullet);
       if (bullet.pierce <= 0) {
         bullet.life = 0;
         break;
@@ -11254,11 +11415,32 @@ function drawParticles() {
     }
     const size = particle.size * (0.45 + alpha * 0.85);
     ctx.save();
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = particle.shape === "mist" ? alpha * 0.68 : alpha;
     ctx.translate(particle.x, particle.y);
-    ctx.rotate((1 - alpha) * Math.PI * 0.65);
+    ctx.rotate((particle.rotation ?? 0) + (1 - alpha) * Math.PI * 0.35);
     ctx.fillStyle = particle.color;
-    ctx.fillRect(-size / 2, -size / 2, size, size);
+    if (particle.shape === "slash") {
+      ctx.fillRect(-(particle.length ?? 14) / 2, -Math.max(1, size * 0.28), particle.length ?? 14, Math.max(1, size * 0.56));
+    } else if (particle.shape === "keycap") {
+      const width = Math.max(7, particle.length ?? size * 1.8);
+      ctx.fillRect(-width / 2, -size / 2, width, size);
+      ctx.globalAlpha = Math.min(1, alpha + 0.18);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.42)";
+      ctx.fillRect(-width / 2 + 2, -size / 2 + 1, Math.max(2, width - 4), Math.max(1, size * 0.24));
+    } else if (particle.shape === "mist") {
+      ctx.beginPath();
+      ctx.arc(0, 0, size, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (particle.shape === "ring") {
+      const radius = particle.size * (1.15 - alpha * 0.12);
+      ctx.strokeStyle = particle.color;
+      ctx.lineWidth = Math.max(1.5, 3 * alpha);
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      ctx.fillRect(-size / 2, -size / 2, size, size);
+    }
     ctx.restore();
   }
   ctx.globalAlpha = 1;
@@ -11858,20 +12040,47 @@ function installAutomationTestHooks() {
     const previousArchive = cloneForSave(archiveState, null);
     resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 80, weaponIndex: 0 });
     particles = [];
-    const enemy = spawnEnemyNear(player.x + 120, player.y, "stress", { hpMultiplier: 0.6, speedMultiplier: 0.1 });
-    const target = enemies[enemies.length - 1] ?? enemy;
-    const damage = applyEnemyDamage(target, 17, "weapon");
-    const textParticle = particles.find((particle) => particle.type === "text" && String(particle.text).includes("17"));
-    const sparkCount = particles.length;
+    const samples = weaponDefinitions.slice(0, 3).map((weapon, index) => {
+      const enemy = spawnEnemyNear(player.x + 120 + index * 42, player.y + index * 18, "stress", { hpMultiplier: 0.8, speedMultiplier: 0.1 });
+      const target = enemies[enemies.length - 1] ?? enemy;
+      const charged = weapon.id === "paperclip";
+      const profile = getWeaponImpactProfile(weapon.id, charged);
+      const beforeCount = particles.length;
+      target.hp = 120;
+      const damage = applyEnemyDamage(target, 17 + index, "weapon");
+      spawnWeaponImpactFeedback(target, {
+        weaponId: weapon.id,
+        charged,
+        impactProfile: profile,
+        vx: weapon.bulletSpeed ?? 0,
+        vy: 0,
+      }, damage);
+      const emitted = particles.slice(beforeCount);
+      const textParticle = emitted.find((particle) => particle.type === "text" && String(particle.text).includes(profile.textPrefix ?? ""));
+      const impactParticles = emitted.filter((particle) => particle.type === "impact" && particle.impactProfile === profile.id);
+      const shapes = [...new Set(impactParticles.map((particle) => particle.shape).filter(Boolean))];
+      return {
+        weaponId: weapon.id,
+        profile: profile.id,
+        label: profile.label,
+        text: textParticle?.text ?? "",
+        damage: round(damage),
+        hitFlash: round(target.hitFlash),
+        particleCount: impactParticles.length,
+        shapes,
+      };
+    });
     const result = {
-      ok: Math.round(damage) === 17
-        && target.hitFlash > 0
-        && Boolean(textParticle)
-        && sparkCount >= 1,
-      damage,
-      hitFlash: target.hitFlash,
-      textParticle: cloneForSave(textParticle, null),
-      particleCount: sparkCount,
+      ok: samples.length === 3
+        && samples.every((sample, index) => Math.round(sample.damage) === 17 + index)
+        && samples.every((sample) => sample.hitFlash > 0)
+        && samples.every((sample) => sample.text.includes(String(Math.round(sample.damage))))
+        && samples.every((sample) => sample.particleCount >= 6)
+        && samples.some((sample) => sample.shapes.includes("slash"))
+        && samples.some((sample) => sample.shapes.includes("keycap"))
+        && samples.some((sample) => sample.shapes.includes("mist")),
+      samples,
+      particleCount: particles.length,
     };
     deleteRunSave();
     archiveState = previousArchive ?? loadArchive();

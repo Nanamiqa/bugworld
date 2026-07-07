@@ -1,6 +1,9 @@
 (function () {
   const cueThrottleMs = {
     weapon: 90,
+    "weapon-hit-paperclip": 42,
+    "weapon-hit-keyboard": 55,
+    "weapon-hit-correction": 48,
     pickup: 75,
     "enemy-down": 110,
     damage: 220,
@@ -169,6 +172,21 @@
           break;
         case "weapon":
           tone(880, now, 0.035, 0.09, "square", 1180);
+          break;
+        case "weapon-hit-paperclip":
+          tone(1320, now, 0.026, 0.08 * intensity, "square", 1780);
+          tone(660, now + 0.014, 0.04, 0.05 * intensity, "triangle", 520);
+          noise(now, 0.026, 0.025 * intensity, 3600);
+          break;
+        case "weapon-hit-keyboard":
+          noise(now, 0.038, 0.055 * intensity, 1900);
+          tone(420, now, 0.035, 0.055 * intensity, "square", 360);
+          tone(720, now + 0.026, 0.032, 0.04 * intensity, "triangle");
+          break;
+        case "weapon-hit-correction":
+          noise(now, 0.07, 0.045 * intensity, 860);
+          tone(300, now, 0.075, 0.05 * intensity, "sine", 210);
+          tone(520, now + 0.032, 0.065, 0.032 * intensity, "triangle", 390);
           break;
         case "dash":
           noise(now, 0.13, 0.14 * intensity, 2200);
