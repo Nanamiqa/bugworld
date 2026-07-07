@@ -1438,6 +1438,24 @@ const starterBuilds = [
     },
   },
 ];
+
+const weaponOpeningHooks = {
+  paperclip: {
+    title: "首 30 秒：断点点杀",
+    text: "远距点掉裂隙怪，清场后更快触发精准弹超频。",
+    tag: "适合想稳扎稳打看弱点窗口",
+  },
+  keyboard: {
+    title: "首 30 秒：弹幕连段",
+    text: "三枚按键弹铺安全区，第一波直接点亮连段补给。",
+    tag: "适合新手快速看到爽点",
+  },
+  "correction-fluid": {
+    title: "首 30 秒：近身控场",
+    text: "高频减速拆开贴脸怪，清裂隙后马上获得容错。",
+    tag: "适合边躲边反打",
+  },
+};
 const bossPhaseTuning = {
   1: {
     desiredDistance: 235,
@@ -3578,6 +3596,13 @@ function getWeaponById(id) {
   return weaponDefinitions.find((weapon) => weapon.id === id) ?? null;
 }
 
+function getWeaponOpeningHook(weapon) {
+  if (!weapon?.id) {
+    return null;
+  }
+  return weaponOpeningHooks[weapon.id] ?? null;
+}
+
 function createStarterIgnitionState(build) {
   if (!build?.id) {
     return null;
@@ -4115,6 +4140,8 @@ function configureStoreShotMode() {
 function createBugNode(x = random(90, world.width - 90), y = random(96, world.height - 86), eventId = null) {
   const event = eventId ? getEventById(eventId) : bugEvents[Math.floor(Math.random() * bugEvents.length)];
   const safePoint = findNearestFreePoint(x, y, 42);
+  const stepIndex = chapterState?.stepIndex ?? -1;
+  const openingFocus = currentChapterIndex === 0 && stepIndex === 0 && (runStats?.eventsResolved ?? 0) === 0;
 
   return {
     x: safePoint.x,
@@ -4124,7 +4151,8 @@ function createBugNode(x = random(90, world.width - 90), y = random(96, world.he
     pulse: random(0, Math.PI * 2),
     animPhase: random(0, Math.PI * 2),
     event,
-    chapterStep: chapterState?.stepIndex ?? -1,
+    chapterStep: stepIndex,
+    openingFocus,
   };
 }
 
@@ -4298,7 +4326,11 @@ function openWeaponSelect() {
     const specializationLine = specialization
       ? `<span class="specialization-line ${specialization.active ? "is-active" : ""}">${specialization.text}</span>`
       : "";
-    button.innerHTML = `${icon}<span class="choice-copy"><span class="choice-title">${weapon.name} · ${weapon.role}</span><span class="choice-effect">${weapon.desc}<br>${weapon.traitText}${specializationLine}</span></span>`;
+    const openingHook = getWeaponOpeningHook(weapon);
+    const openingHookLine = openingHook
+      ? `<span class="weapon-opening-hook"><strong>${openingHook.title}</strong>${openingHook.text}<em>${openingHook.tag}</em></span>`
+      : "";
+    button.innerHTML = `${icon}<span class="choice-copy"><span class="choice-title">${weapon.name} · ${weapon.role}</span><span class="choice-effect">${weapon.desc}<br>${weapon.traitText}${specializationLine}${openingHookLine}</span></span>`;
     button.addEventListener("click", () => {
       equipWeapon(weapon);
       saveRunCheckpoint("weapon-selected");
@@ -4535,8 +4567,11 @@ function spawnChapterNodes(step) {
   bugNodes = nodes.map((node) => createBugNode(node.x, node.y, node.eventId));
   world.mode = "playing";
   const hint = currentMap().stepHints?.[chapterState.stepIndex];
-  if (hint) {
-    setLog(hint);
+  const openingHint = currentChapterIndex === 0 && chapterState.stepIndex === 0
+    ? "首个异常已标记：靠近它会打开事件选择，处理后立刻推进开场目标链。"
+    : "";
+  if (openingHint || hint) {
+    setLog(openingHint || hint);
   }
   saveRunCheckpoint("chapter-step");
 }
@@ -9759,6 +9794,16 @@ function drawBugNodes(dt) {
       drawCenteredAsset(assetKey, 0, 0, 42 + glow, 42 + glow, false);
     }
     ctx.restore();
+
+    if (node.openingFocus) {
+      const labelY = node.y + bob - (node.interactRadius ?? node.radius + 28) - 22;
+      ctx.save();
+      ctx.globalAlpha = 0.92;
+      drawMarkerTag("首个异常 · 触发开场链", node.x, labelY, node.event.color);
+      ctx.globalAlpha = 0.82;
+      drawSmallText("+1 bug点数 / +2 经验", node.x - 56, labelY + 24, "#26364d", 12);
+      ctx.restore();
+    }
   }
 }
 
@@ -10394,7 +10439,7 @@ function getObjectiveTargets() {
       x: node.x,
       y: node.y,
       color: node.event?.color ?? "#5de2d1",
-      label: node.event?.title ?? "目标",
+      label: node.openingFocus ? "首个异常" : node.event?.title ?? "目标",
     }));
   }
 
@@ -10434,7 +10479,7 @@ function drawObjectiveCompass(camera) {
     ctx.arc(screenX, screenY, 44 * pulse, 0, Math.PI * 2);
     ctx.stroke();
     ctx.globalAlpha = 0.92;
-    drawSmallText("目标", screenX - 14, screenY - 52, "#26364d", 13);
+    drawSmallText(target.label === "首个异常" ? "首个异常" : "目标", screenX - 28, screenY - 52, "#26364d", 13);
     ctx.restore();
     return;
   }
@@ -11637,6 +11682,45 @@ function installAutomationTestHooks() {
     return result;
   }
 
+  function runOpeningGuidanceProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    startNewRun(0);
+    const weaponChoiceText = ui.storyChoices?.textContent ?? "";
+    const hookCoverage = weaponDefinitions
+      .filter((weapon) => getWeaponOpeningHook(weapon))
+      .every((weapon) => {
+        const hook = getWeaponOpeningHook(weapon);
+        return weaponChoiceText.includes(hook.title)
+          && weaponChoiceText.includes(hook.tag);
+      });
+
+    resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 80, weaponIndex: 0 });
+    runStats.eventsResolved = 0;
+    spawnChapterNodes(currentChapter().steps?.[0]);
+    const focusNode = bugNodes.find((node) => node.openingFocus);
+    const firstTarget = getObjectiveTargets()[0];
+    const result = {
+      ok: hookCoverage
+        && Boolean(focusNode)
+        && firstTarget?.label === "首个异常"
+        && ui.log?.textContent.includes("首个异常已标记"),
+      hookCoverage,
+      weaponChoiceText,
+      focusNode: focusNode ? {
+        eventId: focusNode.event?.id ?? null,
+        chapterStep: focusNode.chapterStep,
+        openingFocus: Boolean(focusNode.openingFocus),
+      } : null,
+      firstTarget,
+      logText: ui.log?.textContent ?? "",
+    };
+    deleteRunSave();
+    ui.storyPanel.classList.add("hidden");
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
+    return result;
+  }
+
   function runResultReviewProbe() {
     const previousArchive = cloneForSave(archiveState, null);
     resetStoreRun(0, { stepIndex: 1, bugPoints: 0, hp: 20, level: 2 });
@@ -12099,6 +12183,7 @@ function installAutomationTestHooks() {
     const echoArchive = runEchoArchiveProbe();
     const openingSprint = runOpeningSprintProbe();
     const openingSurge = runOpeningSurgeProbe();
+    const openingGuidance = runOpeningGuidanceProbe();
     const resultReview = runResultReviewProbe();
     const starterBuild = runStarterBuildProbe();
 
@@ -12119,6 +12204,9 @@ function installAutomationTestHooks() {
     }
     if (!openingSurge.ok) {
       failures.push("opening surge first wave failed");
+    }
+    if (!openingGuidance.ok) {
+      failures.push("opening weapon and anomaly guidance failed");
     }
     if (!resultReview.ok) {
       failures.push("result review recommendation failed");
@@ -12209,6 +12297,7 @@ function installAutomationTestHooks() {
       echoArchive,
       openingSprint,
       openingSurge,
+      openingGuidance,
       resultReview,
       starterBuild,
       chapters: chaptersCovered,
@@ -12228,6 +12317,7 @@ function installAutomationTestHooks() {
     runEchoArchiveProbe,
     runOpeningSprintProbe,
     runOpeningSurgeProbe,
+    runOpeningGuidanceProbe,
     runMapInteractiveProbe,
     runResultReviewProbe,
     runStarterBuildProbe,
