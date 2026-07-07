@@ -2171,6 +2171,40 @@ function normalizeRetryPlan(value) {
   };
 }
 
+function normalizeFairDamageCue(value = null) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  return {
+    label: typeof value.label === "string" ? value.label : "伤害来源",
+    message: typeof value.message === "string" ? value.message : "未知伤害",
+    amount: Math.max(0, Math.round(Number(value.amount) || 0)),
+    hpBefore: Math.max(0, Math.round(Number(value.hpBefore) || 0)),
+    hpAfter: Math.round(Number(value.hpAfter) || 0),
+    level: ["low", "critical", "lethal"].includes(value.level) ? value.level : "hit",
+    hint: typeof value.hint === "string" ? value.hint : "",
+    invulnerable: Math.max(0, Number(value.invulnerable) || 0),
+    at: Number(value.at) || Date.now(),
+  };
+}
+
+function normalizeFailureReplay(value = null) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const lethalHit = normalizeFairDamageCue(value.lethalHit);
+  const lastCue = normalizeFairDamageCue(value.lastCue);
+  return {
+    title: typeof value.title === "string" ? value.title : "失败回放",
+    summary: typeof value.summary === "string" ? value.summary : "最后一次失误已经记录。",
+    counter: typeof value.counter === "string" ? value.counter : "下一把按推荐路线重开，先拿容错再清第一波。",
+    lethalHit,
+    lastCue,
+    warningCount: Math.max(0, Math.trunc(Number(value.warningCount) || 0)),
+    safetyWindowCount: Math.max(0, Math.trunc(Number(value.safetyWindowCount) || 0)),
+  };
+}
+
 function normalizeLastRunReview(value) {
   if (!value || typeof value !== "object") {
     return null;
@@ -2188,6 +2222,7 @@ function normalizeLastRunReview(value) {
     recommendedStarterBuildId: build?.id ?? null,
     retryBoost: normalizeRetryBoost(value.retryBoost),
     retryPlan: normalizeRetryPlan(value.retryPlan),
+    failureReplay: normalizeFailureReplay(value.failureReplay),
     at: Number(value.at) || Date.now(),
   };
 }
@@ -2198,6 +2233,10 @@ function createFairWarningState() {
     criticalHpWarned: false,
     warningCount: 0,
     lastWarningAt: 0,
+    safetyWindowCount: 0,
+    lastHit: null,
+    lastCue: null,
+    lethalHit: null,
   };
 }
 
@@ -2208,6 +2247,10 @@ function normalizeFairWarningState(value = {}) {
     criticalHpWarned: Boolean(value?.criticalHpWarned),
     warningCount: Math.max(0, Math.trunc(Number(value?.warningCount) || 0)),
     lastWarningAt: Number(value?.lastWarningAt) || 0,
+    safetyWindowCount: Math.max(0, Math.trunc(Number(value?.safetyWindowCount) || 0)),
+    lastHit: normalizeFairDamageCue(value?.lastHit),
+    lastCue: normalizeFairDamageCue(value?.lastCue),
+    lethalHit: normalizeFairDamageCue(value?.lethalHit),
   };
 }
 
@@ -3749,7 +3792,7 @@ function createReviewRetryBoost(victory, build, pressureTitle = "") {
     return null;
   }
 
-  if (build?.id === "close-control" || pressureTitle.includes("伤害")) {
+  if (build?.id === "close-control" || pressureTitle.includes("伤害") || pressureTitle.includes("回放")) {
     return normalizeRetryBoost({
       id: "shielded-second-night",
       title: "护盾起步",
@@ -3819,7 +3862,7 @@ function createReviewRetryPlan(victory, build, retryBoost = null, pressureTitle 
     });
   }
 
-  if (safeBuild.id === "close-control" || pressureTitle.includes("伤害")) {
+  if (safeBuild.id === "close-control" || pressureTitle.includes("伤害") || pressureTitle.includes("回放")) {
     return normalizeRetryPlan({
       ...base,
       id: "control-second-night-route",
@@ -3937,6 +3980,41 @@ function applyRetryBoost(boost) {
   return runStats.retryBoost;
 }
 
+function createFailureReplay(victory, pressureTitle = "") {
+  if (victory || !runStats) {
+    return null;
+  }
+  const warning = normalizeFairWarningState(runStats.fairWarning);
+  const lethalHit = warning.lethalHit ?? warning.lastHit;
+  const lastCue = warning.lastCue;
+  if (!lethalHit && !lastCue && (runStats.damageTaken ?? 0) <= 0) {
+    return null;
+  }
+
+  const source = String(lethalHit?.message || lastCue?.message || pressureTitle || "未知伤害")
+    .replace(/[。.!！]+$/u, "");
+  const amountText = lethalHit ? `${lethalHit.amount} 点伤害` : `${Math.round(runStats.damageTaken ?? 0)} 点累计伤害`;
+  const warningText = warning.warningCount > 0
+    ? `已触发 ${warning.warningCount} 次生命预警、${warning.safetyWindowCount} 次短暂无敌。`
+    : "本局没有来得及触发生命预警，说明最后一段爆发需要更早拉开距离。";
+  const hpText = lethalHit
+    ? `生命 ${lethalHit.hpBefore} -> ${Math.max(0, lethalHit.hpAfter)}。`
+    : "";
+  const counter = lastCue?.hint
+    ? `${lastCue.hint} 下一把按推荐路线先拿容错，再清第一波裂隙。`
+    : "下一把按推荐路线先拿容错，优先留闪避处理红色危险区。";
+
+  return normalizeFailureReplay({
+    title: source.includes("红色") || source.includes("危险") ? "危险区命中回放" : "伤害回放已记录",
+    summary: `最后记录：${source}，${amountText}。${hpText}${warningText}`,
+    counter,
+    lethalHit,
+    lastCue,
+    warningCount: warning.warningCount,
+    safetyWindowCount: warning.safetyWindowCount,
+  });
+}
+
 function createRunReview(victory) {
   const bestStreak = runStats?.tempo?.bestStreak ?? 0;
   const eventsResolved = runStats?.eventsResolved ?? 0;
@@ -3978,6 +4056,12 @@ function createRunReview(victory) {
     pressureText = "按推荐流派目标打完第一波，武器会获得一次明显超频。";
   }
 
+  const failureReplay = createFailureReplay(victory, pressureTitle);
+  if (failureReplay) {
+    pressureTitle = failureReplay.title;
+    pressureText = `${failureReplay.summary} ${failureReplay.counter}`;
+  }
+
   const nextTitle = victory ? "挑战低伤通关" : `推荐再来：${build?.title ?? "推荐流派"}`;
   const nextText = victory
     ? "已经通关，下一把用同一套路线追低伤、未收集回声和更清晰的截图。"
@@ -3997,6 +4081,7 @@ function createRunReview(victory) {
     recommendedStarterBuildId: build?.id ?? null,
     retryBoost,
     retryPlan,
+    failureReplay,
     at: Date.now(),
   };
 }
@@ -7854,11 +7939,47 @@ function triggerFairWarningIfNeeded(beforeHp, amount, fallbackMessage) {
     ? "临界生命：短暂无敌已触发，先横向拉开距离，找 bug点数或回复地标。"
     : "低生命警报：下一次失误可能会中断夜巡，先绕开红色危险区。";
   player.invulnerable = Math.max(player.invulnerable ?? 0, critical ? fairWarningConfig.criticalInvulnerable : fairWarningConfig.lowInvulnerable);
+  warning.safetyWindowCount += 1;
+  warning.lastCue = normalizeFairDamageCue({
+    label,
+    message: fallbackMessage,
+    amount,
+    hpBefore: beforeHp,
+    hpAfter: player.hp,
+    level: critical ? "critical" : "low",
+    hint,
+    invulnerable: player.invulnerable,
+    at: warning.lastWarningAt,
+  });
   world.cameraShake = Math.max(world.cameraShake ?? 0, critical ? 0.28 : 0.2);
   burst(player.x, player.y, critical ? "#ef6a70" : "#f1c15b", critical ? 24 : 16);
   spawnFloatingText(player.x, player.y - 48, label, critical ? "#ef6a70" : "#f1c15b", { size: critical ? 19 : 17, life: 0.9, vy: -36 });
   playAudioCue(critical ? "danger" : "damage", { intensity: Math.min(1.9, Math.max(0.9, amount / 14)) });
   return hint;
+}
+
+function recordFairDamageCue(beforeHp, amount, message, lethal = false) {
+  if (!runStats || !player) {
+    return null;
+  }
+  const warning = normalizeFairWarningState(runStats.fairWarning);
+  const cue = normalizeFairDamageCue({
+    label: lethal ? "最后一击" : "最近伤害",
+    message,
+    amount,
+    hpBefore: beforeHp,
+    hpAfter: player.hp,
+    level: lethal ? "lethal" : "hit",
+    hint: lethal ? "最后一击已记录，结算页会给出下一把反制路线。" : "",
+    invulnerable: player.invulnerable ?? 0,
+    at: Date.now(),
+  });
+  warning.lastHit = cue;
+  if (lethal) {
+    warning.lethalHit = cue;
+  }
+  runStats.fairWarning = warning;
+  return cue;
 }
 
 function damagePlayer(amount, message) {
@@ -7869,6 +7990,8 @@ function damagePlayer(amount, message) {
   const beforeHp = player.hp;
   player.hp -= amount;
   runStats.damageTaken += amount;
+  const lethal = player.hp <= 0;
+  recordFairDamageCue(beforeHp, amount, message, lethal);
   player.invulnerable = 0.55;
   world.cameraShake = 0.18;
   burst(player.x, player.y, "#ef6a70", 10);
@@ -8397,8 +8520,16 @@ function renderResultInsights(review = archiveState?.lastRunReview) {
   const cards = [
     ["本局亮点", normalized.highlightTitle, normalized.highlightText, ""],
     ["下次注意", normalized.pressureTitle, normalized.pressureText, ""],
-    ["下一把", normalized.nextTitle, normalized.nextText, "is-next"],
   ];
+  if (normalized.failureReplay) {
+    cards.push([
+      "失败回放",
+      normalized.failureReplay.title,
+      `${normalized.failureReplay.summary} 反制：${normalized.failureReplay.counter}`,
+      "is-danger",
+    ]);
+  }
+  cards.push(["下一把", normalized.nextTitle, normalized.nextText, "is-next"]);
   if (normalized.retryPlan) {
     cards.push([
       "下一局路线",
@@ -12601,6 +12732,58 @@ function installAutomationTestHooks() {
     return result;
   }
 
+  function runFailureReplayProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 50, level: 2, weaponIndex: 2 });
+    runStats.fairWarning = createFairWarningState();
+    runStats.damageTaken = 0;
+    world.mode = "playing";
+    damagePlayer(20, "测试伤害：进入低生命。");
+    player.invulnerable = 0;
+    damagePlayer(8, "测试伤害：进入临界生命。");
+    player.invulnerable = 0;
+    damagePlayer(40, "测试伤害：最后一击。");
+    const warningBeforeReview = cloneForSave(runStats.fairWarning, null);
+    recordRunEnd(false);
+    const review = normalizeLastRunReview(archiveState.lastRunReview);
+    renderResultInsights(review);
+    syncResultRetryButton(review);
+    const insightsText = ui.resultInsights?.textContent ?? "";
+    const build = getStarterBuildById(resultRetryStarterBuildId);
+    const boost = cloneForSave(resultRetryBoost, null);
+    const plan = cloneForSave(resultRetryPlan, null);
+    startNewRun(build?.chapterIndex ?? 0, { starterBuildId: build?.id, retryBoost: boost, retryPlan: plan });
+    const result = {
+      ok: warningBeforeReview?.lowHpWarned
+        && warningBeforeReview?.criticalHpWarned
+        && warningBeforeReview?.lethalHit?.level === "lethal"
+        && review?.failureReplay?.title?.includes("回放")
+        && review?.failureReplay?.summary?.includes("最后记录")
+        && review?.failureReplay?.counter?.includes("下一把")
+        && insightsText.includes("失败回放")
+        && insightsText.includes("反制")
+        && boost?.id === "shielded-second-night"
+        && Boolean(runStats.retryBoost?.applied)
+        && Boolean(runStats.retryPlan?.applied),
+      warningBeforeReview,
+      review,
+      insightsText,
+      retryBoost: boost,
+      retryPlan: plan,
+      appliedRetryBoost: cloneForSave(runStats.retryBoost, null),
+      appliedRetryPlan: cloneForSave(runStats.retryPlan, null),
+    };
+    ui.resultInsights.innerHTML = "";
+    resultRetryStarterBuildId = null;
+    resultRetryBoost = null;
+    resultRetryPlan = null;
+    syncResultRetryButton(null);
+    deleteRunSave();
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
+    return result;
+  }
+
   function runResultReviewProbe() {
     const previousArchive = cloneForSave(archiveState, null);
     resetStoreRun(0, { stepIndex: 1, bugPoints: 0, hp: 20, level: 2 });
@@ -13162,6 +13345,7 @@ function installAutomationTestHooks() {
     const openingGuidance = runOpeningGuidanceProbe();
     const hitFeedback = runHitFeedbackProbe();
     const fairWarning = runFairWarningProbe();
+    const failureReplay = runFailureReplayProbe();
     const resultReview = runResultReviewProbe();
     const retryCombatShowcase = runRetryCombatShowcaseProbe();
     const starterBuild = runStarterBuildProbe();
@@ -13192,6 +13376,9 @@ function installAutomationTestHooks() {
     }
     if (!fairWarning.ok) {
       failures.push("fair low-health warning failed");
+    }
+    if (!failureReplay.ok) {
+      failures.push("failure replay loop failed");
     }
     if (!resultReview.ok) {
       failures.push("result review recommendation failed");
@@ -13288,6 +13475,7 @@ function installAutomationTestHooks() {
       openingGuidance,
       hitFeedback,
       fairWarning,
+      failureReplay,
       resultReview,
       retryCombatShowcase,
       starterBuild,
@@ -13311,6 +13499,7 @@ function installAutomationTestHooks() {
     runOpeningGuidanceProbe,
     runHitFeedbackProbe,
     runFairWarningProbe,
+    runFailureReplayProbe,
     runMapInteractiveProbe,
     runResultReviewProbe,
     runRetryCombatShowcaseProbe,
