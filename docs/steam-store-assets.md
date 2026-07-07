@@ -83,6 +83,10 @@ npm run capture:store-screenshots
 - `desktop/steam/store-assets/screenshots/04-boss-protocol-rider.png`
 - `desktop/steam/store-assets/screenshots/05-whitebox-core.png`
 - `desktop/steam/store-assets/screenshots/06-pc-settings.png`
+- `desktop/steam/store-assets/screenshots/07-metro-combat-showcase.png`
+- `desktop/steam/store-assets/screenshots/08-hash-combat-showcase.png`
+- `desktop/steam/store-assets/screenshots/09-promise-combat-showcase.png`
+- `desktop/steam/store-assets/screenshots/10-whitebox-combat-showcase.png`
 
 生成当前页面顺序复核图：
 

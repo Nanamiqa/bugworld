@@ -14,6 +14,7 @@ const mainSource = fs.readFileSync(path.join(rootDir, "src", "main.js"), "utf8")
 const storeManifestPath = path.join(rootDir, "desktop", "steam", "store-assets", "store-assets.json");
 const storeManifest = JSON.parse(fs.readFileSync(storeManifestPath, "utf8"));
 const errors = [];
+const screenshotsById = new Map((storeManifest.screenshots ?? []).map((entry) => [entry.id, entry]));
 
 function readPngSize(relativePath) {
   const filePath = path.join(rootDir, relativePath);
@@ -42,6 +43,11 @@ for (const map of maps) {
   for (const field of ["combatTitle", "combatFocus"]) {
     if (typeof map[field] !== "string" || map[field].trim().length < 8) {
       errors.push(`${map.id} is missing a useful ${field}`);
+    }
+  }
+  for (const field of ["combatShotFile", "storeScreenshotId", "storeScreenshotTitle"]) {
+    if (typeof map[field] !== "string" || map[field].trim().length < 8) {
+      errors.push(`${map.id} is missing ${field}`);
     }
   }
   if (!Array.isArray(map.compositionTags) || map.compositionTags.length < 3) {
@@ -89,6 +95,35 @@ for (const map of maps) {
   }
   if (!mainSource.includes(`badgeKey: "${map.assetKey}"`)) {
     errors.push(`${map.assetKey} missing from chapterMaps`);
+  }
+
+  const combatShot = readPngSize(map.combatShotFile);
+  if (combatShot) {
+    if (combatShot.width !== 1920 || combatShot.height !== 1080) {
+      errors.push(`${map.combatShotFile} is ${combatShot.width}x${combatShot.height}, expected 1920x1080`);
+    }
+    if (combatShot.bytes < 180000) {
+      errors.push(`${map.combatShotFile} looks too small (${combatShot.bytes} bytes)`);
+    }
+  }
+  const screenshot = screenshotsById.get(map.storeScreenshotId);
+  if (!screenshot) {
+    errors.push(`${map.storeScreenshotId} missing from store screenshots`);
+  } else {
+    if (screenshot.status !== "ready") {
+      errors.push(`${map.storeScreenshotId} must be ready`);
+    }
+    if (screenshot.targetFile !== map.combatShotFile) {
+      errors.push(`${map.storeScreenshotId} targetFile should be ${map.combatShotFile}`);
+    }
+    if (screenshot.title !== map.storeScreenshotTitle) {
+      errors.push(`${map.storeScreenshotId} title should match chapter map manifest`);
+    }
+    for (const term of ["地图装置", "敌人机制", "Boss", "武器特效"]) {
+      if (!screenshot.mustShow?.some((item) => String(item).includes(term))) {
+        errors.push(`${map.storeScreenshotId} mustShow should include ${term}`);
+      }
+    }
   }
 }
 

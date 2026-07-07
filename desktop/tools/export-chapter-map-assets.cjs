@@ -492,6 +492,54 @@ function drawCombatShowcasePanel(buffer, width, height, panel, index) {
   }
 }
 
+function drawSingleCombatScreenshot(map, index) {
+  const width = 1920;
+  const height = 1080;
+  const buffer = canvas(width, height);
+  const p = map.palette;
+  drawBackground(buffer, width, height);
+
+  drawText(buffer, width, height, "VARIABLE CITY NIGHTWATCH", 76, 40, 3, [176, 221, 255, 255], 0.86);
+  drawText(buffer, width, height, map.combatTitle, 76, 90, 6, [255, 255, 255, 255], 0.96);
+  drawText(buffer, width, height, `STEAM SCREENSHOT ${String(index + 2).padStart(2, "0")}`, 1478, 94, 2, [...p.hazard, 255], 0.98);
+  rect(buffer, width, height, 76, 158, 1768, 4, [...p.secondary, 255], 0.78);
+  rect(buffer, width, height, 76, 168, 1768, 2, [...p.hazard, 255], 0.62);
+
+  const sceneX = 78;
+  const sceneY = 218;
+  const sceneScale = 4.16;
+  const sceneW = badgeSize.width * sceneScale;
+  const sceneH = badgeSize.height * sceneScale;
+  roundedRect(buffer, width, height, sceneX - 14, sceneY - 14, sceneW + 28, sceneH + 28, 24, [255, 255, 255, 255], 0.1);
+  drawCombatScene(buffer, width, height, map, sceneX, sceneY, sceneScale);
+  line(buffer, width, height, sceneX - 8, sceneY - 8, sceneX + sceneW + 8, sceneY - 8, 3, [...p.secondary, 255], 0.52);
+  line(buffer, width, height, sceneX - 8, sceneY + sceneH + 8, sceneX + sceneW + 8, sceneY + sceneH + 8, 3, [...p.hazard, 255], 0.52);
+
+  const sideX = 1460;
+  const sideY = 218;
+  const sideW = 384;
+  const sideH = sceneH + 28;
+  roundedRect(buffer, width, height, sideX, sideY - 14, sideW, sideH, 24, [7, 13, 22, 255], 0.78);
+  drawPillText(buffer, width, height, "HOOK", sideX + 30, sideY + 30, 3, [...p.primary, 255], [8, 14, 22, 255]);
+  let textY = sideY + 92;
+  textY = drawWrappedText(buffer, width, height, map.combatFocus, sideX + 30, textY, sideW - 60, 2, [235, 242, 255, 255], 0.93, 4) + 28;
+  drawPillText(buffer, width, height, "CHECKLIST", sideX + 30, textY, 3, [...p.hazard, 255], [8, 14, 22, 255]);
+  textY += 64;
+  for (const item of map.combatChecklist ?? []) {
+    roundedRect(buffer, width, height, sideX + 30, textY, sideW - 60, 46, 10, [255, 255, 255, 255], 0.12);
+    drawText(buffer, width, height, `OK ${item}`, sideX + 48, textY + 15, 2, [245, 250, 255, 255], 0.92);
+    textY += 62;
+  }
+  drawPillText(buffer, width, height, "STORE PAGE", sideX + 30, sideY + sideH - 122, 2, [...p.secondary, 255], [8, 14, 22, 255]);
+  drawWrappedText(buffer, width, height, "Use after hero combat to prove every chapter changes the fight.", sideX + 30, sideY + sideH - 78, sideW - 60, 1, [235, 242, 255, 255], 0.86, 3);
+
+  roundedRect(buffer, width, height, 76, 1000, 1768, 44, 14, [255, 255, 255, 255], 0.08);
+  drawText(buffer, width, height, "DEVICE / ENEMY MECHANIC / BOSS WINDOW / WEAPON VFX", 104, 1015, 2, [235, 242, 255, 255], 0.9);
+  drawText(buffer, width, height, `READY: ${map.storeScreenshotId}`, 1378, 1015, 2, [...p.hazard, 255], 0.96);
+
+  return buffer;
+}
+
 const sheet = canvas(candidateSize.width, candidateSize.height);
 drawBackground(sheet, candidateSize.width, candidateSize.height);
 drawText(sheet, candidateSize.width, candidateSize.height, "CHAPTER MAP SELLING SHOTS", 90, 32, 4, [255, 255, 255, 255], 0.94);
@@ -517,3 +565,7 @@ const combatPanels = [
 ];
 combatPanels.forEach((panel, index) => drawCombatShowcasePanel(combatSheet, combatCandidateSize.width, combatCandidateSize.height, panel, index));
 savePng(combatCandidateFile, combatCandidateSize.width, combatCandidateSize.height, combatSheet);
+
+maps.forEach((map, index) => {
+  savePng(map.combatShotFile, 1920, 1080, drawSingleCombatScreenshot(map, index));
+});

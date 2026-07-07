@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "reviewDate": "2026-07-02",
-  "steamPageGoal": "Lead with readable combat, then prove map variety, build depth, late-game scale, persistence, and PC settings.",
+  "reviewDate": "2026-07-07",
+  "steamPageGoal": "Lead with readable combat, immediately prove chapter-to-chapter combat variety, then show exploration, builds, persistence, and PC settings.",
   "screenshotOrder": [
     {
       "rank": 1,
@@ -11,30 +11,54 @@
     },
     {
       "rank": 2,
+      "id": "screenshot_07_metro_combat_showcase",
+      "role": "chapter_combat_metro",
+      "reason": "Shows the second chapter's time-gate device, dash telegraph, boss timing window, and weapon VFX."
+    },
+    {
+      "rank": 3,
+      "id": "screenshot_08_hash_combat_showcase",
+      "role": "chapter_combat_hash",
+      "reason": "Shows the hash-market salt lantern, queue trail pressure, index lock window, and burst VFX."
+    },
+    {
+      "rank": 4,
+      "id": "screenshot_09_promise_combat_showcase",
+      "role": "chapter_combat_promise",
+      "reason": "Shows the promise-tower relay, shield mechanic, anchor window, and impact feedback."
+    },
+    {
+      "rank": 5,
+      "id": "screenshot_10_whitebox_combat_showcase",
+      "role": "chapter_combat_whitebox",
+      "reason": "Shows the final chapter's diff console, scan lane pressure, appeal window, and weapon feedback."
+    },
+    {
+      "rank": 6,
       "id": "screenshot_02_chapter_one_map",
       "role": "core_exploration",
       "reason": "Shows the upgraded chapter-one office map, obstacles, weapons, and enemies."
     },
     {
-      "rank": 3,
+      "rank": 7,
       "id": "screenshot_03_roguelite_build",
       "role": "build_depth",
       "reason": "Makes the roguelite promise concrete with blessings, rarity, and synergy tags."
     },
     {
-      "rank": 4,
+      "rank": 8,
       "id": "screenshot_05_late_chapter",
       "role": "chapter_variety",
       "reason": "Confirms the later chapters are visually and mechanically distinct."
     },
     {
-      "rank": 5,
+      "rank": 9,
       "id": "screenshot_01_start_menu",
       "role": "meta_progression",
       "reason": "Documents the start screen, chapter practice, save slot, and achievement counters."
     },
     {
-      "rank": 6,
+      "rank": 10,
       "id": "screenshot_06_pc_settings",
       "role": "pc_readiness",
       "reason": "Shows settings, audio, fullscreen, and controller support for Steam users."

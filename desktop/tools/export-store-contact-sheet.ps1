@@ -47,14 +47,21 @@ try {
   $RankBrush = New-Object System.Drawing.SolidBrush -ArgumentList ([System.Drawing.Color]::FromArgb(249, 192, 79))
 
   $Graphics.DrawString("Variable City Nightwatch - Steam Screenshot Review", $TitleFont, $TitleBrush, 48, 28)
-  $Graphics.DrawString("Final page order: combat hook, map variety, build depth, late chapter scale, meta, PC settings.", $SubFont, $SubBrush, 52, 76)
+  $Graphics.DrawString("Final page order: combat hook, chapter combat variety, exploration, build depth, meta, PC settings.", $SubFont, $SubBrush, 52, 76)
 
-  $Columns = 3
-  $Rows = 2
+  $ShotCount = [Math]::Max(1, $Page.screenshotOrder.Count)
+  if ($ShotCount -gt 8) {
+    $Columns = 5
+  } elseif ($ShotCount -gt 6) {
+    $Columns = 4
+  } else {
+    $Columns = 3
+  }
+  $Rows = [Math]::Ceiling($ShotCount / $Columns)
   $MarginX = 48
   $Top = 122
   $GutterX = 24
-  $GutterY = 30
+  $GutterY = 24
   $CellW = [math]::Floor(($Width - ($MarginX * 2) - ($GutterX * ($Columns - 1))) / $Columns)
   $CellH = [math]::Floor(($Height - $Top - 44 - ($GutterY * ($Rows - 1))) / $Rows)
   $ImageH = [math]::Floor($CellW * 9 / 16)

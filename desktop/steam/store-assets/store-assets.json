@@ -186,6 +186,46 @@
       "mustShow": ["Boss 阶段", "专属攻击特效", "躲避空间", "战斗日志"]
     },
     {
+      "id": "screenshot_07_metro_combat_showcase",
+      "title": "第二章：站台错拍实战镜头",
+      "width": 1920,
+      "height": 1080,
+      "status": "ready",
+      "targetFile": "desktop/steam/store-assets/screenshots/07-metro-combat-showcase.png",
+      "captureUrl": "index.html?storeShot=chapter-2-combat",
+      "mustShow": ["地图装置：准点闸门", "敌人机制：冲刺红线", "Boss 弱点窗口", "武器特效"]
+    },
+    {
+      "id": "screenshot_08_hash_combat_showcase",
+      "title": "第三章：哈希盐雨实战镜头",
+      "width": 1920,
+      "height": 1080,
+      "status": "ready",
+      "targetFile": "desktop/steam/store-assets/screenshots/08-hash-combat-showcase.png",
+      "captureUrl": "index.html?storeShot=chapter-3-combat",
+      "mustShow": ["地图装置：盐值灯串", "敌人机制：盐雨拖尾", "Boss 弱点窗口", "武器特效"]
+    },
+    {
+      "id": "screenshot_09_promise_combat_showcase",
+      "title": "第四章：承诺根层实战镜头",
+      "width": 1920,
+      "height": 1080,
+      "status": "ready",
+      "targetFile": "desktop/steam/store-assets/screenshots/09-promise-combat-showcase.png",
+      "captureUrl": "index.html?storeShot=chapter-4-combat",
+      "mustShow": ["地图装置：叶灯中继", "敌人机制：承诺护盾", "Boss 弱点窗口", "武器特效"]
+    },
+    {
+      "id": "screenshot_10_whitebox_combat_showcase",
+      "title": "第五章：白箱申诉实战镜头",
+      "width": 1920,
+      "height": 1080,
+      "status": "ready",
+      "targetFile": "desktop/steam/store-assets/screenshots/10-whitebox-combat-showcase.png",
+      "captureUrl": "index.html?storeShot=chapter-5-combat",
+      "mustShow": ["地图装置：差异控制台", "敌人机制：点名扫描", "Boss 弱点窗口", "武器特效"]
+    },
+    {
       "id": "screenshot_05_late_chapter",
       "title": "后续章节：公共规则引擎核心",
       "width": 1920,

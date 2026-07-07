@@ -15,6 +15,9 @@ module.exports = {
       deviceLabel: "TIME GATE RESET",
       combatTitle: "CH2 STATION MISBEAT",
       combatFocus: "Time gate, dash telegraph, two-beat boss window",
+      combatShotFile: "desktop/steam/store-assets/screenshots/07-metro-combat-showcase.png",
+      storeScreenshotId: "screenshot_07_metro_combat_showcase",
+      storeScreenshotTitle: "第二章：站台错拍实战镜头",
       combatChecklist: ["TIME GATE", "DASH LINE", "BOSS BEAT", "IMPACT VFX"],
       combatCallouts: [
         { x: 74, y: 62, label: "DEVICE" },
@@ -45,6 +48,9 @@ module.exports = {
       deviceLabel: "SALT LANTERN BURST",
       combatTitle: "CH3 HASH SALT RAIN",
       combatFocus: "Salt lantern, queue trail, index-lock weak window",
+      combatShotFile: "desktop/steam/store-assets/screenshots/08-hash-combat-showcase.png",
+      storeScreenshotId: "screenshot_08_hash_combat_showcase",
+      storeScreenshotTitle: "第三章：哈希盐雨实战镜头",
       combatChecklist: ["LANTERN", "SALT TRAIL", "INDEX LOCK", "BURST VFX"],
       combatCallouts: [
         { x: 114, y: 50, label: "LANTERN" },
@@ -75,6 +81,9 @@ module.exports = {
       deviceLabel: "BRANCH RELAY WINDOW",
       combatTitle: "CH4 ROOT RELAY",
       combatFocus: "Leaf relay, promise shield, anchor weak window",
+      combatShotFile: "desktop/steam/store-assets/screenshots/09-promise-combat-showcase.png",
+      storeScreenshotId: "screenshot_09_promise_combat_showcase",
+      storeScreenshotTitle: "第四章：承诺根层实战镜头",
       combatChecklist: ["LEAF RELAY", "SHIELD", "ANCHOR", "IMPACT VFX"],
       combatCallouts: [
         { x: 262, y: 42, label: "RELAY" },
@@ -105,6 +114,9 @@ module.exports = {
       deviceLabel: "DIFF CONSOLE REVEAL",
       combatTitle: "CH5 WHITEBOX APPEAL",
       combatFocus: "Diff console, scan lane, final appeal window",
+      combatShotFile: "desktop/steam/store-assets/screenshots/10-whitebox-combat-showcase.png",
+      storeScreenshotId: "screenshot_10_whitebox_combat_showcase",
+      storeScreenshotTitle: "第五章：白箱申诉实战镜头",
       combatChecklist: ["DIFF CONSOLE", "SCAN LANE", "APPEAL", "IMPACT VFX"],
       combatCallouts: [
         { x: 248, y: 116, label: "DIFF" },
