@@ -5992,6 +5992,10 @@ function applyEnemyDamage(enemy, amount, source = "weapon") {
 
   enemy.hp -= finalDamage;
   enemy.hitFlash = Math.max(enemy.hitFlash ?? 0, 0.14);
+  if (["weapon", "pulse", "ally"].includes(source)) {
+    const color = source === "pulse" ? "#72a5ff" : source === "ally" ? "#96e072" : "#f1c15b";
+    spawnFloatingText(enemy.x + random(-10, 10), enemy.y - enemy.radius - 12, `${Math.max(1, Math.round(finalDamage))}`, color);
+  }
   return finalDamage;
 }
 
@@ -7606,25 +7610,37 @@ function checkBugCollision() {
   for (let index = 0; index < bugNodes.length; index += 1) {
     const node = bugNodes[index];
     if (distance(player, node) < player.radius + (node.interactRadius ?? node.radius + 24)) {
-      activeEvent = { ...node.event, index };
+      activeEvent = {
+        ...node.event,
+        index,
+        openingFocus: Boolean(node.openingFocus),
+        chapterStep: node.chapterStep,
+      };
       openEvent(activeEvent);
       break;
     }
   }
 }
 
+function getOpeningEventChoicePreview(event) {
+  if (!event?.openingFocus) {
+    return "";
+  }
+  return `<span class="opening-choice-preview"><strong>开场链推进</strong>处理后点亮 1/3 目标，掉落 +1 bug点数 / +3 经验，并引出第一波裂隙。</span>`;
+}
+
 function openEvent(event) {
   world.mode = "event";
-  ui.eventKicker.textContent = event.kicker;
+  ui.eventKicker.textContent = event.openingFocus ? `首个异常 · ${event.kicker}` : event.kicker;
   ui.eventTitle.textContent = event.title;
   ui.eventText.textContent = event.text;
   ui.eventChoices.innerHTML = "";
 
   for (const choice of event.choices) {
     const button = document.createElement("button");
-    button.className = "choice-button";
+    button.className = ["choice-button", "event-choice", event.openingFocus ? "is-opening-choice" : ""].filter(Boolean).join(" ");
     button.disabled = choiceIsDisabled(choice);
-    button.innerHTML = `<span class="choice-title">${choice.title}</span><span class="choice-effect">${choice.effect}</span>`;
+    button.innerHTML = `<span class="choice-title">${choice.title}</span><span class="choice-effect">${choice.effect}${getOpeningEventChoicePreview(event)}</span>`;
     button.addEventListener("click", () => resolveEvent(choice));
     ui.eventChoices.appendChild(button);
   }
@@ -7635,12 +7651,16 @@ function openEvent(event) {
 
 function resolveEvent(choice) {
   playAudioCue("ui-confirm");
+  const wasOpeningFocus = Boolean(activeEvent?.openingFocus);
   applyActions(choice.actions);
   runStats.eventsResolved += 1;
   updateNightHook(0);
   evaluateRunAchievements("event_resolved");
   const removed = bugNodes.splice(activeEvent.index, 1)[0];
   burst(removed.x, removed.y, removed.event.color, 28);
+  if (wasOpeningFocus) {
+    spawnFloatingText(removed.x, removed.y - 54, "开场链 +1", removed.event.color, { size: 17, life: 0.82, vy: -38 });
+  }
   spawnBugPickup(removed.x, removed.y, 1, 3);
   activeEvent = null;
   ui.eventPanel.classList.add("hidden");
@@ -11151,6 +11171,19 @@ function strokeCircle(x, y, radius, color, width) {
 function drawParticles() {
   for (const particle of particles) {
     const alpha = Math.max(0, particle.life / particle.maxLife);
+    if (particle.type === "text") {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.font = `800 ${particle.size}px Microsoft YaHei, Segoe UI, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(38, 54, 77, 0.42)";
+      ctx.strokeText(particle.text, particle.x, particle.y);
+      ctx.fillStyle = particle.color;
+      ctx.fillText(particle.text, particle.x, particle.y);
+      ctx.restore();
+      continue;
+    }
     const size = particle.size * (0.45 + alpha * 0.85);
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -11200,6 +11233,21 @@ function resolveDeskCollision(entity) {
       entity.y += Math.sin(angle) * overlap;
     }
   }
+}
+
+function spawnFloatingText(x, y, text, color = "#f1c15b", options = {}) {
+  particles.push({
+    type: "text",
+    text,
+    x,
+    y,
+    vx: options.vx ?? random(-10, 10),
+    vy: options.vy ?? -48,
+    size: options.size ?? 15,
+    color,
+    life: options.life ?? 0.62,
+    maxLife: options.life ?? 0.62,
+  });
 }
 
 function isPointBlockedByMap(x, y, radius = 18) {
@@ -11699,13 +11747,28 @@ function installAutomationTestHooks() {
     spawnChapterNodes(currentChapter().steps?.[0]);
     const focusNode = bugNodes.find((node) => node.openingFocus);
     const firstTarget = getObjectiveTargets()[0];
+    const focusIndex = bugNodes.indexOf(focusNode);
+    if (focusNode && focusIndex >= 0) {
+      activeEvent = {
+        ...focusNode.event,
+        index: focusIndex,
+        openingFocus: Boolean(focusNode.openingFocus),
+        chapterStep: focusNode.chapterStep,
+      };
+      openEvent(activeEvent);
+    }
+    const eventChoiceText = ui.eventChoices?.textContent ?? "";
     const result = {
       ok: hookCoverage
         && Boolean(focusNode)
         && firstTarget?.label === "首个异常"
-        && ui.log?.textContent.includes("首个异常已标记"),
+        && ui.log?.textContent.includes("首个异常已标记")
+        && ui.eventKicker?.textContent.includes("首个异常")
+        && eventChoiceText.includes("开场链推进")
+        && eventChoiceText.includes("第一波裂隙"),
       hookCoverage,
       weaponChoiceText,
+      eventChoiceText,
       focusNode: focusNode ? {
         eventId: focusNode.event?.id ?? null,
         chapterStep: focusNode.chapterStep,
@@ -11716,6 +11779,33 @@ function installAutomationTestHooks() {
     };
     deleteRunSave();
     ui.storyPanel.classList.add("hidden");
+    ui.eventPanel.classList.add("hidden");
+    activeEvent = null;
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
+    return result;
+  }
+
+  function runHitFeedbackProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 80, weaponIndex: 0 });
+    particles = [];
+    const enemy = spawnEnemyNear(player.x + 120, player.y, "stress", { hpMultiplier: 0.6, speedMultiplier: 0.1 });
+    const target = enemies[enemies.length - 1] ?? enemy;
+    const damage = applyEnemyDamage(target, 17, "weapon");
+    const textParticle = particles.find((particle) => particle.type === "text" && String(particle.text).includes("17"));
+    const sparkCount = particles.length;
+    const result = {
+      ok: Math.round(damage) === 17
+        && target.hitFlash > 0
+        && Boolean(textParticle)
+        && sparkCount >= 1,
+      damage,
+      hitFlash: target.hitFlash,
+      textParticle: cloneForSave(textParticle, null),
+      particleCount: sparkCount,
+    };
+    deleteRunSave();
     archiveState = previousArchive ?? loadArchive();
     saveArchive();
     return result;
@@ -12184,6 +12274,7 @@ function installAutomationTestHooks() {
     const openingSprint = runOpeningSprintProbe();
     const openingSurge = runOpeningSurgeProbe();
     const openingGuidance = runOpeningGuidanceProbe();
+    const hitFeedback = runHitFeedbackProbe();
     const resultReview = runResultReviewProbe();
     const starterBuild = runStarterBuildProbe();
 
@@ -12207,6 +12298,9 @@ function installAutomationTestHooks() {
     }
     if (!openingGuidance.ok) {
       failures.push("opening weapon and anomaly guidance failed");
+    }
+    if (!hitFeedback.ok) {
+      failures.push("weapon hit feedback failed");
     }
     if (!resultReview.ok) {
       failures.push("result review recommendation failed");
@@ -12298,6 +12392,7 @@ function installAutomationTestHooks() {
       openingSprint,
       openingSurge,
       openingGuidance,
+      hitFeedback,
       resultReview,
       starterBuild,
       chapters: chaptersCovered,
@@ -12318,6 +12413,7 @@ function installAutomationTestHooks() {
     runOpeningSprintProbe,
     runOpeningSurgeProbe,
     runOpeningGuidanceProbe,
+    runHitFeedbackProbe,
     runMapInteractiveProbe,
     runResultReviewProbe,
     runStarterBuildProbe,
