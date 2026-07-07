@@ -1374,6 +1374,36 @@ const openingSurgeConfig = {
     { type: "stress", dx: 304, dy: -6, hpMultiplier: 0.42, speedMultiplier: 0.8, scale: 0.72, mechanicDepth: 1 },
   ],
 };
+const chapterShowcaseConfigs = {
+  "metro-loop": {
+    title: "站台错拍镜头",
+    hook: "准点闸门、工单冲刺和管理员二拍落点要能同屏读懂。",
+    deviceLabel: "准点闸门",
+    mechanicLabel: "冲刺红线",
+    bossLabel: "二拍落点",
+  },
+  "hash-market": {
+    title: "哈希盐雨镜头",
+    hook: "盐值灯串、队列拖尾和索引锁弱点要形成夜市场面。",
+    deviceLabel: "盐值灯串",
+    mechanicLabel: "盐雨拖尾",
+    bossLabel: "索引锁窗口",
+  },
+  "promise-tower": {
+    title: "承诺塔根层镜头",
+    hook: "叶灯中继、承诺护盾和责任锚兑现要成为章节记忆点。",
+    deviceLabel: "叶灯中继",
+    mechanicLabel: "承诺护盾",
+    bossLabel: "责任锚窗口",
+  },
+  "whitebox-core": {
+    title: "白箱核心镜头",
+    hook: "差异控制台、点名扫描和申诉窗口要说明最终章玩法。",
+    deviceLabel: "差异控制台",
+    mechanicLabel: "点名扫描",
+    bossLabel: "申诉窗口",
+  },
+};
 const starterBuilds = [
   {
     id: "precision-breakpoint",
@@ -1948,6 +1978,7 @@ function createRunStats() {
     retryBoost: null,
     retryPlan: null,
     openingShowcase: null,
+    chapterShowcase: null,
     fairWarning: createFairWarningState(),
     tempo: createCombatTempoState(),
     openingSprint: null,
@@ -3180,6 +3211,179 @@ function updateOpeningShowcase(dt = 0) {
   }
 }
 
+function getChapterShowcaseConfig(chapterIndex = currentChapterIndex) {
+  const mapId = chapterMaps[chapterIndex]?.id;
+  if (!mapId) {
+    return null;
+  }
+  return chapterShowcaseConfigs[mapId] ?? null;
+}
+
+function createChapterShowcaseChecklist(value = {}) {
+  return {
+    device: Boolean(value.device),
+    mechanic: Boolean(value.mechanic),
+    boss: Boolean(value.boss),
+    effect: Boolean(value.effect),
+    ready: Boolean(value.ready),
+    effectLabel: typeof value.effectLabel === "string" ? value.effectLabel : "",
+    bossPhase: Math.max(0, Math.trunc(Number(value.bossPhase) || 0)),
+  };
+}
+
+function createChapterShowcaseState(chapterIndex = currentChapterIndex, trigger = "chapter", options = {}) {
+  const config = getChapterShowcaseConfig(chapterIndex);
+  if (!config || chapterIndex <= 0) {
+    return null;
+  }
+  const map = chapterMaps[chapterIndex] ?? currentMap();
+  const focus = options.focus ?? getMapInteractives(map)[0] ?? map.bossSpawn ?? map.start ?? player;
+  return {
+    id: `${map.id}-combat-showcase`,
+    chapterIndex,
+    mapId: map.id,
+    trigger,
+    active: true,
+    title: options.title ?? config.title,
+    hook: options.hook ?? config.hook,
+    deviceLabel: options.deviceLabel ?? config.deviceLabel,
+    mechanicLabel: options.mechanicLabel ?? config.mechanicLabel,
+    bossLabel: options.bossLabel ?? config.bossLabel,
+    callout: options.callout ?? "章节镜头检查点",
+    x: Number.isFinite(options.x) ? options.x : focus?.x ?? player?.x ?? 0,
+    y: Number.isFinite(options.y) ? options.y : focus?.y ?? player?.y ?? 0,
+    radius: Math.max(110, Number(options.radius) || 220),
+    checklist: createChapterShowcaseChecklist(options.checklist),
+    flash: Math.max(0, Number(options.flash) || 1.6),
+    hold: Math.max(8, Number(options.hold) || 18),
+    completed: Boolean(options.completed),
+  };
+}
+
+function normalizeChapterShowcaseState(value = null) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const chapterIndex = clamp(Math.trunc(Number(value.chapterIndex) || currentChapterIndex), 0, chapters.length - 1);
+  const fallback = createChapterShowcaseState(chapterIndex, value.trigger ?? "chapter");
+  if (!fallback) {
+    return null;
+  }
+  const hold = Math.max(0, Number(value.hold ?? fallback.hold) || 0);
+  return {
+    ...fallback,
+    ...value,
+    id: fallback.id,
+    chapterIndex,
+    mapId: fallback.mapId,
+    active: Boolean(value.active) && hold > 0,
+    title: typeof value.title === "string" ? value.title : fallback.title,
+    hook: typeof value.hook === "string" ? value.hook : fallback.hook,
+    deviceLabel: typeof value.deviceLabel === "string" ? value.deviceLabel : fallback.deviceLabel,
+    mechanicLabel: typeof value.mechanicLabel === "string" ? value.mechanicLabel : fallback.mechanicLabel,
+    bossLabel: typeof value.bossLabel === "string" ? value.bossLabel : fallback.bossLabel,
+    callout: typeof value.callout === "string" ? value.callout : fallback.callout,
+    x: Number.isFinite(value.x) ? value.x : fallback.x,
+    y: Number.isFinite(value.y) ? value.y : fallback.y,
+    radius: Math.max(110, Number(value.radius ?? fallback.radius) || fallback.radius),
+    checklist: createChapterShowcaseChecklist(value.checklist ?? fallback.checklist),
+    flash: Math.max(0, Number(value.flash) || 0),
+    hold,
+    completed: Boolean(value.completed),
+  };
+}
+
+function activateChapterShowcase(trigger = "chapter", options = {}) {
+  if (!runStats || currentChapterIndex <= 0 || !getChapterShowcaseConfig(currentChapterIndex)) {
+    return null;
+  }
+  const previous = runStats.chapterShowcase?.mapId === currentMap().id
+    ? runStats.chapterShowcase
+    : null;
+  const state = createChapterShowcaseState(currentChapterIndex, trigger, {
+    ...options,
+    checklist: {
+      ...(previous?.checklist ?? {}),
+      ...(options.checklist ?? {}),
+    },
+    hold: Math.max(previous?.hold ?? 0, Number(options.hold) || 18),
+  });
+  if (!state) {
+    return null;
+  }
+  state.completed = Boolean(previous?.completed) || state.completed;
+  runStats.chapterShowcase = state;
+  return state;
+}
+
+function markChapterShowcase(key, options = {}) {
+  const showcase = activateChapterShowcase(options.trigger ?? key, options);
+  if (!showcase || !["device", "mechanic", "boss", "effect"].includes(key)) {
+    return null;
+  }
+  showcase.checklist = createChapterShowcaseChecklist(showcase.checklist);
+  showcase.checklist[key] = true;
+  if (key === "effect" && options.effectLabel) {
+    showcase.checklist.effectLabel = options.effectLabel;
+  }
+  if (key === "boss" && boss?.phase) {
+    showcase.checklist.bossPhase = Math.max(showcase.checklist.bossPhase ?? 0, boss.phase);
+  }
+  showcase.x = Number.isFinite(options.x) ? options.x : showcase.x;
+  showcase.y = Number.isFinite(options.y) ? options.y : showcase.y;
+  showcase.flash = Math.max(showcase.flash ?? 0, 1.2);
+  return showcase;
+}
+
+function updateChapterShowcase(dt = 0) {
+  if (!runStats || currentChapterIndex <= 0 || world.mode !== "playing") {
+    return;
+  }
+  const config = getChapterShowcaseConfig(currentChapterIndex);
+  if (!config) {
+    return;
+  }
+  let showcase = runStats.chapterShowcase?.mapId === currentMap().id
+    ? runStats.chapterShowcase
+    : activateChapterShowcase("chapter", { callout: "章节镜头检查点" });
+  if (!showcase?.active) {
+    showcase = activateChapterShowcase("chapter", {
+      callout: "章节镜头检查点",
+      hold: 18,
+    });
+  }
+  if (!showcase?.active) {
+    return;
+  }
+
+  const checklist = createChapterShowcaseChecklist(showcase.checklist);
+  const pendingDevice = getMapInteractives().find((device) => !isMapInteractiveActivated(device)) ?? getMapInteractives()[0];
+  if (pendingDevice && (isMapInteractiveActivated(pendingDevice) || isPointInCurrentCamera(pendingDevice.x, pendingDevice.y, -20))) {
+    checklist.device = true;
+  }
+  const visibleMechanic = [...enemies, ...cleaners].some((enemy) => {
+    return enemy.mechanic && enemy.hp > 0 && isPointInCurrentCamera(enemy.x, enemy.y, -30);
+  }) || enemyHazards.some((hazard) => isPointInCurrentCamera(hazard.x, hazard.y, -40));
+  checklist.mechanic = checklist.mechanic || visibleMechanic;
+  const bossWindow = Boolean(boss && boss.hp > 0 && (boss.phase >= 2 || boss.hitFlash > 0 || boss.slowTimer > 0));
+  checklist.boss = checklist.boss || bossWindow;
+  if (boss?.phase) {
+    checklist.bossPhase = Math.max(checklist.bossPhase ?? 0, boss.phase);
+  }
+  const visibleEffect = particles.some((particle) => {
+    return particle.type === "impact" && particle.life > 0 && isPointInCurrentCamera(particle.x, particle.y, -20);
+  });
+  checklist.effect = checklist.effect || visibleEffect;
+  checklist.ready = checklist.device && checklist.mechanic && checklist.boss && checklist.effect;
+  showcase.checklist = checklist;
+  showcase.completed = showcase.completed || checklist.ready;
+  showcase.flash = Math.max(0, (showcase.flash ?? 0) - dt);
+  showcase.hold = Math.max(showcase.completed ? 6 : 0, (showcase.hold ?? 0) - dt);
+  if (showcase.hold <= 0) {
+    showcase.active = false;
+  }
+}
+
 function normalizeOpeningSprintState(savedSprint = null) {
   if (!savedSprint || typeof savedSprint !== "object") {
     return null;
@@ -3682,6 +3886,7 @@ function restoreRunSave(save) {
     retryBoost: normalizeRetryBoost(save.runStats?.retryBoost),
     retryPlan: normalizeRetryPlan(save.runStats?.retryPlan),
     openingShowcase: normalizeOpeningShowcaseState(save.runStats?.openingShowcase),
+    chapterShowcase: normalizeChapterShowcaseState(save.runStats?.chapterShowcase),
     fairWarning: normalizeFairWarningState(save.runStats?.fairWarning),
     distanceTraveled: Math.max(0, Number(save.runStats?.distanceTraveled) || 0),
     tempo: normalizeCombatTempoState(save.runStats?.tempo),
@@ -4747,6 +4952,7 @@ function spawnEnemyNear(x, y, type = "stress", overrides = {}) {
   } else {
     enemies.push(enemy);
   }
+  return enemy;
 }
 
 function gain({ bugPoints = 0, hp = 0, backlash = 0, fixed = 0, log = "" }) {
@@ -5159,6 +5365,15 @@ function startBossFight(bossId = null) {
   setChapterObjective(bossConfig.objective ?? "打断错误配送协议，救回外卖小哥周行");
   setLog(bossConfig.startLog ?? "Boss 战开始：订单被误识别成网络数据包。躲开路线，打掉大件包。");
   playAudioCue("boss-start");
+  if (currentChapterIndex > 0) {
+    activateChapterShowcase("boss", {
+      callout: "Boss 弱点窗口检查",
+      x: boss.x,
+      y: boss.y,
+      radius: 260,
+      hold: 22,
+    });
+  }
   world.mode = "playing";
   saveRunCheckpoint("boss-start");
 }
@@ -6273,6 +6488,7 @@ function updatePlaying(dt) {
   updateOpeningSurge(dt);
   updateOpeningSprint(dt);
   updateOpeningShowcase(dt);
+  updateChapterShowcase(dt);
   if (world.mode !== "playing") {
     return;
   }
@@ -6448,6 +6664,14 @@ function spawnWeaponImpactFeedback(enemy, bullet, finalDamage) {
   const label = profile.textPrefix ? `${profile.textPrefix} ${roundedDamage}` : `${roundedDamage}`;
   spawnWeaponImpactParticles(enemy.x, enemy.y, profile, bullet);
   markOpeningShowcaseWeaponEffect(enemy, profile);
+  if (currentChapterIndex > 0) {
+    markChapterShowcase("effect", {
+      trigger: "weapon",
+      effectLabel: profile?.label ?? player?.weapon?.name ?? "命中",
+      x: enemy.x,
+      y: enemy.y,
+    });
+  }
   spawnFloatingText(
     enemy.x + random(-10, 10),
     enemy.y - (enemy.radius ?? 18) - 12,
@@ -6816,6 +7040,14 @@ function updateBoss(dt) {
     world.cameraShake = 0.2;
     playAudioCue("boss-phase");
     boss.attackCooldown = Math.min(boss.attackCooldown, boss.phase === 3 ? 0.22 : 0.36);
+    if (currentChapterIndex > 0 && boss.phase >= 2) {
+      markChapterShowcase("boss", {
+        trigger: "boss-phase",
+        callout: `Boss 阶段 ${boss.phase} 弱点窗口`,
+        x: boss.x,
+        y: boss.y,
+      });
+    }
   }
 
   if (boss.state === "handshake") {
@@ -8252,6 +8484,14 @@ function activateMapInteractive(device) {
   const weakened = applyMapInteractiveWeaken(device);
   const archiveReward = recordMapInteractiveInArchive(device);
   completeDeviceGuide(device);
+  if (currentChapterIndex > 0) {
+    markChapterShowcase("device", {
+      trigger: "device",
+      callout: `装置已入镜：${device.label ?? "互动装置"}`,
+      x: device.x,
+      y: device.y,
+    });
+  }
 
   burst(device.x, device.y, device.color ?? "#72a5ff", 24);
   burst(player.x, player.y, "#5de2d1", 14);
@@ -8612,6 +8852,7 @@ function draw(dt) {
   drawDeviceGuideCompass(camera);
   drawExplorationMiniMap(camera);
   drawOpeningShowcaseOverlay(camera);
+  drawChapterShowcaseOverlay(camera);
   drawBossHud();
   ctx.restore();
 }
@@ -11444,6 +11685,89 @@ function drawOpeningShowcaseOverlay(camera) {
   ctx.restore();
 }
 
+function drawChapterShowcaseOverlay(camera) {
+  const showcase = runStats?.chapterShowcase;
+  if (!showcase?.active || world.mode !== "playing" || currentChapterIndex <= 0) {
+    return;
+  }
+
+  const checklist = createChapterShowcaseChecklist(showcase.checklist);
+  const items = [
+    { key: "device", label: showcase.deviceLabel ?? "地图装置" },
+    { key: "mechanic", label: showcase.mechanicLabel ?? "敌人机制" },
+    { key: "boss", label: showcase.bossLabel ?? "Boss 窗口" },
+    { key: "effect", label: checklist.effectLabel || "武器特效" },
+  ];
+  const readyCount = items.filter((item) => checklist[item.key]).length;
+  const progress = readyCount / items.length;
+  const visual = getChapterVisual();
+  const accent = checklist.ready || showcase.completed ? "#5de2d1" : visual.accent ?? "#72a5ff";
+  const anchorX = Number.isFinite(showcase.x) ? showcase.x : player.x;
+  const anchorY = Number.isFinite(showcase.y) ? showcase.y : player.y;
+  const radius = Math.max(110, Number(showcase.radius) || 220);
+  const screenX = anchorX - camera.x;
+  const screenY = anchorY - camera.y;
+  const frameW = Math.min(radius * 1.36, world.viewWidth - 36);
+  const frameH = Math.min(radius * 0.82, world.viewHeight - 126);
+  const frameX = clamp(screenX - frameW / 2, 18, Math.max(18, world.viewWidth - frameW - 18));
+  const frameY = clamp(screenY - frameH / 2, 118, Math.max(118, world.viewHeight - frameH - 24));
+  const flash = clamp(Number(showcase.flash) || 0, 0, 2.2);
+  const cardW = Math.min(390, world.viewWidth - 36);
+  const cardH = 138;
+  const cardX = Math.max(18, world.viewWidth - cardW - 18);
+  const cardY = boss && boss.hp > 0 ? 150 : 92;
+
+  ctx.save();
+  ctx.globalAlpha = 0.46 + flash * 0.08;
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 3;
+  ctx.setLineDash(showcase.completed ? [] : [10, 7]);
+  ctx.strokeRect(frameX, frameY, frameW, frameH);
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 0.1 + flash * 0.05;
+  ctx.fillStyle = accent;
+  ctx.fillRect(frameX, frameY, frameW, frameH);
+  ctx.globalAlpha = 0.74;
+  fillCircle(screenX, screenY, 10 + flash * 4, accent);
+  strokeCircle(screenX, screenY, Math.min(radius, 132), accent, 1.4);
+
+  ctx.globalAlpha = 0.93;
+  ctx.fillStyle = "rgba(247, 250, 255, 0.94)";
+  ctx.fillRect(cardX, cardY, cardW, cardH);
+  ctx.strokeStyle = "rgba(26, 42, 68, 0.16)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(cardX, cardY, cardW, cardH);
+  ctx.fillStyle = accent;
+  ctx.fillRect(cardX, cardY, Math.max(4, cardW * progress), 4);
+
+  ctx.fillStyle = "#26364d";
+  ctx.font = "800 12px Microsoft YaHei, Segoe UI, sans-serif";
+  ctx.fillText("CHAPTER SHOT", cardX + 12, cardY + 22);
+  ctx.fillStyle = "#17202a";
+  ctx.font = "800 16px Microsoft YaHei, Segoe UI, sans-serif";
+  ctx.fillText(shortenText(showcase.title, 18), cardX + 12, cardY + 45);
+  ctx.fillStyle = "#526174";
+  ctx.font = "12px Microsoft YaHei, Segoe UI, sans-serif";
+  ctx.fillText(shortenText(showcase.callout ?? showcase.hook, 30), cardX + 12, cardY + 65);
+  ctx.fillText(shortenText(showcase.hook, 38), cardX + 12, cardY + 83);
+
+  ctx.font = "800 10px Microsoft YaHei, Segoe UI, sans-serif";
+  items.forEach((item, index) => {
+    const ok = Boolean(checklist[item.key]);
+    const x = cardX + 12 + (index % 2) * Math.max(162, Math.floor(cardW / 2) - 8);
+    const y = cardY + 108 + Math.floor(index / 2) * 17;
+    ctx.fillStyle = ok ? "#0f9f95" : "#8d9aab";
+    ctx.fillText(`${ok ? "✓" : "○"} ${shortenText(item.label, 13)}`, x, y);
+  });
+
+  if (checklist.ready) {
+    ctx.fillStyle = "#0f9f95";
+    ctx.font = "800 11px Microsoft YaHei, Segoe UI, sans-serif";
+    ctx.fillText("镜头已就绪", cardX + cardW - 82, cardY + 22);
+  }
+  ctx.restore();
+}
+
 function drawBossHud() {
   if (!boss || boss.hp <= 0) {
     return;
@@ -12948,6 +13272,101 @@ function installAutomationTestHooks() {
     return result;
   }
 
+  function runChapterShowcaseProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    const enemyByChapter = {
+      1: "deadline",
+      2: "queueSnake",
+      3: "promise",
+      4: "inspectionProbe",
+    };
+    const results = [];
+
+    for (let index = 1; index < chapters.length; index += 1) {
+      const chapter = chapters[index];
+      const bossSpawn = chapterMaps[index]?.bossSpawn ?? chapterMaps[index]?.start ?? player;
+      enterChapter(index, {
+        stepIndex: Math.max(0, Math.min(2, (chapter?.steps?.length ?? 1) - 1)),
+        focus: chapterMaps[index]?.start ?? bossSpawn,
+      });
+      world.mode = "playing";
+      runStats.chapterShowcase = null;
+      activateChapterShowcase("probe", { hold: 24 });
+
+      const device = getMapInteractives()[0] ?? null;
+      let deviceSample = null;
+      if (device) {
+        deviceSample = movePlayerTo(device.x, device.y, `chapter-showcase-device-${index}`);
+        checkMapInteractiveCollision();
+      }
+
+      const enemyType = enemyByChapter[index] ?? "deadline";
+      const enemyPoint = findNearestFreePoint(
+        clamp(player.x + 148, 76, world.width - 76),
+        clamp(player.y + 24, 96, world.height - 76),
+        28
+      );
+      const target = spawnEnemyNear(enemyPoint.x, enemyPoint.y, enemyType, {
+        hpMultiplier: 0.5,
+        speedMultiplier: 0.72,
+        mechanicDepth: 1,
+      });
+      centerCameraOnPlayer();
+      updateChapterShowcase(0.2);
+
+      startBossFight(chapter?.boss?.id);
+      if (boss) {
+        boss.attackCooldown = Math.max(boss.attackCooldown, 4);
+        boss.hp = boss.maxHp * 0.64;
+        updateBoss(0.16);
+      }
+
+      const hitTarget = target ?? enemies[0] ?? cleaners[0] ?? boss;
+      if (hitTarget && player.weapon) {
+        const profile = getWeaponImpactProfile(player.weapon.id, false);
+        spawnWeaponImpactFeedback(hitTarget, {
+          weaponId: player.weapon.id,
+          charged: false,
+          impactProfile: profile,
+          vx: player.weapon.bulletSpeed ?? 0,
+          vy: 0,
+        }, 18);
+      }
+      updateChapterShowcase(0.28);
+      syncHud();
+
+      const showcase = cloneForSave(runStats.chapterShowcase, null);
+      const checklist = showcase?.checklist ?? {};
+      results.push({
+        ok: Boolean(showcase?.active)
+          && showcase?.mapId === chapterMaps[index]?.id
+          && checklist.device
+          && checklist.mechanic
+          && checklist.boss
+          && checklist.effect
+          && checklist.ready
+          && Boolean(showcase?.completed),
+        chapterIndex: index,
+        title: chapter?.title ?? `Chapter ${index + 1}`,
+        mapId: chapterMaps[index]?.id ?? null,
+        deviceId: device?.id ?? null,
+        enemyType,
+        bossId: boss?.id ?? null,
+        deviceSample,
+        checklist,
+        showcase,
+      });
+    }
+
+    deleteRunSave();
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
+    return {
+      ok: results.length === Math.max(0, chapters.length - 1) && results.every((result) => result.ok),
+      results,
+    };
+  }
+
   function runStarterBuildProbe() {
     const previousArchive = cloneForSave(archiveState, null);
     const build = starterBuilds[0];
@@ -13348,6 +13767,7 @@ function installAutomationTestHooks() {
     const failureReplay = runFailureReplayProbe();
     const resultReview = runResultReviewProbe();
     const retryCombatShowcase = runRetryCombatShowcaseProbe();
+    const chapterShowcase = runChapterShowcaseProbe();
     const starterBuild = runStarterBuildProbe();
 
     if (!metaProgression.ok) {
@@ -13385,6 +13805,9 @@ function installAutomationTestHooks() {
     }
     if (!retryCombatShowcase.ok) {
       failures.push("retry combat showcase failed");
+    }
+    if (!chapterShowcase.ok) {
+      failures.push("chapter combat showcase failed");
     }
     if (!starterBuild.ok) {
       failures.push("starter build quick start failed");
@@ -13478,6 +13901,7 @@ function installAutomationTestHooks() {
       failureReplay,
       resultReview,
       retryCombatShowcase,
+      chapterShowcase,
       starterBuild,
       chapters: chaptersCovered,
       finalSnapshot: snapshot({ action: "routePressureComplete" }),
@@ -13503,6 +13927,7 @@ function installAutomationTestHooks() {
     runMapInteractiveProbe,
     runResultReviewProbe,
     runRetryCombatShowcaseProbe,
+    runChapterShowcaseProbe,
     runStarterBuildProbe,
     runRoutePressureTest,
   };
