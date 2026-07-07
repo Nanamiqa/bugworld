@@ -366,6 +366,7 @@ let lastInputMethod = "keyboard";
 let metaUnlockPulseNodeId = null;
 let resultRetryStarterBuildId = null;
 let resultRetryBoost = null;
+let resultRetryPlan = null;
 
 const desks = [
   { x: 84, y: 104, w: 136, h: 54, tag: "Q3报表", assetKey: "propWorkstationA" },
@@ -1945,6 +1946,7 @@ function createRunStats() {
     mapInteractivesActivated: [],
     deviceGuide: null,
     retryBoost: null,
+    retryPlan: null,
     fairWarning: createFairWarningState(),
     tempo: createCombatTempoState(),
     openingSprint: null,
@@ -2144,6 +2146,30 @@ function normalizeRetryBoost(value) {
   return normalized;
 }
 
+function normalizeRetryPlan(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const build = getStarterBuildById(value.starterBuildId) ?? starterBuilds[0] ?? null;
+  if (!build) {
+    return null;
+  }
+  return {
+    id: typeof value.id === "string" && value.id ? value.id : `${build.id}-retry-plan`,
+    starterBuildId: build.id,
+    title: typeof value.title === "string" ? value.title : "下一局 30 秒路线",
+    promise: typeof value.promise === "string" ? value.promise : "按推荐流派重开，先拿到第一处异常和第一波补给。",
+    firstGoal: typeof value.firstGoal === "string" ? value.firstGoal : "处理首个异常 -> 清掉第一波追击 -> 点亮流派超频",
+    rewardText: typeof value.rewardText === "string" ? value.rewardText : "开局资源、复盘加成和武器超频会合并成第一波收益。",
+    screenshotFocus: typeof value.screenshotFocus === "string" ? value.screenshotFocus : "第一波追击、武器命中特效和 HUD 目标同时入镜。",
+    log: typeof value.log === "string" ? value.log : "复盘路线已带入：先按 30 秒路线打出第一波收益。",
+    openingSurgeDelayMultiplier: clamp(Number(value.openingSurgeDelayMultiplier) || 1, 0.45, 1),
+    starterIgnitionCredit: clamp(Math.trunc(Number(value.starterIgnitionCredit) || 0), 0, 2),
+    applied: Boolean(value.applied),
+    appliedAt: Number(value.appliedAt) || null,
+  };
+}
+
 function normalizeLastRunReview(value) {
   if (!value || typeof value !== "object") {
     return null;
@@ -2160,6 +2186,7 @@ function normalizeLastRunReview(value) {
     nextText: typeof value.nextText === "string" ? value.nextText : "用推荐流派更快进入第一波爽点。",
     recommendedStarterBuildId: build?.id ?? null,
     retryBoost: normalizeRetryBoost(value.retryBoost),
+    retryPlan: normalizeRetryPlan(value.retryPlan),
     at: Number(value.at) || Date.now(),
   };
 }
@@ -3410,6 +3437,7 @@ function restoreRunSave(save) {
     mapInteractivesActivated: cloneForSave(save.runStats?.mapInteractivesActivated, []),
     deviceGuide: normalizeDeviceGuideState(save.runStats?.deviceGuide),
     retryBoost: normalizeRetryBoost(save.runStats?.retryBoost),
+    retryPlan: normalizeRetryPlan(save.runStats?.retryPlan),
     fairWarning: normalizeFairWarningState(save.runStats?.fairWarning),
     distanceTraveled: Math.max(0, Number(save.runStats?.distanceTraveled) || 0),
     tempo: normalizeCombatTempoState(save.runStats?.tempo),
@@ -3564,6 +3592,110 @@ function createReviewRetryBoost(victory, build, pressureTitle = "") {
   });
 }
 
+function createReviewRetryPlan(victory, build, retryBoost = null, pressureTitle = "") {
+  const safeBuild = build ?? starterBuilds[0] ?? null;
+  if (!safeBuild) {
+    return null;
+  }
+  const weapon = getWeaponById(safeBuild.weaponId) ?? weaponDefinitions[0] ?? {};
+  const boostTitle = retryBoost?.title ? `${retryBoost.title} + ` : "";
+  const base = {
+    starterBuildId: safeBuild.id,
+    openingSurgeDelayMultiplier: victory ? 1 : 0.72,
+    starterIgnitionCredit: victory ? 0 : 1,
+  };
+
+  if (victory) {
+    return normalizeRetryPlan({
+      ...base,
+      id: "clean-victory-route",
+      title: "低伤截图路线",
+      promise: "保留通关档案，下一把追求低伤、未收集回声和更好商店截图。",
+      firstGoal: "先处理首个异常，再把快递裂隙拉进武器特效范围内清场。",
+      rewardText: "低伤目标、回声档案和首波特效截图会变成下一轮展示重点。",
+      screenshotFocus: "低伤 HUD、Boss 地标和武器命中特效同时可见。",
+      log: "复盘路线已带入：这把优先追低伤截图和未收集档案。",
+    });
+  }
+
+  if (safeBuild.id === "close-control" || pressureTitle.includes("伤害")) {
+    return normalizeRetryPlan({
+      ...base,
+      id: "control-second-night-route",
+      title: "30秒止损路线",
+      promise: `${boostTitle}${weapon.name ?? "修正液"}开局，先用减速把贴脸怪拆开，再吃首个异常的复盘加成。`,
+      firstGoal: "处理首个异常 -> 用雾化减速清裂隙 -> 触发控场超频",
+      rewardText: "开局生命、首异常加成和修正液超频会合并成容错窗口。",
+      screenshotFocus: "雾化命中特效、低血安全提示和第一波裂隙清场同屏。",
+      log: "复盘路线已带入：30秒止损路线生效，先处理首个异常，再用修正液控住裂隙。",
+    });
+  }
+
+  if (safeBuild.id === "queue-barrage" || pressureTitle.includes("连段")) {
+    return normalizeRetryPlan({
+      ...base,
+      id: "barrage-combo-route",
+      title: "30秒连段路线",
+      promise: `${boostTitle}${weapon.name ?? "键盘宏"}开局，第一波按键弹铺安全区，优先把连段补给点亮。`,
+      firstGoal: "处理首个异常 -> 把裂隙怪压在屏幕外 -> 点亮连段补给",
+      rewardText: "复盘 bug点数、连段奖励和键盘超频会更早叠到一起。",
+      screenshotFocus: "按键弹幕、连段条和裂隙清场奖励同时入镜。",
+      log: "复盘路线已带入：30秒连段路线生效，先用键盘弹幕把第一波压出去。",
+    });
+  }
+
+  if (pressureTitle.includes("装置")) {
+    return normalizeRetryPlan({
+      ...base,
+      id: "device-first-route",
+      title: "30秒装置路线",
+      promise: `${boostTitle}${weapon.name ?? "初始武器"}开局，先追最近互动标记，把地图装置转成战斗收益。`,
+      firstGoal: "处理首个异常 -> 跟随装置箭头 -> 用装置奖励接第一波",
+      rewardText: "地图装置、复盘补给和开场牵引会连成一条探索收益线。",
+      screenshotFocus: "互动装置箭头、地图地标和第一波敌人同时可读。",
+      log: "复盘路线已带入：30秒装置路线生效，先追最近互动标记。",
+    });
+  }
+
+  return normalizeRetryPlan({
+    ...base,
+    id: "breakpoint-first-wave-route",
+    title: "30秒断点路线",
+    promise: `${boostTitle}${weapon.name ?? "回形针"}开局，先点掉最快的裂隙怪，第一波就看见断点爆发。`,
+    firstGoal: "处理首个异常 -> 点杀快递裂隙 -> 拿精准弹超频",
+    rewardText: "复盘补给、首波清场和回形针精准弹会形成第一把节奏。",
+    screenshotFocus: "断点火花、目标罗盘和裂隙奖励同时入镜。",
+    log: "复盘路线已带入：30秒断点路线生效，优先点掉最快的裂隙怪。",
+  });
+}
+
+function applyRetryPlan(plan) {
+  const normalized = normalizeRetryPlan(plan);
+  if (!normalized || !player || !runStats || runStats.retryPlan?.applied) {
+    return null;
+  }
+
+  runStats.retryPlan = {
+    ...normalized,
+    applied: true,
+    appliedAt: Date.now(),
+  };
+  const surge = runStats.openingSprint?.surge;
+  if (surge && normalized.openingSurgeDelayMultiplier < 1) {
+    surge.delayRemaining = Math.max(0.18, (surge.delayRemaining ?? openingSurgeConfig.spawnDelay) * normalized.openingSurgeDelayMultiplier);
+  }
+  if (runStats.starterIgnition && normalized.starterIgnitionCredit > 0) {
+    runStats.starterIgnition.surgeCredit = clamp(
+      Math.trunc(Number(runStats.starterIgnition.surgeCredit) || 0) + normalized.starterIgnitionCredit,
+      0,
+      3,
+    );
+  }
+  setLog(normalized.log);
+  saveRunCheckpoint("retry-plan");
+  return runStats.retryPlan;
+}
+
 function applyRetryBoost(boost) {
   const normalized = normalizeRetryBoost(boost);
   if (!normalized || !player || !runStats || runStats.retryBoost?.applied) {
@@ -3639,6 +3771,7 @@ function createRunReview(victory) {
     ? "已经通关，下一把可以追低伤成就和未收集回声。"
     : `${weapon?.name ?? "初始武器"}开局，目标是更快完成开场牵引和第一次超频。`;
   const retryBoost = createReviewRetryBoost(victory, build, pressureTitle);
+  const retryPlan = createReviewRetryPlan(victory, build, retryBoost, pressureTitle);
 
   return {
     outcome: victory ? "victory" : "defeat",
@@ -3651,6 +3784,7 @@ function createRunReview(victory) {
     nextText,
     recommendedStarterBuildId: build?.id ?? null,
     retryBoost,
+    retryPlan,
     at: Date.now(),
   };
 }
@@ -3886,12 +4020,14 @@ function startNewRun(chapterIndex = 0, options = {}) {
       runStats.starterIgnition = createStarterIgnitionState(starterBuild);
       setLog(`${starterBuild.log} ${starterBuild.perkText}`);
       applyRetryBoost(options.retryBoost);
+      applyRetryPlan(options.retryPlan);
       saveRunCheckpoint("starter-build");
       openStory(currentChapter().opening);
       return;
     }
   }
   applyRetryBoost(options.retryBoost);
+  applyRetryPlan(options.retryPlan);
   openWeaponSelect();
 }
 
@@ -5366,10 +5502,11 @@ function renderStartMenu() {
   const interactiveSummary = getMapInteractiveArchiveSummary();
   const lastReview = normalizeLastRunReview(archiveState.lastRunReview);
   const reviewBoostText = lastReview?.retryBoost ? `${lastReview.retryBoost.title}已备好。` : "";
+  const reviewPlanText = lastReview?.retryPlan ? `${lastReview.retryPlan.title}已排好。` : "";
   ui.startSummary.textContent = runSave
     ? `检测到 ${formatSaveTime(runSave.savedAt)} 的跑局存档：${chapters[runSave.currentChapterIndex]?.title ?? "未知章节"}，${runSave.objective ?? "继续夜巡"}。`
     : lastReview
-      ? `上轮复盘：${lastReview.highlightTitle}。下一把建议：${lastReview.nextTitle}。${reviewBoostText}`
+      ? `上轮复盘：${lastReview.highlightTitle}。下一把建议：${lastReview.nextTitle}。${reviewPlanText}${reviewBoostText}`
       : "档案已就绪。可以从第一章重新出发，也可以进入已解锁章节练习。";
   renderTonightHook();
 
@@ -5612,6 +5749,9 @@ function renderOpeningSprintTracker() {
   const rewardText = sprint.completed
     ? "开场目标链完成"
     : `${progress.value}/${progress.target} · 奖励 +${stepRewardBugPoints} bug点数${retryBonusBugPoints ? "（复盘加成）" : ""}`;
+  const planText = runStats?.retryPlan?.applied && !sprint.completed
+    ? `${runStats.retryPlan.title} · ${runStats.retryPlan.firstGoal}`
+    : null;
   const surge = sprint.surge;
   const surgeText = surge?.spawned && !surge.completed && !surge.failed
     ? `${openingSurgeConfig.label} ${surge.defeats ?? 0}/${openingSurgeConfig.targetDefeats} · 点燃连段 ${formatHookTime(openingSurgeConfig.timeLimit - (surge.elapsed ?? 0))}`
@@ -5628,7 +5768,7 @@ function renderOpeningSprintTracker() {
   ui.openingTracker.innerHTML = `
     <span>开场牵引</span>
     <strong>${sprint.completed ? "第一条路线已接通" : step.title}</strong>
-    <small>${surgeText ?? rewardText}</small>
+    <small>${surgeText ?? planText ?? rewardText}</small>
   `;
 }
 
@@ -8037,6 +8177,9 @@ function renderResultInsights(review = archiveState?.lastRunReview) {
     ["下次注意", normalized.pressureTitle, normalized.pressureText, ""],
     ["下一把", normalized.nextTitle, normalized.nextText, "is-next"],
   ];
+  if (normalized.retryPlan) {
+    cards.push(["下一局路线", normalized.retryPlan.title, `${normalized.retryPlan.firstGoal}。${normalized.retryPlan.rewardText}`, "is-plan"]);
+  }
   if (normalized.retryBoost) {
     cards.push(["重开助推", normalized.retryBoost.title, normalized.retryBoost.summary, "is-boost"]);
   }
@@ -8054,13 +8197,15 @@ function syncResultRetryButton(review = archiveState?.lastRunReview) {
   const build = getStarterBuildById(normalized?.recommendedStarterBuildId);
   resultRetryStarterBuildId = build?.id ?? null;
   resultRetryBoost = normalized?.retryBoost ?? null;
+  resultRetryPlan = normalized?.retryPlan ?? null;
   if (!ui.restartButton) {
     return;
   }
   const weapon = getWeaponById(build?.weaponId);
+  const planText = resultRetryPlan ? ` · ${resultRetryPlan.title}` : "";
   const boostText = resultRetryBoost ? ` · ${resultRetryBoost.title}` : "";
   ui.restartButton.innerHTML = build
-    ? `<span class="choice-title">按推荐再来</span><span class="choice-effect">${build.title} · ${weapon?.name ?? "初始武器"}${boostText}</span>`
+    ? `<span class="choice-title">按推荐再来</span><span class="choice-effect">${build.title} · ${weapon?.name ?? "初始武器"}${planText}${boostText}</span>`
     : `<span class="choice-title">重开夜巡</span><span class="choice-effect">从第一章重新开始</span>`;
 }
 
@@ -12160,15 +12305,24 @@ function installAutomationTestHooks() {
     syncResultRetryButton(review);
     const build = getStarterBuildById(resultRetryStarterBuildId);
     const boost = cloneForSave(resultRetryBoost, null);
+    const plan = cloneForSave(resultRetryPlan, null);
     const buttonText = ui.restartButton?.textContent ?? "";
     const expectedOpeningBonus = boost?.openingTargetBonusBugPoints ?? 0;
     const expectedStepBugPoints = (openingSprintSteps[0]?.rewardBugPoints ?? 0) + expectedOpeningBonus;
-    startNewRun(build?.chapterIndex ?? 0, { starterBuildId: build?.id, retryBoost: boost });
+    startNewRun(build?.chapterIndex ?? 0, { starterBuildId: build?.id, retryBoost: boost, retryPlan: plan });
     const retryApplied = Boolean(runStats.retryBoost?.applied)
       && runStats.retryBoost.id === boost?.id
       && player.bugPoints >= (boost?.bonusBugPoints ?? 0)
       && player.hp >= playerBase.hp;
+    const retryPlanApplied = Boolean(runStats.retryPlan?.applied)
+      && runStats.retryPlan.id === plan?.id
+      && runStats.retryPlan.starterBuildId === build?.id
+      && (runStats.openingSprint?.surge?.delayRemaining ?? openingSurgeConfig.spawnDelay)
+        <= openingSurgeConfig.spawnDelay * (plan?.openingSurgeDelayMultiplier ?? 1) + 0.01
+      && (runStats.starterIgnition?.surgeCredit ?? 0) >= (plan?.starterIgnitionCredit ?? 0);
     const retryOpeningBonusReady = (runStats.openingSprint?.retryBonusBugPoints ?? 0) === expectedOpeningBonus;
+    syncHud();
+    const openingTrackerText = ui.openingTracker?.textContent ?? "";
     world.mode = "playing";
     const bugPointsBeforeStep = player.bugPoints;
     runStats.eventsResolved += openingSprintSteps[0]?.target ?? 1;
@@ -12181,20 +12335,29 @@ function installAutomationTestHooks() {
         && build?.id === "close-control"
         && boost?.id === "shielded-second-night"
         && ui.resultInsights?.textContent.includes("护盾起步")
+        && ui.resultInsights?.textContent.includes("下一局路线")
+        && ui.resultInsights?.textContent.includes(plan?.title ?? "")
         && buttonText.includes("护盾起步")
+        && buttonText.includes(plan?.title ?? "")
         && retryApplied
+        && retryPlanApplied
+        && openingTrackerText.includes(plan?.title ?? "")
         && retryOpeningBonusReady
         && firstStepBoostClaimed,
       review,
       retryStarterBuildId: build?.id ?? null,
       retryBoost: boost,
+      retryPlan: plan,
       retryApplied: cloneForSave(runStats.retryBoost, null),
+      retryPlanApplied: cloneForSave(runStats.retryPlan, null),
+      openingTrackerText,
       firstStepBoostClaimed,
       insightsText: ui.resultInsights?.textContent ?? "",
     };
     ui.resultInsights.innerHTML = "";
     resultRetryStarterBuildId = null;
     resultRetryBoost = null;
+    resultRetryPlan = null;
     syncResultRetryButton(null);
     deleteRunSave();
     archiveState = previousArchive ?? loadArchive();
@@ -12840,10 +13003,10 @@ ui.audioTestButton?.addEventListener("click", () => {
 ui.restartButton.addEventListener("click", () => {
   const build = getStarterBuildById(resultRetryStarterBuildId);
   if (build) {
-    startNewRun(build.chapterIndex, { starterBuildId: build.id, retryBoost: resultRetryBoost });
+    startNewRun(build.chapterIndex, { starterBuildId: build.id, retryBoost: resultRetryBoost, retryPlan: resultRetryPlan });
     return;
   }
-  startNewRun(0, { retryBoost: resultRetryBoost });
+  startNewRun(0, { retryBoost: resultRetryBoost, retryPlan: resultRetryPlan });
 });
 ui.storyPanel.addEventListener("click", (event) => {
   if (event.target.closest("button")) {

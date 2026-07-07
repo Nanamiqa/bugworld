@@ -666,6 +666,17 @@ h1 {
   background: rgba(255, 248, 232, 0.82);
 }
 
+.result-insight.is-plan {
+  border-color: rgba(114, 165, 255, 0.32);
+  background:
+    linear-gradient(135deg, rgba(240, 246, 255, 0.94), rgba(239, 250, 249, 0.8));
+  box-shadow: inset 3px 0 0 rgba(114, 165, 255, 0.5);
+}
+
+.result-insight.is-plan span {
+  color: var(--blue);
+}
+
 .result-insight.is-boost {
   border-color: rgba(15, 159, 149, 0.32);
   background:
