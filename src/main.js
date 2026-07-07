@@ -1947,6 +1947,7 @@ function createRunStats() {
     deviceGuide: null,
     retryBoost: null,
     retryPlan: null,
+    openingShowcase: null,
     fairWarning: createFairWarningState(),
     tempo: createCombatTempoState(),
     openingSprint: null,
@@ -2952,6 +2953,92 @@ function normalizeOpeningSurgeState(savedSurge = null) {
   };
 }
 
+function createOpeningShowcaseState(phase = "spawned", options = {}) {
+  const plan = normalizeRetryPlan(options.retryPlan ?? runStats?.retryPlan);
+  const weapon = player?.weapon ?? getWeaponById(plan?.starterBuildId ? getStarterBuildById(plan.starterBuildId)?.weaponId : null) ?? weaponDefinitions[0] ?? {};
+  const title = phase === "cleared" ? "第一波高光已成片" : "第一波截图高光";
+  const defaultFocus = `${weapon.name ?? "当前武器"}、快递裂隙、开场牵引和连段奖励同屏可读。`;
+  const focus = options.screenshotFocus ?? plan?.screenshotFocus ?? defaultFocus;
+  return {
+    id: "opening-first-wave-showcase",
+    phase,
+    active: true,
+    title: options.title ?? title,
+    promise: options.promise ?? plan?.promise ?? "把首个异常、第一波追击和武器命中特效压进同一屏。",
+    focus,
+    rewardText: options.rewardText ?? plan?.rewardText ?? `清场奖励 +${openingSurgeConfig.rewardBugPoints} bug点数 / +${openingSurgeConfig.rewardXp} 经验，并推进流派启动。`,
+    callout: options.callout ?? (phase === "cleared" ? "清场奖励已入账" : "先看裂隙，再看武器特效"),
+    weaponName: weapon.name ?? "初始武器",
+    x: Number.isFinite(options.x) ? options.x : null,
+    y: Number.isFinite(options.y) ? options.y : null,
+    radius: Math.max(80, Number(options.radius) || 168),
+    spawnedCount: Math.max(0, Math.trunc(Number(options.spawnedCount) || 0)),
+    defeats: clamp(Math.trunc(Number(options.defeats) || 0), 0, openingSurgeConfig.targetDefeats),
+    targetDefeats: openingSurgeConfig.targetDefeats,
+    flash: phase === "cleared" ? 2.2 : 1.6,
+    hold: phase === "cleared" ? 8 : 12,
+    completed: phase === "cleared",
+  };
+}
+
+function normalizeOpeningShowcaseState(savedShowcase = null) {
+  if (!savedShowcase || typeof savedShowcase !== "object") {
+    return null;
+  }
+  const fallback = createOpeningShowcaseState(savedShowcase.phase === "cleared" ? "cleared" : "spawned");
+  const hold = Math.max(0, Number(savedShowcase.hold ?? fallback.hold) || 0);
+  return {
+    ...fallback,
+    ...savedShowcase,
+    id: "opening-first-wave-showcase",
+    phase: savedShowcase.phase === "cleared" ? "cleared" : "spawned",
+    active: Boolean(savedShowcase.active) && hold > 0,
+    title: typeof savedShowcase.title === "string" ? savedShowcase.title : fallback.title,
+    promise: typeof savedShowcase.promise === "string" ? savedShowcase.promise : fallback.promise,
+    focus: typeof savedShowcase.focus === "string" ? savedShowcase.focus : fallback.focus,
+    rewardText: typeof savedShowcase.rewardText === "string" ? savedShowcase.rewardText : fallback.rewardText,
+    callout: typeof savedShowcase.callout === "string" ? savedShowcase.callout : fallback.callout,
+    weaponName: typeof savedShowcase.weaponName === "string" ? savedShowcase.weaponName : fallback.weaponName,
+    x: Number.isFinite(savedShowcase.x) ? savedShowcase.x : fallback.x,
+    y: Number.isFinite(savedShowcase.y) ? savedShowcase.y : fallback.y,
+    radius: Math.max(80, Number(savedShowcase.radius ?? fallback.radius) || fallback.radius),
+    spawnedCount: Math.max(0, Math.trunc(Number(savedShowcase.spawnedCount) || 0)),
+    defeats: clamp(Math.trunc(Number(savedShowcase.defeats) || 0), 0, openingSurgeConfig.targetDefeats),
+    targetDefeats: openingSurgeConfig.targetDefeats,
+    flash: Math.max(0, Number(savedShowcase.flash) || 0),
+    hold,
+    completed: Boolean(savedShowcase.completed) || savedShowcase.phase === "cleared",
+  };
+}
+
+function activateOpeningShowcase(phase, surge, options = {}) {
+  if (!runStats || currentChapterIndex !== 0) {
+    return null;
+  }
+  const state = createOpeningShowcaseState(phase, {
+    ...options,
+    x: Number.isFinite(options.x) ? options.x : surge?.x,
+    y: Number.isFinite(options.y) ? options.y : surge?.y,
+    spawnedCount: options.spawnedCount ?? surge?.spawnedCount,
+    defeats: options.defeats ?? surge?.defeats,
+    retryPlan: options.retryPlan ?? runStats.retryPlan,
+  });
+  runStats.openingShowcase = state;
+  return state;
+}
+
+function updateOpeningShowcase(dt = 0) {
+  const showcase = runStats?.openingShowcase;
+  if (!showcase?.active) {
+    return;
+  }
+  showcase.flash = Math.max(0, (showcase.flash ?? 0) - dt);
+  showcase.hold = Math.max(0, (showcase.hold ?? 0) - dt);
+  if (showcase.hold <= 0) {
+    showcase.active = false;
+  }
+}
+
 function normalizeOpeningSprintState(savedSprint = null) {
   if (!savedSprint || typeof savedSprint !== "object") {
     return null;
@@ -3094,6 +3181,9 @@ function spawnOpeningSurge(sprint = runStats?.openingSprint) {
   world.cameraShake = Math.max(world.cameraShake ?? 0, 0.12);
   burst(center.x, center.y, "#f1c15b", 26);
   playAudioCue("boss-phase");
+  activateOpeningShowcase("spawned", surge, {
+    callout: "截图点：目标、武器、第一波敌人同屏",
+  });
   setLog(`开场快递裂隙出现：${openingSurgeConfig.targetDefeats} 个低血量异常正在靠近，打穿它们就能立刻接上第一波爽点。`);
   saveRunCheckpoint("opening-surge-spawn");
   return true;
@@ -3162,6 +3252,12 @@ function completeOpeningSurge(surge = runStats?.openingSprint?.surge) {
     momentum.tempoKicked ? "连段补给已点亮" : "",
     momentum.ignitionCredited ? "流派启动加速" : "",
   ].filter(Boolean).join("，");
+  activateOpeningShowcase("cleared", surge, {
+    x: player.x,
+    y: player.y,
+    defeats: openingSurgeConfig.targetDefeats,
+    callout: momentumText || "清场奖励已入账",
+  });
   setLog(`开场快递裂隙清场：+${openingSurgeConfig.rewardBugPoints} bug点数，+${openingSurgeConfig.rewardXp} 经验${momentumText ? `，${momentumText}` : ""}。`);
   saveRunCheckpoint("opening-surge-complete");
 }
@@ -3438,6 +3534,7 @@ function restoreRunSave(save) {
     deviceGuide: normalizeDeviceGuideState(save.runStats?.deviceGuide),
     retryBoost: normalizeRetryBoost(save.runStats?.retryBoost),
     retryPlan: normalizeRetryPlan(save.runStats?.retryPlan),
+    openingShowcase: normalizeOpeningShowcaseState(save.runStats?.openingShowcase),
     fairWarning: normalizeFairWarningState(save.runStats?.fairWarning),
     distanceTraveled: Math.max(0, Number(save.runStats?.distanceTraveled) || 0),
     tempo: normalizeCombatTempoState(save.runStats?.tempo),
@@ -5752,6 +5849,10 @@ function renderOpeningSprintTracker() {
   const planText = runStats?.retryPlan?.applied && !sprint.completed
     ? `${runStats.retryPlan.title} · ${runStats.retryPlan.firstGoal}`
     : null;
+  const showcase = runStats?.openingShowcase?.active ? runStats.openingShowcase : null;
+  const showcaseText = showcase
+    ? `${showcase.callout} · ${showcase.focus}`
+    : null;
   const surge = sprint.surge;
   const surgeText = surge?.spawned && !surge.completed && !surge.failed
     ? `${openingSurgeConfig.label} ${surge.defeats ?? 0}/${openingSurgeConfig.targetDefeats} · 点燃连段 ${formatHookTime(openingSurgeConfig.timeLimit - (surge.elapsed ?? 0))}`
@@ -5764,11 +5865,12 @@ function renderOpeningSprintTracker() {
     "opening-tracker",
     sprint.completed ? "is-completed" : "",
     surge?.spawned && !surge.completed && !surge.failed ? "is-surge" : "",
+    showcase ? "is-showcase" : "",
   ].filter(Boolean).join(" ");
   ui.openingTracker.innerHTML = `
-    <span>开场牵引</span>
-    <strong>${sprint.completed ? "第一条路线已接通" : step.title}</strong>
-    <small>${surgeText ?? planText ?? rewardText}</small>
+    <span>${showcase ? "第一波卖点" : "开场牵引"}</span>
+    <strong>${showcase ? showcase.title : sprint.completed ? "第一条路线已接通" : step.title}</strong>
+    <small>${showcaseText ?? surgeText ?? planText ?? rewardText}</small>
   `;
 }
 
@@ -5967,6 +6069,7 @@ function updatePlaying(dt) {
   updateStarterIgnition(dt);
   updateOpeningSurge(dt);
   updateOpeningSprint(dt);
+  updateOpeningShowcase(dt);
   if (world.mode !== "playing") {
     return;
   }
@@ -8253,6 +8356,7 @@ function draw(dt) {
   drawObjectiveCompass(camera);
   drawDeviceGuideCompass(camera);
   drawExplorationMiniMap(camera);
+  drawOpeningShowcaseOverlay(camera);
   drawBossHud();
   ctx.restore();
 }
@@ -11009,6 +11113,61 @@ function drawExplorationMiniMap(camera) {
   ctx.restore();
 }
 
+function drawOpeningShowcaseOverlay(camera) {
+  const showcase = runStats?.openingShowcase;
+  if (!showcase?.active || world.mode !== "playing") {
+    return;
+  }
+
+  const anchorX = Number.isFinite(showcase.x) ? showcase.x : player.x;
+  const anchorY = Number.isFinite(showcase.y) ? showcase.y : player.y;
+  const radius = Math.max(90, Number(showcase.radius) || 168);
+  const screenX = anchorX - camera.x;
+  const screenY = anchorY - camera.y;
+  const frameX = clamp(screenX - radius * 0.72, 18, Math.max(18, world.viewWidth - radius * 1.44 - 18));
+  const frameY = clamp(screenY - radius * 0.48, 110, Math.max(110, world.viewHeight - radius * 0.96 - 24));
+  const frameW = Math.min(radius * 1.44, world.viewWidth - 36);
+  const frameH = Math.min(radius * 0.96, world.viewHeight - 128);
+  const flash = clamp(Number(showcase.flash) || 0, 0, 2.2);
+  const progress = clamp((showcase.defeats ?? 0) / Math.max(1, showcase.targetDefeats ?? openingSurgeConfig.targetDefeats), 0, 1);
+  const accent = showcase.completed ? "#5de2d1" : "#f1c15b";
+
+  ctx.save();
+  ctx.globalAlpha = 0.54 + flash * 0.08;
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 3;
+  ctx.setLineDash(showcase.completed ? [] : [12, 8]);
+  ctx.strokeRect(frameX, frameY, frameW, frameH);
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 0.12 + flash * 0.05;
+  ctx.fillStyle = accent;
+  ctx.fillRect(frameX, frameY, frameW, frameH);
+
+  const cardW = Math.min(390, world.viewWidth - 36);
+  const cardH = 92;
+  const cardX = 18;
+  const cardY = 92;
+  ctx.globalAlpha = 0.92;
+  ctx.fillStyle = "rgba(247, 250, 255, 0.92)";
+  ctx.fillRect(cardX, cardY, cardW, cardH);
+  ctx.strokeStyle = "rgba(26, 42, 68, 0.16)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(cardX, cardY, cardW, cardH);
+  ctx.fillStyle = accent;
+  ctx.fillRect(cardX, cardY, Math.max(4, cardW * progress), 4);
+  ctx.fillStyle = "#26364d";
+  ctx.font = "800 12px Microsoft YaHei, Segoe UI, sans-serif";
+  ctx.fillText("FIRST WAVE", cardX + 12, cardY + 22);
+  ctx.fillStyle = "#17202a";
+  ctx.font = "800 16px Microsoft YaHei, Segoe UI, sans-serif";
+  ctx.fillText(shortenText(showcase.title, 18), cardX + 12, cardY + 45);
+  ctx.fillStyle = "#526174";
+  ctx.font = "12px Microsoft YaHei, Segoe UI, sans-serif";
+  ctx.fillText(shortenText(showcase.callout, 22), cardX + 12, cardY + 65);
+  ctx.fillText(shortenText(showcase.focus, 28), cardX + 12, cardY + 82);
+  ctx.restore();
+}
+
 function drawBossHud() {
   if (!boss || boss.hp <= 0) {
     return;
@@ -12086,18 +12245,30 @@ function installAutomationTestHooks() {
     const startHp = player.hp;
     const startXp = player.xp;
     updateOpeningSurge(0.8);
+    syncHud();
+    const spawnedShowcase = cloneForSave(runStats.openingShowcase, null);
+    const spawnedTrackerText = ui.openingTracker?.textContent ?? "";
     const spawned = enemies.filter((enemy) => enemy.openingSurge);
     for (const enemy of spawned.slice(0, openingSurgeConfig.targetDefeats)) {
       enemy.hp = 0;
     }
     clearDefeatedHostiles();
     updateOpeningSurge(0.1);
+    syncHud();
     const surge = runStats.openingSprint?.surge;
+    const clearedShowcase = cloneForSave(runStats.openingShowcase, null);
+    const clearedTrackerText = ui.openingTracker?.textContent ?? "";
     const savedAfterSurge = loadRunSave();
     const tempoRewardClaimed = (runStats.tempo?.rewardsClaimed ?? 0) >= 1;
     const ignitionCompleted = Boolean(runStats.starterIgnition?.completed);
     const result = {
       ok: spawned.length >= openingSurgeConfig.targetDefeats
+        && spawnedShowcase?.phase === "spawned"
+        && spawnedShowcase?.focus?.includes("同屏")
+        && spawnedTrackerText.includes("第一波卖点")
+        && clearedShowcase?.phase === "cleared"
+        && Boolean(clearedShowcase?.completed)
+        && clearedTrackerText.includes("第一波卖点")
         && Boolean(surge?.completed)
         && (surge?.defeats ?? 0) >= openingSurgeConfig.targetDefeats
         && Boolean(surge?.tempoKickClaimed)
@@ -12110,6 +12281,12 @@ function installAutomationTestHooks() {
         && savedAfterSurge?.reason === "opening-surge-complete",
       spawnedCount: spawned.length,
       surge: cloneForSave(surge, null),
+      openingShowcase: {
+        spawned: spawnedShowcase,
+        cleared: clearedShowcase,
+        spawnedTrackerText,
+        clearedTrackerText,
+      },
       tempo: cloneForSave(runStats.tempo, null),
       ignition: cloneForSave(runStats.starterIgnition, null),
       reward: {

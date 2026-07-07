@@ -348,6 +348,21 @@ h1 {
   background: linear-gradient(90deg, var(--amber), var(--cyan));
 }
 
+.opening-tracker.is-showcase {
+  border-color: rgba(114, 165, 255, 0.38);
+  background:
+    linear-gradient(135deg, rgba(244, 248, 255, 0.94), rgba(255, 248, 232, 0.86));
+  box-shadow: 0 12px 30px rgba(62, 114, 216, 0.14);
+}
+
+.opening-tracker.is-showcase span {
+  color: var(--amber);
+}
+
+.opening-tracker.is-showcase::after {
+  background: linear-gradient(90deg, var(--blue), var(--amber), var(--cyan));
+}
+
 .opening-tracker.hidden,
 .hook-tracker.hidden {
   display: none;
