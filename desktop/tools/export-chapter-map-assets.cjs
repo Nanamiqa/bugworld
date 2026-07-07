@@ -1,7 +1,14 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const zlib = require("node:zlib");
-const { badgeSize, candidateSize, candidateFile, maps } = require("./chapter-map-asset-manifest.cjs");
+const {
+  badgeSize,
+  candidateSize,
+  candidateFile,
+  combatCandidateSize,
+  combatCandidateFile,
+  maps,
+} = require("./chapter-map-asset-manifest.cjs");
 
 const rootDir = path.resolve(__dirname, "..", "..");
 
@@ -368,6 +375,123 @@ function drawCompositionPanel(buffer, width, height, panel, index) {
   }
 }
 
+function drawCombatScene(buffer, width, height, map, imageX, imageY, imageScale) {
+  const p = map.palette;
+  const imageW = badgeSize.width * imageScale;
+  const imageH = badgeSize.height * imageScale;
+  const sx = (value) => imageX + value * imageScale;
+  const sy = (value) => imageY + value * imageScale;
+  const sw = (value) => value * imageScale;
+
+  drawBadge(buffer, width, height, map, imageX, imageY, imageScale);
+  rect(buffer, width, height, imageX, imageY, imageW, imageH, [0, 0, 0, 255], 0.12);
+
+  roundedRect(buffer, width, height, imageX + 22, imageY + 16, imageW - 44, 30, 10, [7, 13, 22, 255], 0.72);
+  drawText(buffer, width, height, "BOSS WINDOW", imageX + 36, imageY + 25, 2, [255, 255, 255, 255], 0.96);
+  rect(buffer, width, height, imageX + imageW - 214, imageY + 28, 176, 8, [38, 56, 74, 255], 0.9);
+  rect(buffer, width, height, imageX + imageW - 214, imageY + 28, 112, 8, [...p.hazard, 255], 0.95);
+
+  const player = { x: sx(94), y: sy(132) };
+  const enemy = { x: sx(162), y: sy(98) };
+  const bossPoint = { x: sx(246), y: sy(120) };
+  const device = { x: sx(map.combatCallouts?.[0]?.x ?? 78), y: sy(map.combatCallouts?.[0]?.y ?? 64) };
+
+  line(buffer, width, height, player.x, player.y, bossPoint.x, bossPoint.y, sw(4), [...p.secondary, 255], 0.62);
+  for (let index = 0; index < 5; index += 1) {
+    const t = index / 4;
+    circle(
+      buffer,
+      width,
+      height,
+      player.x + (enemy.x - player.x) * t,
+      player.y + (enemy.y - player.y) * t,
+      sw(4 + index * 0.8),
+      [...p.hazard, 255],
+      0.72 - index * 0.08
+    );
+  }
+
+  circle(buffer, width, height, player.x, player.y, sw(15), [255, 255, 255, 255], 0.96);
+  circle(buffer, width, height, player.x, player.y, sw(8), [...p.secondary, 255], 0.95);
+  drawText(buffer, width, height, "P", player.x - sw(4), player.y - sw(6), 2, [7, 13, 22, 255], 0.95);
+
+  circle(buffer, width, height, enemy.x, enemy.y, sw(20), [...p.hazard, 255], 0.7);
+  circle(buffer, width, height, enemy.x, enemy.y, sw(11), [255, 255, 255, 255], 0.75);
+  if (map.id === "promise-tower") {
+    circle(buffer, width, height, enemy.x, enemy.y, sw(32), [...p.secondary, 255], 0.23);
+  }
+  if (map.id === "whitebox-core") {
+    line(buffer, width, height, sx(42), enemy.y, sx(286), enemy.y, sw(5), [...p.hazard, 255], 0.62);
+  }
+  if (map.id === "hash-market") {
+    for (let i = 0; i < 4; i += 1) {
+      circle(buffer, width, height, enemy.x - sw(22 + i * 14), enemy.y + sw(22 + i * 8), sw(8), [...p.primary, 255], 0.38);
+    }
+  }
+  if (map.id === "metro-loop") {
+    line(buffer, width, height, enemy.x - sw(48), enemy.y - sw(12), enemy.x + sw(60), enemy.y + sw(8), sw(5), [...p.hazard, 255], 0.74);
+  }
+
+  roundedRect(buffer, width, height, bossPoint.x - sw(34), bossPoint.y - sw(26), sw(68), sw(52), sw(12), [7, 13, 22, 255], 0.76);
+  circle(buffer, width, height, bossPoint.x, bossPoint.y, sw(26), [...p.primary, 255], 0.72);
+  circle(buffer, width, height, bossPoint.x, bossPoint.y, sw(38), [...p.hazard, 255], 0.18);
+  drawText(buffer, width, height, "B", bossPoint.x - sw(5), bossPoint.y - sw(8), 3, [255, 255, 255, 255], 0.96);
+
+  circle(buffer, width, height, device.x, device.y, sw(16), [...p.secondary, 255], 0.86);
+  circle(buffer, width, height, device.x, device.y, sw(29), [...p.secondary, 255], 0.2);
+  drawText(buffer, width, height, "D", device.x - sw(4), device.y - sw(6), 2, [7, 13, 22, 255], 0.95);
+
+  const cardW = 174;
+  const cardH = 84;
+  const cardX = imageX + imageW - cardW - 18;
+  const cardY = imageY + imageH - cardH - 18;
+  roundedRect(buffer, width, height, cardX, cardY, cardW, cardH, 12, [245, 250, 255, 255], 0.9);
+  rect(buffer, width, height, cardX, cardY, cardW, 5, [...p.secondary, 255], 0.96);
+  drawText(buffer, width, height, "CHAPTER SHOT", cardX + 12, cardY + 14, 2, [38, 54, 77, 255], 0.98);
+  drawText(buffer, width, height, "READY", cardX + 12, cardY + 42, 3, [...p.secondary, 255], 0.96);
+  drawText(buffer, width, height, "DEVICE MECH BOSS VFX", cardX + 12, cardY + 70, 1, [38, 54, 77, 255], 0.9);
+
+  (map.combatCallouts ?? []).forEach((callout, calloutIndex) => {
+    drawCallout(buffer, width, height, callout, imageX, imageY, imageW, imageH, imageScale, p, calloutIndex);
+  });
+}
+
+function drawCombatShowcasePanel(buffer, width, height, panel, index) {
+  const { x, y, map } = panel;
+  const p = map.palette;
+  const panelWidth = 820;
+  const panelHeight = 438;
+  const imageScale = 1.84;
+  const imageX = x + 32;
+  const imageY = y + 86;
+  const imageW = badgeSize.width * imageScale;
+  const imageH = badgeSize.height * imageScale;
+  const sideX = x + 646;
+  const sideY = y + 86;
+
+  roundedRect(buffer, width, height, x, y, panelWidth, panelHeight, 24, [255, 255, 255, 255], 0.08);
+  roundedRect(buffer, width, height, x + 8, y + 8, panelWidth - 16, panelHeight - 16, 18, [0, 0, 0, 255], 0.17);
+  rect(buffer, width, height, x + 28, y + 66, panelWidth - 56, 3, [...p.secondary, 255], 0.9);
+  rect(buffer, width, height, x + 28, y + 72, panelWidth - 56, 2, [...p.hazard, 255], 0.62);
+  drawText(buffer, width, height, map.combatTitle, x + 30, y + 25, 4, [255, 255, 255, 255], 0.96);
+  drawText(buffer, width, height, `COMBAT ${String(index + 2).padStart(2, "0")}`, x + panelWidth - 190, y + 32, 2, [...p.hazard, 255], 0.98);
+
+  roundedRect(buffer, width, height, imageX - 10, imageY - 10, imageW + 20, imageH + 20, 14, [255, 255, 255, 255], 0.11);
+  drawCombatScene(buffer, width, height, map, imageX, imageY, imageScale);
+
+  roundedRect(buffer, width, height, sideX, sideY, 142, imageH + 20, 16, [7, 13, 22, 255], 0.74);
+  drawPillText(buffer, width, height, "HOOK", sideX + 14, sideY + 16, 2, [...p.primary, 255], [8, 14, 22, 255]);
+  let textY = sideY + 58;
+  textY = drawWrappedText(buffer, width, height, map.combatFocus, sideX + 14, textY, 112, 1, [235, 242, 255, 255], 0.92, 5) + 12;
+  drawPillText(buffer, width, height, "CHECK", sideX + 14, textY, 2, [...p.hazard, 255], [8, 14, 22, 255]);
+  textY += 42;
+  for (const item of map.combatChecklist ?? []) {
+    roundedRect(buffer, width, height, sideX + 14, textY, 116, 20, 5, [255, 255, 255, 255], 0.12);
+    drawText(buffer, width, height, `OK ${item}`, sideX + 22, textY + 6, 1, [245, 250, 255, 255], 0.9);
+    textY += 27;
+  }
+}
+
 const sheet = canvas(candidateSize.width, candidateSize.height);
 drawBackground(sheet, candidateSize.width, candidateSize.height);
 drawText(sheet, candidateSize.width, candidateSize.height, "CHAPTER MAP SELLING SHOTS", 90, 32, 4, [255, 255, 255, 255], 0.94);
@@ -380,3 +504,16 @@ const panels = [
 ];
 panels.forEach((panel, index) => drawCompositionPanel(sheet, candidateSize.width, candidateSize.height, panel, index));
 savePng(candidateFile, candidateSize.width, candidateSize.height, sheet);
+
+const combatSheet = canvas(combatCandidateSize.width, combatCandidateSize.height);
+drawBackground(combatSheet, combatCandidateSize.width, combatCandidateSize.height);
+drawText(combatSheet, combatCandidateSize.width, combatCandidateSize.height, "CHAPTER COMBAT SHOWCASE SHOTS", 90, 32, 4, [255, 255, 255, 255], 0.94);
+drawText(combatSheet, combatCandidateSize.width, combatCandidateSize.height, "DEVICE / ENEMY MECHANIC / BOSS WINDOW / WEAPON VFX", 90, 78, 2, [176, 221, 255, 255], 0.86);
+const combatPanels = [
+  { x: 78, y: 126, map: maps[0] },
+  { x: 1022, y: 126, map: maps[1] },
+  { x: 78, y: 604, map: maps[2] },
+  { x: 1022, y: 604, map: maps[3] },
+];
+combatPanels.forEach((panel, index) => drawCombatShowcasePanel(combatSheet, combatCandidateSize.width, combatCandidateSize.height, panel, index));
+savePng(combatCandidateFile, combatCandidateSize.width, combatCandidateSize.height, combatSheet);

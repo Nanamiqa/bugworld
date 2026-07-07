@@ -58,6 +58,11 @@
       "id": "chapter-map-candidate-compositions",
       "path": "desktop/steam/store-assets/review/chapter-map-candidate-compositions-v1.png",
       "usage": ["store-page-review", "screenshot-planning"]
+    },
+    {
+      "id": "chapter-combat-showcase-candidates",
+      "path": "desktop/steam/store-assets/review/chapter-combat-showcase-candidates-v1.png",
+      "usage": ["store-page-review", "combat-screenshot-planning"]
     }
   ],
   "capsules": [

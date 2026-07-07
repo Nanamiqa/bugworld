@@ -2,6 +2,8 @@ module.exports = {
   badgeSize: { width: 320, height: 180 },
   candidateSize: { width: 1920, height: 1080 },
   candidateFile: "desktop/steam/store-assets/review/chapter-map-candidate-compositions-v1.png",
+  combatCandidateSize: { width: 1920, height: 1080 },
+  combatCandidateFile: "desktop/steam/store-assets/review/chapter-combat-showcase-candidates-v1.png",
   maps: [
     {
       id: "metro-loop",
@@ -11,6 +13,14 @@ module.exports = {
       shotTitle: "CH2 LOOPLINE SHADOW",
       shotFocus: "Lost-frame rails, crowd slows, time-gate reset",
       deviceLabel: "TIME GATE RESET",
+      combatTitle: "CH2 STATION MISBEAT",
+      combatFocus: "Time gate, dash telegraph, two-beat boss window",
+      combatChecklist: ["TIME GATE", "DASH LINE", "BOSS BEAT", "IMPACT VFX"],
+      combatCallouts: [
+        { x: 74, y: 62, label: "DEVICE" },
+        { x: 166, y: 98, label: "DASH" },
+        { x: 246, y: 132, label: "BOSS" },
+      ],
       compositionTags: ["rail chase", "slow crowd", "turnback boss"],
       callouts: [
         { x: 252, y: 70, label: "TIME GATE" },
@@ -33,6 +43,14 @@ module.exports = {
       shotTitle: "CH3 HASH RAIN MARKET",
       shotFocus: "Salt rain, duplicate stalls, cache-burst lantern",
       deviceLabel: "SALT LANTERN BURST",
+      combatTitle: "CH3 HASH SALT RAIN",
+      combatFocus: "Salt lantern, queue trail, index-lock weak window",
+      combatChecklist: ["LANTERN", "SALT TRAIL", "INDEX LOCK", "BURST VFX"],
+      combatCallouts: [
+        { x: 114, y: 50, label: "LANTERN" },
+        { x: 72, y: 132, label: "TRAIL" },
+        { x: 244, y: 86, label: "LOCK" },
+      ],
       compositionTags: ["salt rain", "duplicate codes", "cache burst"],
       callouts: [
         { x: 128, y: 44, label: "SALT RAIN" },
@@ -55,6 +73,14 @@ module.exports = {
       shotTitle: "CH4 PROMISE ROOT TOWER",
       shotFocus: "Branch lanes, recursion pools, safety relay",
       deviceLabel: "BRANCH RELAY WINDOW",
+      combatTitle: "CH4 ROOT RELAY",
+      combatFocus: "Leaf relay, promise shield, anchor weak window",
+      combatChecklist: ["LEAF RELAY", "SHIELD", "ANCHOR", "IMPACT VFX"],
+      combatCallouts: [
+        { x: 262, y: 42, label: "RELAY" },
+        { x: 86, y: 92, label: "SHIELD" },
+        { x: 170, y: 132, label: "ANCHOR" },
+      ],
       compositionTags: ["root lanes", "weak window", "debt stack"],
       callouts: [
         { x: 164, y: 56, label: "ROOT HUB" },
@@ -77,6 +103,14 @@ module.exports = {
       shotTitle: "CH5 WHITEBOX CORE",
       shotFocus: "Scan lanes, diff console, final rule reveal",
       deviceLabel: "DIFF CONSOLE REVEAL",
+      combatTitle: "CH5 WHITEBOX APPEAL",
+      combatFocus: "Diff console, scan lane, final appeal window",
+      combatChecklist: ["DIFF CONSOLE", "SCAN LANE", "APPEAL", "IMPACT VFX"],
+      combatCallouts: [
+        { x: 248, y: 116, label: "DIFF" },
+        { x: 64, y: 58, label: "SCAN" },
+        { x: 162, y: 86, label: "CORE" },
+      ],
       compositionTags: ["scan lanes", "diff console", "final rule"],
       callouts: [
         { x: 162, y: 86, label: "CORE" },

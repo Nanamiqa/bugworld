@@ -1,6 +1,13 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { badgeSize, candidateSize, candidateFile, maps } = require("./chapter-map-asset-manifest.cjs");
+const {
+  badgeSize,
+  candidateSize,
+  candidateFile,
+  combatCandidateSize,
+  combatCandidateFile,
+  maps,
+} = require("./chapter-map-asset-manifest.cjs");
 
 const rootDir = path.resolve(__dirname, "..", "..");
 const mainSource = fs.readFileSync(path.join(rootDir, "src", "main.js"), "utf8");
@@ -32,8 +39,16 @@ for (const map of maps) {
       errors.push(`${map.id} is missing a useful ${field}`);
     }
   }
+  for (const field of ["combatTitle", "combatFocus"]) {
+    if (typeof map[field] !== "string" || map[field].trim().length < 8) {
+      errors.push(`${map.id} is missing a useful ${field}`);
+    }
+  }
   if (!Array.isArray(map.compositionTags) || map.compositionTags.length < 3) {
     errors.push(`${map.id} needs at least 3 compositionTags for screenshot planning`);
+  }
+  if (!Array.isArray(map.combatChecklist) || map.combatChecklist.length < 4) {
+    errors.push(`${map.id} needs 4 combatChecklist items for chapter shot planning`);
   }
   if (!Array.isArray(map.callouts) || map.callouts.length < 3) {
     errors.push(`${map.id} needs at least 3 map callouts`);
@@ -44,6 +59,18 @@ for (const map of maps) {
       }
       if (typeof callout.x !== "number" || typeof callout.y !== "number") {
         errors.push(`${map.id} callout ${callout.label ?? "unknown"} needs numeric coordinates`);
+      }
+    }
+  }
+  if (!Array.isArray(map.combatCallouts) || map.combatCallouts.length < 3) {
+    errors.push(`${map.id} needs at least 3 combat callouts`);
+  } else {
+    for (const callout of map.combatCallouts) {
+      if (typeof callout.label !== "string" || callout.label.trim().length < 3) {
+        errors.push(`${map.id} has an unnamed combat callout`);
+      }
+      if (typeof callout.x !== "number" || typeof callout.y !== "number") {
+        errors.push(`${map.id} combat callout ${callout.label ?? "unknown"} needs numeric coordinates`);
       }
     }
   }
@@ -75,6 +102,19 @@ if (candidate) {
   }
 }
 
+const combatCandidate = readPngSize(combatCandidateFile);
+if (combatCandidate) {
+  if (combatCandidate.width !== combatCandidateSize.width || combatCandidate.height !== combatCandidateSize.height) {
+    errors.push(
+      `${combatCandidateFile} is ${combatCandidate.width}x${combatCandidate.height}, ` +
+        `expected ${combatCandidateSize.width}x${combatCandidateSize.height}`
+    );
+  }
+  if (combatCandidate.bytes < 120000) {
+    errors.push(`${combatCandidateFile} looks too small (${combatCandidate.bytes} bytes)`);
+  }
+}
+
 const sourceImagePaths = new Set((storeManifest.sourceImages ?? []).map((entry) => entry.path));
 for (const map of maps) {
   if (!sourceImagePaths.has(map.file)) {
@@ -84,10 +124,13 @@ for (const map of maps) {
 if (!sourceImagePaths.has(candidateFile)) {
   errors.push(`${candidateFile} missing from store sourceImages`);
 }
+if (!sourceImagePaths.has(combatCandidateFile)) {
+  errors.push(`${combatCandidateFile} missing from store sourceImages`);
+}
 
 if (errors.length > 0) {
   console.error(`Chapter map asset check failed:\n- ${errors.join("\n- ")}`);
   process.exit(1);
 }
 
-console.log(`Chapter map assets ok: ${maps.length} badges and 1 candidate sheet`);
+console.log(`Chapter map assets ok: ${maps.length} badges and 2 candidate sheets`);

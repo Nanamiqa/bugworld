@@ -117,6 +117,23 @@ if (manifest && page) {
       "Store screenshot contact sheet"
     );
   }
+
+  for (const [artifactId, artifact] of Object.entries(page.reviewArtifacts ?? {})) {
+    if (artifactId === "contactSheet") {
+      continue;
+    }
+    if (!artifact?.path || !artifact.width || !artifact.height) {
+      errors.push(`Review artifact ${artifactId} needs path, width, and height`);
+      continue;
+    }
+    ensureReadyImage(
+      artifact,
+      artifact.path,
+      artifact.width,
+      artifact.height,
+      `Review artifact ${artifactId}`
+    );
+  }
 }
 
 if (errors.length > 0) {

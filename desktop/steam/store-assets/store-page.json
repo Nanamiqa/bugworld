@@ -53,6 +53,13 @@
       "width": 1920,
       "height": 1080,
       "status": "ready"
+    },
+    "chapterCombatShowcaseSheet": {
+      "path": "desktop/steam/store-assets/review/chapter-combat-showcase-candidates-v1.png",
+      "width": 1920,
+      "height": 1080,
+      "status": "ready",
+      "purpose": "Second-to-fifth chapter combat screenshot candidates with device, enemy mechanic, boss window, and VFX checks."
     }
   }
 }
