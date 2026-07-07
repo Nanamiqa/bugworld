@@ -334,6 +334,12 @@ const combatTempoConfig = {
   healReward: 4,
   pickupXpReward: 2,
 };
+const fairWarningConfig = {
+  lowHpRatio: 0.35,
+  criticalHpRatio: 0.2,
+  lowInvulnerable: 0.78,
+  criticalInvulnerable: 1.05,
+};
 
 let player;
 let bugNodes;
@@ -1859,6 +1865,7 @@ function createRunStats() {
     mapInteractivesActivated: [],
     deviceGuide: null,
     retryBoost: null,
+    fairWarning: createFairWarningState(),
     tempo: createCombatTempoState(),
     openingSprint: null,
     starterBuild: null,
@@ -2074,6 +2081,25 @@ function normalizeLastRunReview(value) {
     recommendedStarterBuildId: build?.id ?? null,
     retryBoost: normalizeRetryBoost(value.retryBoost),
     at: Number(value.at) || Date.now(),
+  };
+}
+
+function createFairWarningState() {
+  return {
+    lowHpWarned: false,
+    criticalHpWarned: false,
+    warningCount: 0,
+    lastWarningAt: 0,
+  };
+}
+
+function normalizeFairWarningState(value = {}) {
+  return {
+    ...createFairWarningState(),
+    lowHpWarned: Boolean(value?.lowHpWarned),
+    criticalHpWarned: Boolean(value?.criticalHpWarned),
+    warningCount: Math.max(0, Math.trunc(Number(value?.warningCount) || 0)),
+    lastWarningAt: Number(value?.lastWarningAt) || 0,
   };
 }
 
@@ -3304,6 +3330,7 @@ function restoreRunSave(save) {
     mapInteractivesActivated: cloneForSave(save.runStats?.mapInteractivesActivated, []),
     deviceGuide: normalizeDeviceGuideState(save.runStats?.deviceGuide),
     retryBoost: normalizeRetryBoost(save.runStats?.retryBoost),
+    fairWarning: normalizeFairWarningState(save.runStats?.fairWarning),
     distanceTraveled: Math.max(0, Number(save.runStats?.distanceTraveled) || 0),
     tempo: normalizeCombatTempoState(save.runStats?.tempo),
   };
@@ -5562,6 +5589,9 @@ function renderRunPanel() {
 
 function syncHud() {
   ui.hp.textContent = `${Math.ceil(player.hp)}/${player.maxHp}`;
+  const hpRatio = player.maxHp > 0 ? player.hp / player.maxHp : 1;
+  ui.hp.parentElement?.classList.toggle("is-low-hp", hpRatio <= fairWarningConfig.lowHpRatio && hpRatio > fairWarningConfig.criticalHpRatio);
+  ui.hp.parentElement?.classList.toggle("is-critical-hp", hpRatio <= fairWarningConfig.criticalHpRatio);
   ui.level.textContent = player.level;
   ui.xp.textContent = `${player.xp}/${player.xpToNext}`;
   ui.bug.textContent = player.bugPoints;
@@ -7271,18 +7301,56 @@ function applyEnemyDeathMechanic(enemy, deferredSpawns = null) {
   setEnemyMechanicLog(mechanic.log ?? "异常实体被击破后分裂成更小的待办。");
 }
 
+function triggerFairWarningIfNeeded(beforeHp, amount, fallbackMessage) {
+  if (!runStats || !player || player.maxHp <= 0 || player.hp <= 0) {
+    return fallbackMessage;
+  }
+
+  const warning = normalizeFairWarningState(runStats.fairWarning);
+  runStats.fairWarning = warning;
+  const beforeRatio = beforeHp / player.maxHp;
+  const afterRatio = player.hp / player.maxHp;
+  const crossedCritical = beforeRatio > fairWarningConfig.criticalHpRatio
+    && afterRatio <= fairWarningConfig.criticalHpRatio
+    && !warning.criticalHpWarned;
+  const crossedLow = beforeRatio > fairWarningConfig.lowHpRatio
+    && afterRatio <= fairWarningConfig.lowHpRatio
+    && !warning.lowHpWarned;
+
+  if (!crossedCritical && !crossedLow) {
+    return fallbackMessage;
+  }
+
+  const critical = crossedCritical;
+  warning.lowHpWarned = true;
+  warning.criticalHpWarned = warning.criticalHpWarned || critical;
+  warning.warningCount += 1;
+  warning.lastWarningAt = Date.now();
+  const label = critical ? "临界生命" : "低生命";
+  const hint = critical
+    ? "临界生命：短暂无敌已触发，先横向拉开距离，找 bug点数或回复地标。"
+    : "低生命警报：下一次失误可能会中断夜巡，先绕开红色危险区。";
+  player.invulnerable = Math.max(player.invulnerable ?? 0, critical ? fairWarningConfig.criticalInvulnerable : fairWarningConfig.lowInvulnerable);
+  world.cameraShake = Math.max(world.cameraShake ?? 0, critical ? 0.28 : 0.2);
+  burst(player.x, player.y, critical ? "#ef6a70" : "#f1c15b", critical ? 24 : 16);
+  spawnFloatingText(player.x, player.y - 48, label, critical ? "#ef6a70" : "#f1c15b", { size: critical ? 19 : 17, life: 0.9, vy: -36 });
+  playAudioCue(critical ? "danger" : "damage", { intensity: Math.min(1.9, Math.max(0.9, amount / 14)) });
+  return hint;
+}
+
 function damagePlayer(amount, message) {
   if (player.invulnerable > 0 || world.mode !== "playing") {
     return false;
   }
 
+  const beforeHp = player.hp;
   player.hp -= amount;
   runStats.damageTaken += amount;
   player.invulnerable = 0.55;
   world.cameraShake = 0.18;
   burst(player.x, player.y, "#ef6a70", 10);
   playAudioCue("damage", { intensity: Math.min(1.8, Math.max(0.7, amount / 16)) });
-  setLog(message);
+  setLog(triggerFairWarningIfNeeded(beforeHp, amount, message));
   breakCombatTempo();
   updateNightHook(0);
   return true;
@@ -11811,6 +11879,52 @@ function installAutomationTestHooks() {
     return result;
   }
 
+  function runFairWarningProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 50, weaponIndex: 0 });
+    runStats.fairWarning = createFairWarningState();
+    particles = [];
+    world.mode = "playing";
+    damagePlayer(20, "测试伤害：进入低生命。");
+    syncHud();
+    const afterLow = {
+      hp: round(player.hp),
+      log: ui.log?.textContent ?? "",
+      warning: cloneForSave(runStats.fairWarning, null),
+      lowClass: Boolean(ui.hp.parentElement?.classList.contains("is-low-hp")),
+      criticalClass: Boolean(ui.hp.parentElement?.classList.contains("is-critical-hp")),
+      invulnerable: round(player.invulnerable),
+      textShown: particles.some((particle) => particle.type === "text" && String(particle.text).includes("低生命")),
+    };
+    player.invulnerable = 0;
+    damagePlayer(16, "测试伤害：进入临界生命。");
+    syncHud();
+    const afterCritical = {
+      hp: round(player.hp),
+      log: ui.log?.textContent ?? "",
+      warning: cloneForSave(runStats.fairWarning, null),
+      lowClass: Boolean(ui.hp.parentElement?.classList.contains("is-low-hp")),
+      criticalClass: Boolean(ui.hp.parentElement?.classList.contains("is-critical-hp")),
+      invulnerable: round(player.invulnerable),
+      textShown: particles.some((particle) => particle.type === "text" && String(particle.text).includes("临界生命")),
+    };
+    const result = {
+      ok: afterLow.warning?.lowHpWarned
+        && afterLow.lowClass
+        && afterLow.textShown
+        && afterCritical.warning?.criticalHpWarned
+        && afterCritical.criticalClass
+        && afterCritical.textShown
+        && afterCritical.invulnerable >= fairWarningConfig.criticalInvulnerable,
+      afterLow,
+      afterCritical,
+    };
+    deleteRunSave();
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
+    return result;
+  }
+
   function runResultReviewProbe() {
     const previousArchive = cloneForSave(archiveState, null);
     resetStoreRun(0, { stepIndex: 1, bugPoints: 0, hp: 20, level: 2 });
@@ -12275,6 +12389,7 @@ function installAutomationTestHooks() {
     const openingSurge = runOpeningSurgeProbe();
     const openingGuidance = runOpeningGuidanceProbe();
     const hitFeedback = runHitFeedbackProbe();
+    const fairWarning = runFairWarningProbe();
     const resultReview = runResultReviewProbe();
     const starterBuild = runStarterBuildProbe();
 
@@ -12301,6 +12416,9 @@ function installAutomationTestHooks() {
     }
     if (!hitFeedback.ok) {
       failures.push("weapon hit feedback failed");
+    }
+    if (!fairWarning.ok) {
+      failures.push("fair low-health warning failed");
     }
     if (!resultReview.ok) {
       failures.push("result review recommendation failed");
@@ -12393,6 +12511,7 @@ function installAutomationTestHooks() {
       openingSurge,
       openingGuidance,
       hitFeedback,
+      fairWarning,
       resultReview,
       starterBuild,
       chapters: chaptersCovered,
@@ -12414,6 +12533,7 @@ function installAutomationTestHooks() {
     runOpeningSurgeProbe,
     runOpeningGuidanceProbe,
     runHitFeedbackProbe,
+    runFairWarningProbe,
     runMapInteractiveProbe,
     runResultReviewProbe,
     runStarterBuildProbe,

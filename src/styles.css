@@ -112,6 +112,35 @@ h1 {
   font-weight: 700;
 }
 
+.hud span.is-low-hp {
+  border-color: rgba(201, 132, 22, 0.42);
+  background: rgba(255, 248, 232, 0.88);
+  color: #8a5a0f;
+}
+
+.hud span.is-critical-hp {
+  border-color: rgba(239, 106, 112, 0.58);
+  background: rgba(255, 237, 238, 0.92);
+  color: #9d3038;
+  animation: hp-danger-pulse 720ms ease-in-out infinite alternate;
+}
+
+.hud span.is-low-hp strong,
+.hud span.is-critical-hp strong {
+  color: inherit;
+}
+
+@keyframes hp-danger-pulse {
+  from {
+    transform: translateY(0);
+    box-shadow: 0 0 0 rgba(239, 106, 112, 0);
+  }
+  to {
+    transform: translateY(-1px);
+    box-shadow: 0 0 18px rgba(239, 106, 112, 0.18);
+  }
+}
+
 .system-actions {
   display: flex;
   flex-wrap: wrap;
