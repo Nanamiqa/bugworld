@@ -78,6 +78,17 @@ function summarizeMemory(samples) {
   return { maxWorkingSetMb, maxPrivateMb };
 }
 
+function getSteadyPageSamples(pageSamples) {
+  if (pageSamples.length < 6) {
+    return { warmupSampleCount: 0, samples: pageSamples };
+  }
+  const warmupSampleCount = Math.min(3, Math.floor(pageSamples.length / 4));
+  return {
+    warmupSampleCount,
+    samples: pageSamples.slice(warmupSampleCount),
+  };
+}
+
 function pageProbeScript() {
   return `
     (() => {
@@ -248,8 +259,11 @@ function finish(exitCode = 0) {
   clearTimeout(finishTimer);
   clearInterval(sampleTimer);
   const pageSamples = diagnostics.samples.map((sample) => sample.page);
-  const fpsValues = pageSamples.map((page) => page.averageFps).filter((value) => Number.isFinite(value) && value > 0);
-  const worstFpsValues = pageSamples.map((page) => page.worstRecentFps).filter((value) => Number.isFinite(value) && value > 0);
+  const steady = getSteadyPageSamples(pageSamples);
+  const rawFpsValues = pageSamples.map((page) => page.averageFps).filter((value) => Number.isFinite(value) && value > 0);
+  const fpsValues = steady.samples.map((page) => page.averageFps).filter((value) => Number.isFinite(value) && value > 0);
+  const worstFpsValues = steady.samples.map((page) => page.worstRecentFps).filter((value) => Number.isFinite(value) && value > 0);
+  const rawAverageFps = rawFpsValues.reduce((sum, value) => sum + value, 0) / Math.max(1, rawFpsValues.length);
   const averageFps = fpsValues.reduce((sum, value) => sum + value, 0) / Math.max(1, fpsValues.length);
   const worstRecentFps = Math.min(...worstFpsValues, Number.POSITIVE_INFINITY);
   const memory = summarizeMemory(diagnostics.samples);
@@ -259,10 +273,12 @@ function finish(exitCode = 0) {
     ok: exitCode === 0,
     reportPath,
     averageFps: Number(averageFps.toFixed(1)),
+    rawAverageFps: Number(rawAverageFps.toFixed(1)),
     worstRecentFps: Number((Number.isFinite(worstRecentFps) ? worstRecentFps : 0).toFixed(1)),
     maxWorkingSetMb: memory.maxWorkingSetMb,
     maxPrivateMb: memory.maxPrivateMb,
     sampleCount: diagnostics.samples.length,
+    warmupSampleCount: steady.warmupSampleCount,
     consoleErrorCount: diagnostics.consoleErrors.length,
     pageErrorCount,
     loadFailureCount: diagnostics.loadFailures.length,

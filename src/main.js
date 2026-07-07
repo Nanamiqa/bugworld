@@ -2953,21 +2953,39 @@ function normalizeOpeningSurgeState(savedSurge = null) {
   };
 }
 
+function normalizeOpeningShowcasePhase(phase) {
+  if (phase === "cleared" || phase === "retry") {
+    return phase;
+  }
+  return "spawned";
+}
+
 function createOpeningShowcaseState(phase = "spawned", options = {}) {
+  const normalizedPhase = normalizeOpeningShowcasePhase(phase);
   const plan = normalizeRetryPlan(options.retryPlan ?? runStats?.retryPlan);
   const weapon = player?.weapon ?? getWeaponById(plan?.starterBuildId ? getStarterBuildById(plan.starterBuildId)?.weaponId : null) ?? weaponDefinitions[0] ?? {};
-  const title = phase === "cleared" ? "第一波高光已成片" : "第一波截图高光";
+  const title = normalizedPhase === "cleared"
+    ? "第一波高光已成片"
+    : normalizedPhase === "retry"
+      ? "推荐再来 30 秒路线"
+      : "第一波截图高光";
   const defaultFocus = `${weapon.name ?? "当前武器"}、快递裂隙、开场牵引和连段奖励同屏可读。`;
   const focus = options.screenshotFocus ?? plan?.screenshotFocus ?? defaultFocus;
   return {
     id: "opening-first-wave-showcase",
-    phase,
+    phase: normalizedPhase,
     active: true,
     title: options.title ?? title,
     promise: options.promise ?? plan?.promise ?? "把首个异常、第一波追击和武器命中特效压进同一屏。",
     focus,
     rewardText: options.rewardText ?? plan?.rewardText ?? `清场奖励 +${openingSurgeConfig.rewardBugPoints} bug点数 / +${openingSurgeConfig.rewardXp} 经验，并推进流派启动。`,
-    callout: options.callout ?? (phase === "cleared" ? "清场奖励已入账" : "先看裂隙，再看武器特效"),
+    callout: options.callout ?? (
+      normalizedPhase === "cleared"
+        ? "清场奖励已入账"
+        : normalizedPhase === "retry"
+          ? "复盘路线已带入，先按这条线打"
+          : "先看裂隙，再看武器特效"
+    ),
     weaponName: weapon.name ?? "初始武器",
     x: Number.isFinite(options.x) ? options.x : null,
     y: Number.isFinite(options.y) ? options.y : null,
@@ -2975,9 +2993,9 @@ function createOpeningShowcaseState(phase = "spawned", options = {}) {
     spawnedCount: Math.max(0, Math.trunc(Number(options.spawnedCount) || 0)),
     defeats: clamp(Math.trunc(Number(options.defeats) || 0), 0, openingSurgeConfig.targetDefeats),
     targetDefeats: openingSurgeConfig.targetDefeats,
-    flash: phase === "cleared" ? 2.2 : 1.6,
-    hold: phase === "cleared" ? 8 : 12,
-    completed: phase === "cleared",
+    flash: normalizedPhase === "cleared" ? 2.2 : normalizedPhase === "retry" ? 1.9 : 1.6,
+    hold: normalizedPhase === "cleared" ? 8 : normalizedPhase === "retry" ? 14 : 12,
+    completed: normalizedPhase === "cleared",
   };
 }
 
@@ -2985,13 +3003,14 @@ function normalizeOpeningShowcaseState(savedShowcase = null) {
   if (!savedShowcase || typeof savedShowcase !== "object") {
     return null;
   }
-  const fallback = createOpeningShowcaseState(savedShowcase.phase === "cleared" ? "cleared" : "spawned");
+  const phase = normalizeOpeningShowcasePhase(savedShowcase.phase);
+  const fallback = createOpeningShowcaseState(phase);
   const hold = Math.max(0, Number(savedShowcase.hold ?? fallback.hold) || 0);
   return {
     ...fallback,
     ...savedShowcase,
     id: "opening-first-wave-showcase",
-    phase: savedShowcase.phase === "cleared" ? "cleared" : "spawned",
+    phase,
     active: Boolean(savedShowcase.active) && hold > 0,
     title: typeof savedShowcase.title === "string" ? savedShowcase.title : fallback.title,
     promise: typeof savedShowcase.promise === "string" ? savedShowcase.promise : fallback.promise,
@@ -3007,7 +3026,7 @@ function normalizeOpeningShowcaseState(savedShowcase = null) {
     targetDefeats: openingSurgeConfig.targetDefeats,
     flash: Math.max(0, Number(savedShowcase.flash) || 0),
     hold,
-    completed: Boolean(savedShowcase.completed) || savedShowcase.phase === "cleared",
+    completed: Boolean(savedShowcase.completed) || phase === "cleared",
   };
 }
 
@@ -3788,6 +3807,17 @@ function applyRetryPlan(plan) {
       3,
     );
   }
+  activateOpeningShowcase("retry", surge, {
+    title: "推荐再来 30 秒路线",
+    promise: normalized.promise,
+    screenshotFocus: normalized.screenshotFocus,
+    rewardText: normalized.rewardText,
+    callout: normalized.title,
+    x: player.x,
+    y: player.y,
+    radius: 204,
+    retryPlan: normalized,
+  });
   setLog(normalized.log);
   saveRunCheckpoint("retry-plan");
   return runStats.retryPlan;
@@ -3865,8 +3895,8 @@ function createRunReview(victory) {
 
   const nextTitle = victory ? "挑战低伤通关" : `推荐再来：${build?.title ?? "推荐流派"}`;
   const nextText = victory
-    ? "已经通关，下一把可以追低伤成就和未收集回声。"
-    : `${weapon?.name ?? "初始武器"}开局，目标是更快完成开场牵引和第一次超频。`;
+    ? "已经通关，下一把用同一套路线追低伤、未收集回声和更清晰的截图。"
+    : `${weapon?.name ?? "初始武器"}开局，前 30 秒只做三件事：首个异常、快递裂隙、流派超频。`;
   const retryBoost = createReviewRetryBoost(victory, build, pressureTitle);
   const retryPlan = createReviewRetryPlan(victory, build, retryBoost, pressureTitle);
 
@@ -5851,7 +5881,7 @@ function renderOpeningSprintTracker() {
     : null;
   const showcase = runStats?.openingShowcase?.active ? runStats.openingShowcase : null;
   const showcaseText = showcase
-    ? `${showcase.callout} · ${showcase.focus}`
+    ? `${showcase.callout} · ${showcase.focus}${showcase.phase === "retry" ? ` · 奖励：${showcase.rewardText}` : ""}`
     : null;
   const surge = sprint.surge;
   const surgeText = surge?.spawned && !surge.completed && !surge.failed
@@ -5866,9 +5896,10 @@ function renderOpeningSprintTracker() {
     sprint.completed ? "is-completed" : "",
     surge?.spawned && !surge.completed && !surge.failed ? "is-surge" : "",
     showcase ? "is-showcase" : "",
+    showcase?.phase === "retry" ? "is-retry-route" : "",
   ].filter(Boolean).join(" ");
   ui.openingTracker.innerHTML = `
-    <span>${showcase ? "第一波卖点" : "开场牵引"}</span>
+    <span>${showcase?.phase === "retry" ? "推荐再来" : showcase ? "第一波卖点" : "开场牵引"}</span>
     <strong>${showcase ? showcase.title : sprint.completed ? "第一条路线已接通" : step.title}</strong>
     <small>${showcaseText ?? surgeText ?? planText ?? rewardText}</small>
   `;
@@ -8281,7 +8312,12 @@ function renderResultInsights(review = archiveState?.lastRunReview) {
     ["下一把", normalized.nextTitle, normalized.nextText, "is-next"],
   ];
   if (normalized.retryPlan) {
-    cards.push(["下一局路线", normalized.retryPlan.title, `${normalized.retryPlan.firstGoal}。${normalized.retryPlan.rewardText}`, "is-plan"]);
+    cards.push([
+      "下一局路线",
+      normalized.retryPlan.title,
+      `${normalized.retryPlan.firstGoal}。${normalized.retryPlan.rewardText} 截图焦点：${normalized.retryPlan.screenshotFocus}`,
+      "is-plan",
+    ]);
   }
   if (normalized.retryBoost) {
     cards.push(["重开助推", normalized.retryBoost.title, normalized.retryBoost.summary, "is-boost"]);
@@ -11129,8 +11165,11 @@ function drawOpeningShowcaseOverlay(camera) {
   const frameW = Math.min(radius * 1.44, world.viewWidth - 36);
   const frameH = Math.min(radius * 0.96, world.viewHeight - 128);
   const flash = clamp(Number(showcase.flash) || 0, 0, 2.2);
-  const progress = clamp((showcase.defeats ?? 0) / Math.max(1, showcase.targetDefeats ?? openingSurgeConfig.targetDefeats), 0, 1);
-  const accent = showcase.completed ? "#5de2d1" : "#f1c15b";
+  const progress = showcase.phase === "retry"
+    ? 0.34
+    : clamp((showcase.defeats ?? 0) / Math.max(1, showcase.targetDefeats ?? openingSurgeConfig.targetDefeats), 0, 1);
+  const accent = showcase.completed ? "#5de2d1" : showcase.phase === "retry" ? "#72a5ff" : "#f1c15b";
+  const label = showcase.phase === "retry" ? "RETRY ROUTE" : "FIRST WAVE";
 
   ctx.save();
   ctx.globalAlpha = 0.54 + flash * 0.08;
@@ -11143,8 +11182,8 @@ function drawOpeningShowcaseOverlay(camera) {
   ctx.fillStyle = accent;
   ctx.fillRect(frameX, frameY, frameW, frameH);
 
-  const cardW = Math.min(390, world.viewWidth - 36);
-  const cardH = 92;
+  const cardW = Math.min(420, world.viewWidth - 36);
+  const cardH = showcase.phase === "retry" ? 112 : 92;
   const cardX = 18;
   const cardY = 92;
   ctx.globalAlpha = 0.92;
@@ -11157,7 +11196,7 @@ function drawOpeningShowcaseOverlay(camera) {
   ctx.fillRect(cardX, cardY, Math.max(4, cardW * progress), 4);
   ctx.fillStyle = "#26364d";
   ctx.font = "800 12px Microsoft YaHei, Segoe UI, sans-serif";
-  ctx.fillText("FIRST WAVE", cardX + 12, cardY + 22);
+  ctx.fillText(label, cardX + 12, cardY + 22);
   ctx.fillStyle = "#17202a";
   ctx.font = "800 16px Microsoft YaHei, Segoe UI, sans-serif";
   ctx.fillText(shortenText(showcase.title, 18), cardX + 12, cardY + 45);
@@ -11165,6 +11204,11 @@ function drawOpeningShowcaseOverlay(camera) {
   ctx.font = "12px Microsoft YaHei, Segoe UI, sans-serif";
   ctx.fillText(shortenText(showcase.callout, 22), cardX + 12, cardY + 65);
   ctx.fillText(shortenText(showcase.focus, 28), cardX + 12, cardY + 82);
+  if (showcase.phase === "retry") {
+    ctx.fillStyle = "#26364d";
+    ctx.font = "800 11px Microsoft YaHei, Segoe UI, sans-serif";
+    ctx.fillText(shortenText(`奖励：${showcase.rewardText}`, 34), cardX + 12, cardY + 101);
+  }
   ctx.restore();
 }
 
@@ -12500,6 +12544,7 @@ function installAutomationTestHooks() {
     const retryOpeningBonusReady = (runStats.openingSprint?.retryBonusBugPoints ?? 0) === expectedOpeningBonus;
     syncHud();
     const openingTrackerText = ui.openingTracker?.textContent ?? "";
+    const retryShowcase = cloneForSave(runStats.openingShowcase, null);
     world.mode = "playing";
     const bugPointsBeforeStep = player.bugPoints;
     runStats.eventsResolved += openingSprintSteps[0]?.target ?? 1;
@@ -12513,12 +12558,19 @@ function installAutomationTestHooks() {
         && boost?.id === "shielded-second-night"
         && ui.resultInsights?.textContent.includes("护盾起步")
         && ui.resultInsights?.textContent.includes("下一局路线")
+        && ui.resultInsights?.textContent.includes("截图焦点")
         && ui.resultInsights?.textContent.includes(plan?.title ?? "")
         && buttonText.includes("护盾起步")
         && buttonText.includes(plan?.title ?? "")
         && retryApplied
         && retryPlanApplied
         && openingTrackerText.includes(plan?.title ?? "")
+        && openingTrackerText.includes("推荐再来")
+        && retryShowcase?.phase === "retry"
+        && retryShowcase?.title.includes("30 秒路线")
+        && retryShowcase?.focus === plan?.screenshotFocus
+        && retryShowcase?.rewardText === plan?.rewardText
+        && retryShowcase?.callout === plan?.title
         && retryOpeningBonusReady
         && firstStepBoostClaimed,
       review,
@@ -12527,6 +12579,7 @@ function installAutomationTestHooks() {
       retryPlan: plan,
       retryApplied: cloneForSave(runStats.retryBoost, null),
       retryPlanApplied: cloneForSave(runStats.retryPlan, null),
+      retryShowcase,
       openingTrackerText,
       firstStepBoostClaimed,
       insightsText: ui.resultInsights?.textContent ?? "",

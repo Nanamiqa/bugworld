@@ -363,6 +363,17 @@ h1 {
   background: linear-gradient(90deg, var(--blue), var(--amber), var(--cyan));
 }
 
+.opening-tracker.is-retry-route {
+  border-color: rgba(62, 114, 216, 0.42);
+  background:
+    linear-gradient(135deg, rgba(244, 248, 255, 0.96), rgba(239, 250, 249, 0.88));
+  box-shadow: 0 12px 30px rgba(62, 114, 216, 0.18);
+}
+
+.opening-tracker.is-retry-route span {
+  color: var(--blue);
+}
+
 .opening-tracker.hidden,
 .hook-tracker.hidden {
   display: none;
