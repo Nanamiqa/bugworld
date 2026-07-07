@@ -2953,8 +2953,29 @@ function normalizeOpeningSurgeState(savedSurge = null) {
   };
 }
 
+const openingShowcaseChecklistItems = [
+  { key: "target", label: "目标罗盘" },
+  { key: "enemies", label: "首波敌群" },
+  { key: "effect", label: "武器特效" },
+  { key: "reward", label: "奖励反馈" },
+];
+
+function createOpeningShowcaseChecklist(value = {}) {
+  return {
+    target: Boolean(value.target),
+    enemies: Boolean(value.enemies),
+    effect: Boolean(value.effect),
+    reward: Boolean(value.reward),
+    ready: Boolean(value.ready),
+    readyHold: Math.max(0, Number(value.readyHold) || 0),
+    enemyCount: Math.max(0, Math.trunc(Number(value.enemyCount) || 0)),
+    effectPulse: Math.max(0, Number(value.effectPulse) || 0),
+    effectLabel: typeof value.effectLabel === "string" ? value.effectLabel : "",
+  };
+}
+
 function normalizeOpeningShowcasePhase(phase) {
-  if (phase === "cleared" || phase === "retry") {
+  if (phase === "cleared" || phase === "retry" || phase === "combat") {
     return phase;
   }
   return "spawned";
@@ -2968,6 +2989,8 @@ function createOpeningShowcaseState(phase = "spawned", options = {}) {
     ? "第一波高光已成片"
     : normalizedPhase === "retry"
       ? "推荐再来 30 秒路线"
+      : normalizedPhase === "combat"
+        ? "推荐再来实战镜头"
       : "第一波截图高光";
   const defaultFocus = `${weapon.name ?? "当前武器"}、快递裂隙、开场牵引和连段奖励同屏可读。`;
   const focus = options.screenshotFocus ?? plan?.screenshotFocus ?? defaultFocus;
@@ -2984,6 +3007,8 @@ function createOpeningShowcaseState(phase = "spawned", options = {}) {
         ? "清场奖励已入账"
         : normalizedPhase === "retry"
           ? "复盘路线已带入，先按这条线打"
+          : normalizedPhase === "combat"
+            ? "同屏检查：目标 / 敌群 / 特效 / 奖励"
           : "先看裂隙，再看武器特效"
     ),
     weaponName: weapon.name ?? "初始武器",
@@ -2993,8 +3018,9 @@ function createOpeningShowcaseState(phase = "spawned", options = {}) {
     spawnedCount: Math.max(0, Math.trunc(Number(options.spawnedCount) || 0)),
     defeats: clamp(Math.trunc(Number(options.defeats) || 0), 0, openingSurgeConfig.targetDefeats),
     targetDefeats: openingSurgeConfig.targetDefeats,
-    flash: normalizedPhase === "cleared" ? 2.2 : normalizedPhase === "retry" ? 1.9 : 1.6,
-    hold: normalizedPhase === "cleared" ? 8 : normalizedPhase === "retry" ? 14 : 12,
+    checklist: createOpeningShowcaseChecklist(options.checklist),
+    flash: normalizedPhase === "cleared" ? 2.2 : normalizedPhase === "retry" ? 1.9 : normalizedPhase === "combat" ? 2 : 1.6,
+    hold: normalizedPhase === "cleared" ? 8 : normalizedPhase === "retry" ? 14 : normalizedPhase === "combat" ? 12 : 12,
     completed: normalizedPhase === "cleared",
   };
 }
@@ -3024,6 +3050,7 @@ function normalizeOpeningShowcaseState(savedShowcase = null) {
     spawnedCount: Math.max(0, Math.trunc(Number(savedShowcase.spawnedCount) || 0)),
     defeats: clamp(Math.trunc(Number(savedShowcase.defeats) || 0), 0, openingSurgeConfig.targetDefeats),
     targetDefeats: openingSurgeConfig.targetDefeats,
+    checklist: createOpeningShowcaseChecklist(savedShowcase.checklist ?? fallback.checklist),
     flash: Math.max(0, Number(savedShowcase.flash) || 0),
     hold,
     completed: Boolean(savedShowcase.completed) || phase === "cleared",
@@ -3046,11 +3073,63 @@ function activateOpeningShowcase(phase, surge, options = {}) {
   return state;
 }
 
+function isPointInCurrentCamera(x, y, margin = 28) {
+  return Number.isFinite(x)
+    && Number.isFinite(y)
+    && x >= world.cameraX + margin
+    && x <= world.cameraX + world.viewWidth - margin
+    && y >= world.cameraY + 92
+    && y <= world.cameraY + world.viewHeight - margin;
+}
+
+function refreshOpeningShowcaseChecklist(showcase, dt = 0) {
+  if (!showcase || !["retry", "combat", "spawned", "cleared"].includes(showcase.phase)) {
+    return;
+  }
+  const checklist = createOpeningShowcaseChecklist(showcase.checklist);
+  const targets = getObjectiveTargets();
+  const surgeEnemies = enemies.filter((enemy) => enemy.openingSurge && enemy.hp > 0);
+  const visibleSurgeEnemies = surgeEnemies.filter((enemy) => isPointInCurrentCamera(enemy.x, enemy.y, -10));
+  const visibleEffects = particles.some((particle) => {
+    return particle.type === "impact"
+      && particle.life > 0
+      && isPointInCurrentCamera(particle.x, particle.y, -20);
+  }) || bullets.some((bullet) => {
+    return bullet.weaponId === player?.weapon?.id
+      && bullet.life > 0
+      && isPointInCurrentCamera(bullet.x, bullet.y, -20);
+  });
+
+  checklist.target = checklist.target || targets.length > 0;
+  checklist.enemies = checklist.enemies || visibleSurgeEnemies.length >= Math.min(2, openingSurgeConfig.targetDefeats);
+  checklist.effectPulse = Math.max(0, checklist.effectPulse - dt);
+  checklist.effect = checklist.effect || checklist.effectPulse > 0 || visibleEffects;
+  checklist.reward = checklist.reward || Boolean(showcase.rewardText) || Boolean(showcase.completed);
+  checklist.enemyCount = Math.max(checklist.enemyCount, visibleSurgeEnemies.length);
+  checklist.ready = checklist.target && checklist.enemies && checklist.effect && checklist.reward;
+  checklist.readyHold = checklist.ready
+    ? Math.min(6, checklist.readyHold + dt)
+    : Math.max(0, checklist.readyHold - dt * 0.5);
+  showcase.checklist = checklist;
+}
+
+function markOpeningShowcaseWeaponEffect(enemy, profile = null) {
+  const showcase = runStats?.openingShowcase;
+  if (!showcase?.active || !enemy?.openingSurge) {
+    return;
+  }
+  showcase.checklist = createOpeningShowcaseChecklist(showcase.checklist);
+  showcase.checklist.effect = true;
+  showcase.checklist.effectPulse = 1.2;
+  showcase.checklist.effectLabel = profile?.label ?? profile?.id ?? player?.weapon?.name ?? "武器命中";
+}
+
 function updateOpeningShowcase(dt = 0) {
   const showcase = runStats?.openingShowcase;
   if (!showcase?.active) {
     return;
   }
+  refreshOpeningShowcaseChecklist(showcase, dt);
   showcase.flash = Math.max(0, (showcase.flash ?? 0) - dt);
   showcase.hold = Math.max(0, (showcase.hold ?? 0) - dt);
   if (showcase.hold <= 0) {
@@ -3200,8 +3279,14 @@ function spawnOpeningSurge(sprint = runStats?.openingSprint) {
   world.cameraShake = Math.max(world.cameraShake ?? 0, 0.12);
   burst(center.x, center.y, "#f1c15b", 26);
   playAudioCue("boss-phase");
-  activateOpeningShowcase("spawned", surge, {
-    callout: "截图点：目标、武器、第一波敌人同屏",
+  const retryPlan = runStats.retryPlan?.applied ? runStats.retryPlan : null;
+  activateOpeningShowcase(retryPlan ? "combat" : "spawned", surge, {
+    title: retryPlan ? "推荐再来实战镜头" : undefined,
+    promise: retryPlan?.promise,
+    screenshotFocus: retryPlan?.screenshotFocus,
+    rewardText: retryPlan?.rewardText,
+    callout: retryPlan ? "同屏检查：目标 / 敌群 / 特效 / 奖励" : "截图点：目标、武器、第一波敌人同屏",
+    retryPlan,
   });
   setLog(`开场快递裂隙出现：${openingSurgeConfig.targetDefeats} 个低血量异常正在靠近，打穿它们就能立刻接上第一波爽点。`);
   saveRunCheckpoint("opening-surge-spawn");
@@ -5880,8 +5965,9 @@ function renderOpeningSprintTracker() {
     ? `${runStats.retryPlan.title} · ${runStats.retryPlan.firstGoal}`
     : null;
   const showcase = runStats?.openingShowcase?.active ? runStats.openingShowcase : null;
+  const checklistReady = showcase?.checklist?.ready ? " · 镜头已就绪" : "";
   const showcaseText = showcase
-    ? `${showcase.callout} · ${showcase.focus}${showcase.phase === "retry" ? ` · 奖励：${showcase.rewardText}` : ""}`
+    ? `${showcase.callout} · ${showcase.focus}${["retry", "combat"].includes(showcase.phase) ? ` · 奖励：${showcase.rewardText}` : ""}${checklistReady}`
     : null;
   const surge = sprint.surge;
   const surgeText = surge?.spawned && !surge.completed && !surge.failed
@@ -5897,9 +5983,10 @@ function renderOpeningSprintTracker() {
     surge?.spawned && !surge.completed && !surge.failed ? "is-surge" : "",
     showcase ? "is-showcase" : "",
     showcase?.phase === "retry" ? "is-retry-route" : "",
+    showcase?.phase === "combat" ? "is-combat-shot" : "",
   ].filter(Boolean).join(" ");
   ui.openingTracker.innerHTML = `
-    <span>${showcase?.phase === "retry" ? "推荐再来" : showcase ? "第一波卖点" : "开场牵引"}</span>
+    <span>${showcase?.phase === "combat" ? "实战镜头" : showcase?.phase === "retry" ? "推荐再来" : showcase ? "第一波卖点" : "开场牵引"}</span>
     <strong>${showcase ? showcase.title : sprint.completed ? "第一条路线已接通" : step.title}</strong>
     <small>${showcaseText ?? surgeText ?? planText ?? rewardText}</small>
   `;
@@ -6275,6 +6362,7 @@ function spawnWeaponImpactFeedback(enemy, bullet, finalDamage) {
   const roundedDamage = Math.max(1, Math.round(finalDamage));
   const label = profile.textPrefix ? `${profile.textPrefix} ${roundedDamage}` : `${roundedDamage}`;
   spawnWeaponImpactParticles(enemy.x, enemy.y, profile, bullet);
+  markOpeningShowcaseWeaponEffect(enemy, profile);
   spawnFloatingText(
     enemy.x + random(-10, 10),
     enemy.y - (enemy.radius ?? 18) - 12,
@@ -11165,11 +11253,16 @@ function drawOpeningShowcaseOverlay(camera) {
   const frameW = Math.min(radius * 1.44, world.viewWidth - 36);
   const frameH = Math.min(radius * 0.96, world.viewHeight - 128);
   const flash = clamp(Number(showcase.flash) || 0, 0, 2.2);
+  const hasChecklist = ["retry", "combat"].includes(showcase.phase);
+  const checklist = createOpeningShowcaseChecklist(showcase.checklist);
+  const checklistReadyCount = openingShowcaseChecklistItems.filter((item) => checklist[item.key]).length;
   const progress = showcase.phase === "retry"
     ? 0.34
+    : showcase.phase === "combat"
+      ? checklistReadyCount / openingShowcaseChecklistItems.length
     : clamp((showcase.defeats ?? 0) / Math.max(1, showcase.targetDefeats ?? openingSurgeConfig.targetDefeats), 0, 1);
-  const accent = showcase.completed ? "#5de2d1" : showcase.phase === "retry" ? "#72a5ff" : "#f1c15b";
-  const label = showcase.phase === "retry" ? "RETRY ROUTE" : "FIRST WAVE";
+  const accent = showcase.completed ? "#5de2d1" : showcase.phase === "retry" ? "#72a5ff" : showcase.phase === "combat" ? "#f1c15b" : "#f1c15b";
+  const label = showcase.phase === "retry" ? "RETRY ROUTE" : showcase.phase === "combat" ? "COMBAT SHOT" : "FIRST WAVE";
 
   ctx.save();
   ctx.globalAlpha = 0.54 + flash * 0.08;
@@ -11183,7 +11276,7 @@ function drawOpeningShowcaseOverlay(camera) {
   ctx.fillRect(frameX, frameY, frameW, frameH);
 
   const cardW = Math.min(420, world.viewWidth - 36);
-  const cardH = showcase.phase === "retry" ? 112 : 92;
+  const cardH = hasChecklist ? 136 : 92;
   const cardX = 18;
   const cardY = 92;
   ctx.globalAlpha = 0.92;
@@ -11204,10 +11297,18 @@ function drawOpeningShowcaseOverlay(camera) {
   ctx.font = "12px Microsoft YaHei, Segoe UI, sans-serif";
   ctx.fillText(shortenText(showcase.callout, 22), cardX + 12, cardY + 65);
   ctx.fillText(shortenText(showcase.focus, 28), cardX + 12, cardY + 82);
-  if (showcase.phase === "retry") {
+  if (hasChecklist) {
     ctx.fillStyle = "#26364d";
     ctx.font = "800 11px Microsoft YaHei, Segoe UI, sans-serif";
     ctx.fillText(shortenText(`奖励：${showcase.rewardText}`, 34), cardX + 12, cardY + 101);
+    ctx.font = "800 10px Microsoft YaHei, Segoe UI, sans-serif";
+    openingShowcaseChecklistItems.forEach((item, index) => {
+      const ok = Boolean(checklist[item.key]);
+      const x = cardX + 12 + (index % 2) * 188;
+      const y = cardY + 121 + Math.floor(index / 2) * 13;
+      ctx.fillStyle = ok ? "#0f9f95" : "#8d9aab";
+      ctx.fillText(`${ok ? "✓" : "○"} ${item.label}`, x, y);
+    });
   }
   ctx.restore();
 }
@@ -12595,6 +12696,75 @@ function installAutomationTestHooks() {
     return result;
   }
 
+  function runRetryCombatShowcaseProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 74, xp: 0, weaponIndex: 2 });
+    runStats.eventsResolved = 0;
+    runStats.enemiesDefeated = 0;
+    runStats.openingSprint = createOpeningSprintState();
+    runStats.openingSprint.surge.delayRemaining = 0;
+    runStats.tempo = createCombatTempoState();
+    const build = getStarterBuildById("close-control") ?? starterBuilds[0] ?? null;
+    const weapon = getWeaponById(build?.weaponId) ?? weaponDefinitions[2] ?? weaponDefinitions[0];
+    const boost = createReviewRetryBoost(false, build, "伤害吃得偏多");
+    const plan = createReviewRetryPlan(false, build, boost, "伤害吃得偏多");
+    if (weapon) {
+      equipWeapon(weapon);
+    }
+    if (build) {
+      runStats.starterBuild = build.id;
+      runStats.starterIgnition = createStarterIgnitionState(build);
+    }
+    applyRetryBoost(boost);
+    applyRetryPlan(plan);
+    spawnChapterNodes(currentChapter().steps?.[0]);
+    world.mode = "playing";
+    centerCameraOnPlayer();
+    updateOpeningSurge(0.8);
+    const combatShowcaseBeforeHit = cloneForSave(runStats.openingShowcase, null);
+    const target = enemies.find((enemy) => enemy.openingSurge) ?? enemies[0] ?? null;
+    if (target && player.weapon) {
+      const profile = getWeaponImpactProfile(player.weapon.id, false);
+      spawnWeaponImpactFeedback(target, {
+        weaponId: player.weapon.id,
+        charged: false,
+        impactProfile: profile,
+        vx: player.weapon.bulletSpeed ?? 0,
+        vy: 0,
+      }, 18);
+    }
+    updateOpeningShowcase(0.35);
+    syncHud();
+    const combatShowcaseAfterHit = cloneForSave(runStats.openingShowcase, null);
+    const checklist = combatShowcaseAfterHit?.checklist ?? {};
+    const trackerText = ui.openingTracker?.textContent ?? "";
+    const result = {
+      ok: combatShowcaseBeforeHit?.phase === "combat"
+        && combatShowcaseBeforeHit?.title?.includes("实战镜头")
+        && combatShowcaseAfterHit?.phase === "combat"
+        && checklist.target
+        && checklist.enemies
+        && checklist.effect
+        && checklist.reward
+        && checklist.ready
+        && (checklist.enemyCount ?? 0) >= 2
+        && trackerText.includes("实战镜头")
+        && trackerText.includes("奖励")
+        && trackerText.includes("镜头已就绪"),
+      retryPlan: plan,
+      beforeHit: combatShowcaseBeforeHit,
+      afterHit: combatShowcaseAfterHit,
+      trackerText,
+      enemyCount: enemies.filter((enemy) => enemy.openingSurge).length,
+      targetCount: getObjectiveTargets().length,
+      particleCount: particles.length,
+    };
+    deleteRunSave();
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
+    return result;
+  }
+
   function runStarterBuildProbe() {
     const previousArchive = cloneForSave(archiveState, null);
     const build = starterBuilds[0];
@@ -12993,6 +13163,7 @@ function installAutomationTestHooks() {
     const hitFeedback = runHitFeedbackProbe();
     const fairWarning = runFairWarningProbe();
     const resultReview = runResultReviewProbe();
+    const retryCombatShowcase = runRetryCombatShowcaseProbe();
     const starterBuild = runStarterBuildProbe();
 
     if (!metaProgression.ok) {
@@ -13024,6 +13195,9 @@ function installAutomationTestHooks() {
     }
     if (!resultReview.ok) {
       failures.push("result review recommendation failed");
+    }
+    if (!retryCombatShowcase.ok) {
+      failures.push("retry combat showcase failed");
     }
     if (!starterBuild.ok) {
       failures.push("starter build quick start failed");
@@ -13115,6 +13289,7 @@ function installAutomationTestHooks() {
       hitFeedback,
       fairWarning,
       resultReview,
+      retryCombatShowcase,
       starterBuild,
       chapters: chaptersCovered,
       finalSnapshot: snapshot({ action: "routePressureComplete" }),
@@ -13138,6 +13313,7 @@ function installAutomationTestHooks() {
     runFairWarningProbe,
     runMapInteractiveProbe,
     runResultReviewProbe,
+    runRetryCombatShowcaseProbe,
     runStarterBuildProbe,
     runRoutePressureTest,
   };
