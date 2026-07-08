@@ -1359,7 +1359,7 @@ const openingSprintSteps = [
 const openingSurgeConfig = {
   id: "delivery-rift",
   label: "快递裂隙",
-  spawnDelay: 0.65,
+  spawnDelay: 1.15,
   timeLimit: 28,
   targetDefeats: 4,
   rewardBugPoints: 1,
@@ -3241,6 +3241,18 @@ function getOpeningSurgePreviewPoint() {
   );
 }
 
+function getOpeningSurgeLandingPreviewPoints(center = getOpeningSurgePreviewPoint()) {
+  return openingSurgeConfig.enemyPattern.map((pattern, index) => {
+    const point = findNearestFreePoint(center.x + pattern.dx - 260, center.y + pattern.dy, 28);
+    return {
+      ...point,
+      index,
+      type: pattern.type,
+      scale: pattern.scale ?? 1,
+    };
+  });
+}
+
 function activateOpeningSurgePreview(sprint = runStats?.openingSprint) {
   const surge = sprint?.surge;
   if (!surge || currentChapterIndex !== 0 || world.mode !== "playing" || surge.spawned || surge.completed || surge.failed) {
@@ -3253,7 +3265,7 @@ function activateOpeningSurgePreview(sprint = runStats?.openingSprint) {
     x: point.x,
     y: point.y,
     radius: 190,
-    callout: "黄框预告：下一波裂隙马上刷新",
+    callout: "黄框预告：看 4 个落点，倒计时后接怪",
     screenshotFocus: `${player.weapon?.name ?? "当前武器"}准备好，沿黄框路线接第一波追击。`,
   });
 }
@@ -3715,8 +3727,9 @@ function getOpeningRushCoachText(rush = runStats?.openingRush) {
   }
   if (nextMilestone.id === "surge") {
     const phase = runStats?.openingShowcase?.active ? runStats.openingShowcase.phase : "";
+    const previewDelay = runStats?.openingSprint?.surge?.delayRemaining ?? 0;
     const routeHint = phase === "preview"
-      ? "跟黄框接第一波"
+      ? `等 ${formatHookTime(previewDelay)} 接黄框落点`
       : phase === "spawned" || phase === "combat"
         ? "清黄框裂隙"
         : "准备第一波裂隙";
@@ -3808,9 +3821,10 @@ function spawnOpeningSurge(sprint = runStats?.openingSprint) {
   }
 
   const center = getOpeningSurgePreviewPoint();
+  const landingPoints = getOpeningSurgeLandingPreviewPoints(center);
   let spawnedCount = 0;
   for (const [index, pattern] of openingSurgeConfig.enemyPattern.entries()) {
-    const point = findNearestFreePoint(center.x + pattern.dx - 260, center.y + pattern.dy, 28);
+    const point = landingPoints[index] ?? findNearestFreePoint(center.x + pattern.dx - 260, center.y + pattern.dy, 28);
     spawnEnemyNear(point.x, point.y, pattern.type, {
       hpMultiplier: pattern.hpMultiplier,
       speedMultiplier: pattern.speedMultiplier,
@@ -3937,6 +3951,10 @@ function updateOpeningSurge(dt = 0) {
   const sprint = runStats?.openingSprint;
   const surge = sprint?.surge;
   if (!sprint || !surge || sprint.completed || !sprint.active || currentChapterIndex !== 0 || world.mode !== "playing") {
+    return;
+  }
+  const firstStepId = openingSprintSteps[0]?.id;
+  if (firstStepId && !sprint.completedStepIds?.includes(firstStepId)) {
     return;
   }
 
@@ -6766,8 +6784,11 @@ function renderOpeningSprintTracker() {
     : null;
   const showcase = runStats?.openingShowcase?.active ? runStats.openingShowcase : null;
   const checklistReady = showcase?.checklist?.ready ? " · 镜头已就绪" : "";
+  const previewCountdownText = showcase?.phase === "preview" && sprint.surge && !sprint.surge.spawned
+    ? ` · 4个落点 · ${formatHookTime(sprint.surge.delayRemaining ?? 0)} 后刷新`
+    : "";
   const showcaseText = showcase
-    ? `${showcase.callout} · ${showcase.focus}${["retry", "combat"].includes(showcase.phase) ? ` · 奖励：${showcase.rewardText}` : ""}${checklistReady}`
+    ? `${showcase.callout}${previewCountdownText} · ${showcase.focus}${["retry", "combat"].includes(showcase.phase) ? ` · 奖励：${showcase.rewardText}` : ""}${checklistReady}`
     : null;
   const surge = sprint.surge;
   const surgeText = surge?.spawned && !surge.completed && !surge.failed
@@ -6992,8 +7013,8 @@ function updatePlaying(dt) {
   updateNightHook(dt);
   updateCombatTempo(dt);
   updateStarterIgnition(dt);
-  updateOpeningSurge(dt);
   updateOpeningSprint(dt);
+  updateOpeningSurge(dt);
   updateOpeningRush(dt);
   updateOpeningShowcase(dt);
   updateChapterShowcase(dt);
@@ -12170,6 +12191,7 @@ function drawOpeningShowcaseOverlay(camera) {
     const playerScreenX = player.x - camera.x;
     const playerScreenY = player.y - camera.y;
     const routeAngle = Math.atan2(screenY - playerScreenY, screenX - playerScreenX);
+    const landingPoints = getOpeningSurgeLandingPreviewPoints({ x: anchorX, y: anchorY });
     ctx.globalAlpha = 0.66 + flash * 0.06;
     ctx.strokeStyle = accent;
     ctx.lineWidth = 4;
@@ -12196,8 +12218,31 @@ function drawOpeningShowcaseOverlay(camera) {
       ctx.fill();
       ctx.restore();
     });
+    landingPoints.forEach((point) => {
+      const landingX = point.x - camera.x;
+      const landingY = point.y - camera.y;
+      const landingPulse = 1 + Math.sin(world.animTime * 7 + point.index) * 0.12;
+      ctx.globalAlpha = 0.74;
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([6, 5]);
+      ctx.beginPath();
+      ctx.arc(landingX, landingY, (20 + point.index * 1.8) * landingPulse, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 0.18;
+      fillCircle(landingX, landingY, 18 * landingPulse, accent);
+      ctx.globalAlpha = 0.96;
+      drawSmallText(`落点${point.index + 1}`, landingX - 20, landingY - 26, "#26364d", 11);
+    });
     ctx.globalAlpha = 0.94;
-    drawSmallText("下一波裂隙", clamp(screenX - 42, 18, world.viewWidth - 136), clamp(screenY - radius * 0.54, 112, world.viewHeight - 28), "#26364d", 13);
+    drawSmallText(
+      `下一波裂隙 ${formatHookTime(previewDelay)}`,
+      clamp(screenX - 58, 18, world.viewWidth - 168),
+      clamp(screenY - radius * 0.54, 112, world.viewHeight - 28),
+      "#26364d",
+      13,
+    );
   }
 
   const cardW = Math.min(420, world.viewWidth - 36);
@@ -13399,6 +13444,9 @@ function installAutomationTestHooks() {
     const startBugPoints = player.bugPoints;
     const startHp = player.hp;
     const startXp = player.xp;
+    runStats.eventsResolved += openingSprintSteps[0]?.target ?? 1;
+    updateOpeningSprint(0.1);
+    runStats.openingSprint.surge.delayRemaining = 0;
     updateOpeningSurge(0.8);
     syncHud();
     const spawnedShowcase = cloneForSave(runStats.openingShowcase, null);
@@ -13554,6 +13602,9 @@ function installAutomationTestHooks() {
     const previewShowcase = cloneForSave(runStats.openingShowcase, null);
     const previewTrackerText = ui.openingTracker?.textContent ?? "";
     const previewDelay = runStats.openingSprint?.surge?.delayRemaining ?? null;
+    const previewLandingPoints = previewShowcase
+      ? getOpeningSurgeLandingPreviewPoints({ x: previewShowcase.x, y: previewShowcase.y })
+      : [];
 
     updateOpeningSurge(openingSurgeConfig.spawnDelay + 0.08);
     syncHud();
@@ -13566,13 +13617,18 @@ function installAutomationTestHooks() {
         && Number.isFinite(previewShowcase.x)
         && Number.isFinite(previewShowcase.y)
         && previewShowcase.callout.includes("黄框")
+        && previewShowcase.callout.includes("落点")
         && previewShowcase.focus.includes("第一波")
         && previewTrackerText.includes("裂隙预告")
         && previewTrackerText.includes("黄框")
+        && previewTrackerText.includes("4个落点")
+        && previewTrackerText.includes("后刷新")
         && previewTrackerText.includes("追S")
         && previewTrackerText.includes("裂隙清场")
         && previewDelay !== null
-        && previewDelay > 0
+        && previewDelay >= 0.8
+        && previewLandingPoints.length === openingSurgeConfig.targetDefeats
+        && previewLandingPoints.every((point) => point.x > 0 && point.x < world.width && point.y > 0 && point.y < world.height)
         && spawnedShowcase?.phase === "spawned"
         && spawnedTrackerText.includes("第一波卖点")
         && spawned.length >= openingSurgeConfig.targetDefeats,
@@ -13581,6 +13637,7 @@ function installAutomationTestHooks() {
       previewTrackerText,
       spawnedTrackerText,
       previewDelay,
+      previewLandingPoints,
       spawnedCount: spawned.length,
     };
     deleteRunSave();
@@ -13662,8 +13719,8 @@ function installAutomationTestHooks() {
 
     const tickOpeningRoute = (dt) => {
       updateStarterIgnition(dt);
-      updateOpeningSurge(dt);
       updateOpeningSprint(dt);
+      updateOpeningSurge(dt);
       updateOpeningRush(dt);
       updateOpeningShowcase(dt);
     };
@@ -13727,7 +13784,8 @@ function installAutomationTestHooks() {
             && rush.elapsed <= openingRushConfig.windowSeconds
             && Boolean(ignition?.completed)
             && coachAfterAnomaly.includes("追S")
-            && coachAfterAnomaly.includes("黄框"),
+            && coachAfterAnomaly.includes("黄框")
+            && coachAfterAnomaly.includes("4个落点"),
           weaponId: weapon.id,
           buildId: build?.id ?? null,
           cadence: profile.id,
@@ -14024,6 +14082,9 @@ function installAutomationTestHooks() {
     spawnChapterNodes(currentChapter().steps?.[0]);
     world.mode = "playing";
     centerCameraOnPlayer();
+    runStats.eventsResolved += openingSprintSteps[0]?.target ?? 1;
+    updateOpeningSprint(0.1);
+    runStats.openingSprint.surge.delayRemaining = 0;
     updateOpeningSurge(0.8);
     const combatShowcaseBeforeHit = cloneForSave(runStats.openingShowcase, null);
     const target = enemies.find((enemy) => enemy.openingSurge) ?? enemies[0] ?? null;
