@@ -20,6 +20,7 @@
 - `desktop/tools/export-steam-announcement-localization.cjs`：导出 Demo 公告中英本地化 CSV 交接表。
 - `desktop/tools/check-store-assets.cjs`：校验必需 capsule 尺寸、截图数量、源素材引用、宣传片镜头结构。
 - `desktop/tools/check-store-page.cjs`：校验 Steam 页面截图顺序、capsule 引用和复核图尺寸。
+- `desktop/tools/check-store-first-impression.cjs`：校验 Steam 截图首屏是否以 Boss 战斗和第二至五章实战证明开场，并检查截图尺寸、文件密度、取景路由和复核图。
 - `desktop/tools/check-store-content.cjs`：校验商店页文案、标签、语言支持、功能和配置草案。
 - `desktop/tools/check-steam-announcement.cjs`：校验 Demo 公告文案、路线图、反馈入口和事件图尺寸。
 - `desktop/steam/store-content.json`：Steam 商店页录入草案，包含中英文文案、标签顺序、语言表和系统需求。
@@ -58,18 +59,22 @@ npm run export:store-capsules
 
 ## 截图计划
 
-首批准备 6 张 1920 x 1080 商店截图。最终 Steam 页面展示顺序记录在 `desktop/steam/store-assets/store-page.json`：
+当前准备 10 张 1920 x 1080 商店截图。最终 Steam 页面展示顺序记录在 `desktop/steam/store-assets/store-page.json`，首屏优先证明“能打、章节有差异、机制可读”：
 
 1. 第一章 Boss 协议骑手·周行。
-2. 第一章办公室地图与新办公桌椅。
-3. 变量祝福与概念共鸣构筑。
-4. 后续章节公共规则引擎核心。
-5. 档案柜与章节练习入口。
-6. PC 设置、全屏、音频与手柄。
+2. 第二章站台错拍实战镜头。
+3. 第三章哈希盐雨实战镜头。
+4. 第四章承诺根层实战镜头。
+5. 第五章白箱申诉实战镜头。
+6. 第一章办公室地图与新办公桌椅。
+7. 变量祝福与概念共鸣构筑。
+8. 后续章节公共规则引擎核心。
+9. 档案柜与章节练习入口。
+10. PC 设置、全屏、音频与手柄。
 
-每张截图都在 `store-assets.json` 里记录 `mustShow` 检查项。后续可以把 `storeShot` 查询参数接入游戏调试态，让 Playwright 或浏览器手动捕获稳定场景。
+每张截图都在 `store-assets.json` 里记录 `mustShow` 检查项；第二至五章实战图使用 `storeShot=chapter-X-combat` 从可玩版本直接搭建装置、章节敌人机制、Boss 弱点窗口和武器特效。首屏排序和素材密度由 `check-store-first-impression.cjs` 自动校验，避免后续退回菜单/设置占据第一眼。
 
-捕获当前 6 张截图：
+捕获当前 10 张截图：
 
 ```powershell
 npm run capture:store-screenshots
@@ -178,6 +183,7 @@ npm run export:announcement-localization
 ```powershell
 npm run check:store-assets
 npm run check:store-page
+npm run check:store-first-impression
 npm run check:store-content
 npm run check:announcement
 ```
