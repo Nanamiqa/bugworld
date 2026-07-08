@@ -1368,6 +1368,8 @@ const openingSurgeConfig = {
   tempoKick: 1,
   ignitionCredit: 1,
   spawnGrace: 0.55,
+  firstStrikeBugPoints: 1,
+  firstStrikeHp: 2,
   enemyPattern: [
     { type: "deadline", dx: 230, dy: -88, hpMultiplier: 0.5, speedMultiplier: 0.82, scale: 0.84 },
     { type: "stress", dx: 270, dy: 18, hpMultiplier: 0.46, speedMultiplier: 0.82, scale: 0.78, mechanicDepth: 1 },
@@ -3068,6 +3070,10 @@ function createOpeningSurgeState() {
     spawnedCount: 0,
     tempoKickClaimed: false,
     ignitionCreditClaimed: false,
+    firstStrikeClaimed: false,
+    firstStrikeAt: null,
+    firstStrikeSource: null,
+    firstStrikeEnemyIndex: null,
     x: null,
     y: null,
   };
@@ -3099,6 +3105,12 @@ function normalizeOpeningSurgeState(savedSurge = null) {
     spawnedCount: Math.max(0, Math.trunc(Number(savedSurge.spawnedCount) || 0)),
     tempoKickClaimed: Boolean(savedSurge.tempoKickClaimed),
     ignitionCreditClaimed: Boolean(savedSurge.ignitionCreditClaimed),
+    firstStrikeClaimed: Boolean(savedSurge.firstStrikeClaimed),
+    firstStrikeAt: Number.isFinite(savedSurge.firstStrikeAt) ? Math.max(0, savedSurge.firstStrikeAt) : null,
+    firstStrikeSource: typeof savedSurge.firstStrikeSource === "string" ? savedSurge.firstStrikeSource : null,
+    firstStrikeEnemyIndex: Number.isFinite(savedSurge.firstStrikeEnemyIndex)
+      ? Math.max(0, Math.trunc(savedSurge.firstStrikeEnemyIndex))
+      : null,
     x: Number.isFinite(savedSurge.x) ? savedSurge.x : null,
     y: Number.isFinite(savedSurge.y) ? savedSurge.y : null,
   };
@@ -3900,6 +3912,57 @@ function applyOpeningSurgeMomentum(surge) {
   }
 
   return { tempoKicked, ignitionCredited };
+}
+
+function claimOpeningSurgeFirstStrike(enemy, source = "weapon") {
+  const surge = runStats?.openingSprint?.surge;
+  const armTime = Math.max(0, Number(enemy?.openingSurgeArmTime) || 0);
+  const isPlayerAction = ["weapon", "pulse", "probe"].includes(source);
+  if (
+    !enemy?.openingSurge
+    || !surge
+    || !surge.spawned
+    || surge.completed
+    || surge.failed
+    || surge.firstStrikeClaimed
+    || armTime <= 0
+    || !isPlayerAction
+  ) {
+    return false;
+  }
+
+  const bugReward = Math.max(0, Math.trunc(Number(openingSurgeConfig.firstStrikeBugPoints) || 0));
+  const hpReward = Math.max(0, Number(openingSurgeConfig.firstStrikeHp) || 0);
+  surge.firstStrikeClaimed = true;
+  surge.firstStrikeAt = Math.round((surge.elapsed ?? 0) * 100) / 100;
+  surge.firstStrikeSource = source;
+  surge.firstStrikeEnemyIndex = Math.max(0, Math.trunc(Number(enemy.openingSurgeIndex) || 0));
+  enemy.openingSurgeFirstStrike = true;
+  enemy.hitFlash = Math.max(enemy.hitFlash ?? 0, 0.24);
+  player.bugPoints += bugReward;
+  if (hpReward > 0) {
+    player.hp = clamp(player.hp + hpReward, 1, player.maxHp);
+  }
+
+  const showcase = runStats.openingShowcase;
+  if (showcase?.active && ["spawned", "combat"].includes(showcase.phase)) {
+    showcase.callout = "先手截击：命中窗口抢到奖励";
+    showcase.rewardText = `先手 +${bugReward} bug点数${hpReward ? ` / +${hpReward} 生命` : ""}`;
+    showcase.checklist = createOpeningShowcaseChecklist({
+      ...showcase.checklist,
+      reward: true,
+      effectPulse: 0.8,
+      effectLabel: "先手截击",
+    });
+  }
+
+  burst(enemy.x, enemy.y, "#ffffff", 16);
+  burst(enemy.x, enemy.y, "#f1c15b", 14);
+  burst(player.x, player.y, "#5de2d1", 10);
+  playAudioCue("pickup");
+  setLog(`先手截击：在接怪窗口命中裂隙异常，+${bugReward} bug点数${hpReward ? `，+${hpReward} 生命` : ""}。`);
+  saveRunCheckpoint("opening-surge-first-strike");
+  return true;
 }
 
 function completeOpeningSurge(surge = runStats?.openingSprint?.surge) {
@@ -6794,16 +6857,18 @@ function renderOpeningSprintTracker() {
   const previewCountdownText = showcase?.phase === "preview" && sprint.surge && !sprint.surge.spawned
     ? ` · 4个落点 · ${formatHookTime(sprint.surge.delayRemaining ?? 0)} 后刷新`
     : "";
-  const spawnGraceText = showcase?.phase === "spawned" && openingArmTime > 0
-    ? ` · 接怪窗口 ${formatHookTime(openingArmTime)}`
+  const firstStrikeWindowActive = surge?.spawned && !surge.completed && !surge.failed && openingArmTime > 0 && !surge.firstStrikeClaimed;
+  const firstStrikeClaimedText = surge?.firstStrikeClaimed ? " · 先手截击已触发" : "";
+  const spawnGraceText = ["spawned", "combat"].includes(showcase?.phase) && openingArmTime > 0
+    ? ` · 接怪窗口 ${formatHookTime(openingArmTime)}${firstStrikeWindowActive ? " · 命中触发先手截击" : ""}`
     : "";
   const showcaseText = showcase
-    ? `${showcase.callout}${previewCountdownText}${spawnGraceText} · ${showcase.focus}${["retry", "combat"].includes(showcase.phase) ? ` · 奖励：${showcase.rewardText}` : ""}${checklistReady}`
+    ? `${showcase.callout}${previewCountdownText}${spawnGraceText}${firstStrikeClaimedText} · ${showcase.focus}${["retry", "combat"].includes(showcase.phase) ? ` · 奖励：${showcase.rewardText}` : ""}${checklistReady}`
     : null;
   const surgeText = surge?.spawned && !surge.completed && !surge.failed
-    ? `${openingArmTime > 0 ? `接怪窗口 ${formatHookTime(openingArmTime)} · ` : ""}${openingSurgeConfig.label} ${surge.defeats ?? 0}/${openingSurgeConfig.targetDefeats} · 点燃连段 ${formatHookTime(openingSurgeConfig.timeLimit - (surge.elapsed ?? 0))}`
+    ? `${openingArmTime > 0 ? `接怪窗口 ${formatHookTime(openingArmTime)}${firstStrikeWindowActive ? " · 命中触发先手截击" : ""} · ` : ""}${surge.firstStrikeClaimed ? "先手截击已触发 · " : ""}${openingSurgeConfig.label} ${surge.defeats ?? 0}/${openingSurgeConfig.targetDefeats} · 点燃连段 ${formatHookTime(openingSurgeConfig.timeLimit - (surge.elapsed ?? 0))}`
     : surge?.completed
-      ? `${openingSurgeConfig.label}已清场 · 连段与流派提速`
+      ? `${openingSurgeConfig.label}已清场 · ${surge.firstStrikeClaimed ? "先手截击 · " : ""}连段与流派提速`
       : null;
   const rush = runStats?.openingRush;
   const rushText = rush
@@ -7392,6 +7457,9 @@ function applyEnemyDamage(enemy, amount, source = "weapon") {
 
   enemy.hp -= finalDamage;
   enemy.hitFlash = Math.max(enemy.hitFlash ?? 0, 0.14);
+  if (finalDamage > 0) {
+    claimOpeningSurgeFirstStrike(enemy, source);
+  }
   if (["pulse", "ally"].includes(source)) {
     const color = source === "pulse" ? "#72a5ff" : source === "ally" ? "#96e072" : "#f1c15b";
     spawnFloatingText(enemy.x + random(-10, 10), enemy.y - enemy.radius - 12, `${Math.max(1, Math.round(finalDamage))}`, color);
@@ -11802,6 +11870,12 @@ function drawEnemyMechanicOverlay(enemy) {
     const pulse = 0.5 + Math.sin(world.animTime * 8 + (enemy.openingSurgeIndex ?? 0)) * 0.5;
     const ring = enemy.radius + 10 + pulse * 5;
     const armTime = Math.max(0, Number(enemy.openingSurgeArmTime) || 0);
+    const surge = runStats?.openingSprint?.surge;
+    const firstStrikeIndex = Number.isFinite(surge?.firstStrikeEnemyIndex)
+      ? Math.trunc(surge.firstStrikeEnemyIndex)
+      : -1;
+    const isFirstStrikeTarget = Boolean(surge?.firstStrikeClaimed)
+      && firstStrikeIndex === Math.trunc(Number(enemy.openingSurgeIndex) || 0);
     ctx.save();
     ctx.globalAlpha = 0.78;
     ctx.strokeStyle = "#f1c15b";
@@ -11824,8 +11898,25 @@ function drawEnemyMechanicOverlay(enemy) {
       ctx.globalAlpha = 0.22;
       fillCircle(enemy.x, enemy.y, enemy.radius + 26, "#f1c15b");
     }
+    if (isFirstStrikeTarget) {
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y, enemy.radius + 31 + pulse * 3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 0.18;
+      fillCircle(enemy.x, enemy.y, enemy.radius + 32, "#ffffff");
+    }
     ctx.globalAlpha = 0.92;
-    drawMarkerTag(armTime > 0 ? "接怪窗口" : `裂隙 ${Math.trunc(enemy.openingSurgeIndex ?? 0) + 1}`, enemy.x, enemy.y - enemy.radius - 28, "#f1c15b");
+    const tag = isFirstStrikeTarget
+      ? "先手截击"
+      : armTime > 0 && !surge?.firstStrikeClaimed
+        ? "命中先手"
+        : armTime > 0
+          ? "接怪窗口"
+          : `裂隙 ${Math.trunc(enemy.openingSurgeIndex ?? 0) + 1}`;
+    drawMarkerTag(tag, enemy.x, enemy.y - enemy.radius - 28, isFirstStrikeTarget ? "#ffffff" : "#f1c15b");
     ctx.restore();
   }
 
@@ -13480,6 +13571,17 @@ function installAutomationTestHooks() {
     const spawned = enemies.filter((enemy) => enemy.openingSurge);
     const spawnGraceReady = spawned.length >= openingSurgeConfig.targetDefeats
       && spawned.every((enemy) => (enemy.openingSurgeArmTime ?? 0) > 0);
+    const beforeFirstStrikeBugPoints = player.bugPoints;
+    const beforeFirstStrikeHp = player.hp;
+    const firstStrikeTarget = spawned[0] ?? null;
+    const firstStrikeClaimed = firstStrikeTarget
+      ? claimOpeningSurgeFirstStrike(firstStrikeTarget, "probe")
+      : false;
+    syncHud();
+    const firstStrikeTrackerText = ui.openingTracker?.textContent ?? "";
+    const firstStrikeSnapshot = cloneForSave(runStats.openingSprint?.surge, null);
+    const firstStrikeBugGain = player.bugPoints - beforeFirstStrikeBugPoints;
+    const firstStrikeHpGain = player.hp - beforeFirstStrikeHp;
     for (const enemy of spawned.slice(0, openingSurgeConfig.targetDefeats)) {
       enemy.hp = 0;
     }
@@ -13498,7 +13600,13 @@ function installAutomationTestHooks() {
         && spawnedShowcase?.focus?.includes("同屏")
         && spawnedTrackerText.includes("第一波卖点")
         && spawnedTrackerText.includes("接怪窗口")
+        && spawnedTrackerText.includes("命中触发先手截击")
         && spawnGraceReady
+        && firstStrikeClaimed
+        && Boolean(firstStrikeSnapshot?.firstStrikeClaimed)
+        && firstStrikeTrackerText.includes("先手截击")
+        && firstStrikeBugGain >= openingSurgeConfig.firstStrikeBugPoints
+        && firstStrikeHpGain >= openingSurgeConfig.firstStrikeHp
         && clearedShowcase?.phase === "cleared"
         && Boolean(clearedShowcase?.completed)
         && clearedTrackerText.includes("第一波卖点")
@@ -13508,8 +13616,8 @@ function installAutomationTestHooks() {
         && Boolean(surge?.ignitionCreditClaimed)
         && tempoRewardClaimed
         && ignitionCompleted
-        && player.bugPoints >= startBugPoints + openingSurgeConfig.rewardBugPoints + combatTempoConfig.bugPointReward
-        && player.hp >= Math.min(player.maxHp, startHp + openingSurgeConfig.rewardHp)
+        && player.bugPoints >= startBugPoints + openingSurgeConfig.firstStrikeBugPoints + openingSurgeConfig.rewardBugPoints + combatTempoConfig.bugPointReward
+        && player.hp >= Math.min(player.maxHp, startHp + openingSurgeConfig.firstStrikeHp + openingSurgeConfig.rewardHp)
         && player.xp >= startXp + openingSurgeConfig.rewardXp
         && savedAfterSurge?.reason === "opening-surge-complete",
       spawnedCount: spawned.length,
@@ -13517,8 +13625,10 @@ function installAutomationTestHooks() {
       surge: cloneForSave(surge, null),
       openingShowcase: {
         spawned: spawnedShowcase,
+        firstStrike: firstStrikeSnapshot,
         cleared: clearedShowcase,
         spawnedTrackerText,
+        firstStrikeTrackerText,
         clearedTrackerText,
       },
       tempo: cloneForSave(runStats.tempo, null),
@@ -13527,6 +13637,8 @@ function installAutomationTestHooks() {
         bugPoints: player.bugPoints - startBugPoints,
         hp: round(player.hp - startHp),
         xp: player.xp - startXp,
+        firstStrikeBugPoints: firstStrikeBugGain,
+        firstStrikeHp: round(firstStrikeHpGain),
         savedReason: savedAfterSurge?.reason ?? null,
       },
     };
@@ -13665,6 +13777,7 @@ function installAutomationTestHooks() {
         && spawnedShowcase?.phase === "spawned"
         && spawnedTrackerText.includes("第一波卖点")
         && spawnedTrackerText.includes("接怪窗口")
+        && spawnedTrackerText.includes("命中触发先手截击")
         && spawnGraceReady
         && spawned.length >= openingSurgeConfig.targetDefeats,
       previewShowcase,
