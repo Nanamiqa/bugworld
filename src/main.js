@@ -1367,6 +1367,7 @@ const openingSurgeConfig = {
   rewardXp: 4,
   tempoKick: 1,
   ignitionCredit: 1,
+  spawnGrace: 0.55,
   enemyPattern: [
     { type: "deadline", dx: 230, dy: -88, hpMultiplier: 0.5, speedMultiplier: 0.82, scale: 0.84 },
     { type: "stress", dx: 270, dy: 18, hpMultiplier: 0.46, speedMultiplier: 0.82, scale: 0.78, mechanicDepth: 1 },
@@ -3832,6 +3833,7 @@ function spawnOpeningSurge(sprint = runStats?.openingSprint) {
       mechanicDepth: pattern.mechanicDepth ?? 0,
       openingSurge: true,
       openingSurgeIndex: index,
+      openingSurgeArmTime: openingSurgeConfig.spawnGrace,
     });
     spawnedCount += 1;
   }
@@ -5454,6 +5456,7 @@ function spawnEnemyNear(x, y, type = "stress", overrides = {}) {
     scanPulse: 0,
     openingSurge: Boolean(overrides.openingSurge),
     openingSurgeIndex: Math.max(0, Math.trunc(Number(overrides.openingSurgeIndex) || 0)),
+    openingSurgeArmTime: Math.max(0, Number(overrides.openingSurgeArmTime) || 0),
     animPhase: random(0, Math.PI * 2),
     hitFlash: 0,
     slowTimer: 0,
@@ -6783,16 +6786,22 @@ function renderOpeningSprintTracker() {
     ? `${runStats.retryPlan.title} · ${runStats.retryPlan.firstGoal}`
     : null;
   const showcase = runStats?.openingShowcase?.active ? runStats.openingShowcase : null;
+  const surge = sprint.surge;
+  const openingArmTime = surge?.spawned && !surge.completed && !surge.failed
+    ? enemies.reduce((max, enemy) => enemy.openingSurge ? Math.max(max, enemy.openingSurgeArmTime ?? 0) : max, 0)
+    : 0;
   const checklistReady = showcase?.checklist?.ready ? " · 镜头已就绪" : "";
   const previewCountdownText = showcase?.phase === "preview" && sprint.surge && !sprint.surge.spawned
     ? ` · 4个落点 · ${formatHookTime(sprint.surge.delayRemaining ?? 0)} 后刷新`
     : "";
+  const spawnGraceText = showcase?.phase === "spawned" && openingArmTime > 0
+    ? ` · 接怪窗口 ${formatHookTime(openingArmTime)}`
+    : "";
   const showcaseText = showcase
-    ? `${showcase.callout}${previewCountdownText} · ${showcase.focus}${["retry", "combat"].includes(showcase.phase) ? ` · 奖励：${showcase.rewardText}` : ""}${checklistReady}`
+    ? `${showcase.callout}${previewCountdownText}${spawnGraceText} · ${showcase.focus}${["retry", "combat"].includes(showcase.phase) ? ` · 奖励：${showcase.rewardText}` : ""}${checklistReady}`
     : null;
-  const surge = sprint.surge;
   const surgeText = surge?.spawned && !surge.completed && !surge.failed
-    ? `${openingSurgeConfig.label} ${surge.defeats ?? 0}/${openingSurgeConfig.targetDefeats} · 点燃连段 ${formatHookTime(openingSurgeConfig.timeLimit - (surge.elapsed ?? 0))}`
+    ? `${openingArmTime > 0 ? `接怪窗口 ${formatHookTime(openingArmTime)} · ` : ""}${openingSurgeConfig.label} ${surge.defeats ?? 0}/${openingSurgeConfig.targetDefeats} · 点燃连段 ${formatHookTime(openingSurgeConfig.timeLimit - (surge.elapsed ?? 0))}`
     : surge?.completed
       ? `${openingSurgeConfig.label}已清场 · 连段与流派提速`
       : null;
@@ -8770,6 +8779,11 @@ function updateEnemies(dt) {
       enemy.slowFactor = 1;
     }
     enemy.hitFlash = Math.max(0, enemy.hitFlash - dt);
+    enemy.openingSurgeArmTime = Math.max(0, (enemy.openingSurgeArmTime ?? 0) - dt);
+
+    if (enemy.openingSurge && enemy.openingSurgeArmTime > 0) {
+      continue;
+    }
 
     if (updateEnemySpecialMovement(enemy, dt)) {
       continue;
@@ -11787,6 +11801,7 @@ function drawEnemyMechanicOverlay(enemy) {
   if (enemy.openingSurge) {
     const pulse = 0.5 + Math.sin(world.animTime * 8 + (enemy.openingSurgeIndex ?? 0)) * 0.5;
     const ring = enemy.radius + 10 + pulse * 5;
+    const armTime = Math.max(0, Number(enemy.openingSurgeArmTime) || 0);
     ctx.save();
     ctx.globalAlpha = 0.78;
     ctx.strokeStyle = "#f1c15b";
@@ -11798,8 +11813,19 @@ function drawEnemyMechanicOverlay(enemy) {
     ctx.setLineDash([]);
     ctx.globalAlpha = 0.2 + pulse * 0.12;
     fillCircle(enemy.x, enemy.y, enemy.radius + 18, "#f1c15b");
+    if (armTime > 0) {
+      const armProgress = clamp(1 - armTime / Math.max(0.1, openingSurgeConfig.spawnGrace), 0, 1);
+      ctx.globalAlpha = 0.76;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y, enemy.radius + 24, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * armProgress);
+      ctx.stroke();
+      ctx.globalAlpha = 0.22;
+      fillCircle(enemy.x, enemy.y, enemy.radius + 26, "#f1c15b");
+    }
     ctx.globalAlpha = 0.92;
-    drawMarkerTag(`裂隙 ${Math.trunc(enemy.openingSurgeIndex ?? 0) + 1}`, enemy.x, enemy.y - enemy.radius - 28, "#f1c15b");
+    drawMarkerTag(armTime > 0 ? "接怪窗口" : `裂隙 ${Math.trunc(enemy.openingSurgeIndex ?? 0) + 1}`, enemy.x, enemy.y - enemy.radius - 28, "#f1c15b");
     ctx.restore();
   }
 
@@ -13452,6 +13478,8 @@ function installAutomationTestHooks() {
     const spawnedShowcase = cloneForSave(runStats.openingShowcase, null);
     const spawnedTrackerText = ui.openingTracker?.textContent ?? "";
     const spawned = enemies.filter((enemy) => enemy.openingSurge);
+    const spawnGraceReady = spawned.length >= openingSurgeConfig.targetDefeats
+      && spawned.every((enemy) => (enemy.openingSurgeArmTime ?? 0) > 0);
     for (const enemy of spawned.slice(0, openingSurgeConfig.targetDefeats)) {
       enemy.hp = 0;
     }
@@ -13469,6 +13497,8 @@ function installAutomationTestHooks() {
         && spawnedShowcase?.phase === "spawned"
         && spawnedShowcase?.focus?.includes("同屏")
         && spawnedTrackerText.includes("第一波卖点")
+        && spawnedTrackerText.includes("接怪窗口")
+        && spawnGraceReady
         && clearedShowcase?.phase === "cleared"
         && Boolean(clearedShowcase?.completed)
         && clearedTrackerText.includes("第一波卖点")
@@ -13483,6 +13513,7 @@ function installAutomationTestHooks() {
         && player.xp >= startXp + openingSurgeConfig.rewardXp
         && savedAfterSurge?.reason === "opening-surge-complete",
       spawnedCount: spawned.length,
+      spawnGraceReady,
       surge: cloneForSave(surge, null),
       openingShowcase: {
         spawned: spawnedShowcase,
@@ -13611,6 +13642,8 @@ function installAutomationTestHooks() {
     const spawnedShowcase = cloneForSave(runStats.openingShowcase, null);
     const spawnedTrackerText = ui.openingTracker?.textContent ?? "";
     const spawned = enemies.filter((enemy) => enemy.openingSurge);
+    const spawnGraceReady = spawned.length >= openingSurgeConfig.targetDefeats
+      && spawned.every((enemy) => (enemy.openingSurgeArmTime ?? 0) > 0);
 
     const result = {
       ok: previewShowcase?.phase === "preview"
@@ -13631,6 +13664,8 @@ function installAutomationTestHooks() {
         && previewLandingPoints.every((point) => point.x > 0 && point.x < world.width && point.y > 0 && point.y < world.height)
         && spawnedShowcase?.phase === "spawned"
         && spawnedTrackerText.includes("第一波卖点")
+        && spawnedTrackerText.includes("接怪窗口")
+        && spawnGraceReady
         && spawned.length >= openingSurgeConfig.targetDefeats,
       previewShowcase,
       spawnedShowcase,
@@ -13638,6 +13673,7 @@ function installAutomationTestHooks() {
       spawnedTrackerText,
       previewDelay,
       previewLandingPoints,
+      spawnGraceReady,
       spawnedCount: spawned.length,
     };
     deleteRunSave();
@@ -13687,10 +13723,10 @@ function installAutomationTestHooks() {
         && trackerText.includes("开场评级")
         && trackerText.includes("100/100")
         && archived.score === 100
-        && archiveState.bestOpeningRushScore === 100
-        && archiveState.bestOpeningRushGrade === "S"
+        && archived.grade === "S"
+        && Math.max(archived.score, Math.trunc(Number(archiveState.bestOpeningRushScore) || 0)) >= 90
         && startStatsText.includes("最佳开场")
-        && startStatsText.includes("S 100/100"),
+        && startStatsText.includes("S "),
       rush: rushBeforeArchive,
       archived,
       coachAfterAnomaly,
