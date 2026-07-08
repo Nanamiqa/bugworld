@@ -13526,6 +13526,109 @@ function installAutomationTestHooks() {
     return result;
   }
 
+  function runOpeningRushTimingProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    const cadenceProfiles = [
+      { id: "60fps", dt: 1 / 60, anomalyAt: 2.8, clearAt: 9.6 },
+      { id: "30fps", dt: 1 / 30, anomalyAt: 3.2, clearAt: 11.4 },
+      { id: "low-fps", dt: 1 / 12, anomalyAt: 4.4, clearAt: 14.8 },
+    ];
+    const samples = [];
+
+    const tickOpeningRoute = (dt) => {
+      updateStarterIgnition(dt);
+      updateOpeningSurge(dt);
+      updateOpeningSprint(dt);
+      updateOpeningRush(dt);
+      updateOpeningShowcase(dt);
+    };
+
+    const advanceTo = (targetTime, dt) => {
+      let guard = 0;
+      while ((runStats.openingRush?.elapsed ?? 0) + 0.0001 < targetTime && guard < 900) {
+        tickOpeningRoute(Math.min(dt, targetTime - (runStats.openingRush?.elapsed ?? 0)));
+        guard += 1;
+      }
+    };
+
+    for (const [weaponIndex, weapon] of weaponDefinitions.slice(0, 3).entries()) {
+      for (const profile of cadenceProfiles) {
+        resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 80, xp: 0, weaponIndex });
+        archiveState = {
+          ...createArchiveFallback(),
+          calibrationShards: 0,
+        };
+        runStats.eventsResolved = 0;
+        runStats.enemiesDefeated = 0;
+        runStats.openingRush = createOpeningRushState();
+        runStats.openingSprint = createOpeningSprintState();
+        runStats.tempo = createCombatTempoState();
+        runStats.starterBuild = null;
+        runStats.starterIgnition = null;
+        equipWeapon(weapon);
+        const build = applyStarterBuildForWeaponChoice(weapon);
+        player.xp = 0;
+        player.xpToNext = 99;
+        world.mode = "playing";
+
+        advanceTo(profile.anomalyAt, profile.dt);
+        runStats.eventsResolved += openingSprintSteps[0]?.target ?? 1;
+        tickOpeningRoute(profile.dt);
+        syncHud();
+        const coachAfterAnomaly = ui.openingTracker?.textContent ?? "";
+
+        advanceTo(profile.clearAt, profile.dt);
+        let spawned = enemies.filter((enemy) => enemy.openingSurge);
+        let spawnGuard = 0;
+        while (spawned.length < openingSurgeConfig.targetDefeats && spawnGuard < 90) {
+          tickOpeningRoute(profile.dt);
+          spawned = enemies.filter((enemy) => enemy.openingSurge);
+          spawnGuard += 1;
+        }
+        for (const enemy of spawned.slice(0, openingSurgeConfig.targetDefeats)) {
+          enemy.hp = 0;
+        }
+        clearDefeatedHostiles();
+        tickOpeningRoute(profile.dt);
+        syncHud();
+
+        const rush = getOpeningRushSnapshot(runStats.openingRush);
+        const ignition = cloneForSave(runStats.starterIgnition, null);
+        samples.push({
+          ok: Boolean(build)
+            && spawned.length >= openingSurgeConfig.targetDefeats
+            && rush.grade === "S"
+            && rush.score >= 90
+            && rush.elapsed <= openingRushConfig.windowSeconds
+            && Boolean(ignition?.completed)
+            && coachAfterAnomaly.includes("追S"),
+          weaponId: weapon.id,
+          buildId: build?.id ?? null,
+          cadence: profile.id,
+          elapsed: round(rush.elapsed),
+          score: rush.score,
+          grade: rush.grade,
+          completedIds: cloneForSave(rush.completedIds, []),
+          spawnedCount: spawned.length,
+          ignition,
+          coachAfterAnomaly,
+        });
+      }
+    }
+
+    const result = {
+      ok: samples.length === weaponDefinitions.slice(0, 3).length * cadenceProfiles.length
+        && samples.every((sample) => sample.ok),
+      samples,
+      worstElapsed: samples.reduce((max, sample) => Math.max(max, sample.elapsed ?? 0), 0),
+      minScore: samples.reduce((min, sample) => Math.min(min, sample.score ?? 0), 100),
+    };
+    deleteRunSave();
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
+    return result;
+  }
+
   function runHitFeedbackProbe() {
     const previousArchive = cloneForSave(archiveState, null);
     resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 80, weaponIndex: 0 });
@@ -14392,6 +14495,7 @@ function installAutomationTestHooks() {
     const openingSurge = runOpeningSurgeProbe();
     const openingGuidance = runOpeningGuidanceProbe();
     const openingRushRating = runOpeningRushRatingProbe();
+    const openingRushTiming = runOpeningRushTimingProbe();
     const hitFeedback = runHitFeedbackProbe();
     const fairWarning = runFairWarningProbe();
     const failureReplay = runFailureReplayProbe();
@@ -14424,6 +14528,9 @@ function installAutomationTestHooks() {
     }
     if (!openingRushRating.ok) {
       failures.push("opening rush rating failed");
+    }
+    if (!openingRushTiming.ok) {
+      failures.push("opening rush timing failed");
     }
     if (!hitFeedback.ok) {
       failures.push("weapon hit feedback failed");
@@ -14534,6 +14641,7 @@ function installAutomationTestHooks() {
       openingSurge,
       openingGuidance,
       openingRushRating,
+      openingRushTiming,
       hitFeedback,
       fairWarning,
       failureReplay,
@@ -14561,6 +14669,7 @@ function installAutomationTestHooks() {
     runOpeningSurgeProbe,
     runOpeningGuidanceProbe,
     runOpeningRushRatingProbe,
+    runOpeningRushTimingProbe,
     runHitFeedbackProbe,
     runFairWarningProbe,
     runFailureReplayProbe,
