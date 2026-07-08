@@ -385,6 +385,17 @@ h1 {
   color: var(--amber);
 }
 
+.opening-tracker.is-rush-hot {
+  border-color: rgba(15, 159, 149, 0.42);
+  background:
+    linear-gradient(135deg, rgba(239, 250, 249, 0.96), rgba(255, 248, 232, 0.9));
+  box-shadow: 0 12px 30px rgba(15, 159, 149, 0.18);
+}
+
+.opening-tracker.is-rush-hot::after {
+  background: linear-gradient(90deg, var(--cyan), var(--amber), var(--blue));
+}
+
 .opening-tracker.hidden,
 .hook-tracker.hidden {
   display: none;

@@ -1374,6 +1374,22 @@ const openingSurgeConfig = {
     { type: "stress", dx: 304, dy: -6, hpMultiplier: 0.42, speedMultiplier: 0.8, scale: 0.72, mechanicDepth: 1 },
   ],
 };
+const openingRushConfig = {
+  windowSeconds: 30,
+  milestones: [
+    { id: "anomaly", label: "首个异常", score: 28 },
+    { id: "surge", label: "裂隙清场", score: 30 },
+    { id: "overclock", label: "武器超频", score: 32 },
+    { id: "retry-route", label: "推荐路线", score: 10 },
+  ],
+  grades: [
+    { grade: "S", min: 90, title: "S级开场", text: "首个异常、裂隙清场和武器超频在 30 秒内连成了完整爽点。" },
+    { grade: "A", min: 75, title: "A级开场", text: "开局节奏已经成立，下一把可以追更短用时和更干净的清场。" },
+    { grade: "B", min: 55, title: "B级开场", text: "开场目标已经接上，但裂隙、连段或超频还有一步可以更快。" },
+    { grade: "C", min: 28, title: "C级开场", text: "至少处理了第一个关键点，下一把优先把裂隙和超频串起来。" },
+    { grade: "D", min: 0, title: "D级开场", text: "开场还没形成连续反馈，下一把跟随推荐路线先拿第一波收益。" },
+  ],
+};
 const chapterShowcaseConfigs = {
   "metro-loop": {
     title: "站台错拍镜头",
@@ -2025,6 +2041,7 @@ function createRunStats() {
     deviceGuide: null,
     retryBoost: null,
     retryPlan: null,
+    openingRush: createOpeningRushState(),
     openingShowcase: null,
     chapterShowcase: null,
     fairWarning: createFairWarningState(),
@@ -2052,6 +2069,10 @@ function createArchiveFallback() {
     completedNightHooks: [],
     nightHookCompletions: 0,
     bestTempoStreak: 0,
+    bestOpeningRushScore: 0,
+    bestOpeningRushGrade: "D",
+    bestOpeningRushAt: null,
+    lastOpeningRush: null,
     discoveredEchoes: [],
     completedEchoChapters: [],
     lastEchoDiscovery: null,
@@ -2302,6 +2323,7 @@ function normalizeLastRunReview(value) {
     retryBoost: normalizeRetryBoost(value.retryBoost),
     retryPlan: normalizeRetryPlan(value.retryPlan),
     failureReplay: normalizeFailureReplay(value.failureReplay),
+    openingRush: normalizeOpeningRushArchive(value.openingRush),
     at: Number(value.at) || Date.now(),
   };
 }
@@ -2357,6 +2379,7 @@ function loadArchive() {
       activatedMapInteractives: normalizeMapInteractiveIds(saved.activatedMapInteractives),
       completedMapInteractiveChapters: normalizeMapInteractiveChapterIds(saved.completedMapInteractiveChapters),
       lastMapInteractiveDiscovery: normalizeLastMapInteractiveDiscovery(saved.lastMapInteractiveDiscovery),
+      lastOpeningRush: normalizeOpeningRushArchive(saved.lastOpeningRush),
     };
     normalized.archiveVersion = ARCHIVE_VERSION;
     normalized.bestChapter = clamp(Number(normalized.bestChapter) || 1, 1, chapters.length);
@@ -2370,6 +2393,11 @@ function loadArchive() {
       Math.trunc(Number(normalized.nightHookCompletions) || 0),
     );
     normalized.bestTempoStreak = Math.max(0, Math.trunc(Number(normalized.bestTempoStreak) || 0));
+    normalized.bestOpeningRushScore = clamp(Math.trunc(Number(normalized.bestOpeningRushScore) || 0), 0, 100);
+    normalized.bestOpeningRushGrade = ["S", "A", "B", "C", "D"].includes(normalized.bestOpeningRushGrade)
+      ? normalized.bestOpeningRushGrade
+      : getOpeningRushGrade(normalized.bestOpeningRushScore).grade;
+    normalized.bestOpeningRushAt = Number(normalized.bestOpeningRushAt) || null;
     if (!normalized.unlockedChapters.includes(0)) {
       normalized.unlockedChapters.unshift(0);
     }
@@ -3463,6 +3491,180 @@ function normalizeOpeningSprintState(savedSprint = null) {
   };
 }
 
+function getOpeningRushGrade(score = 0) {
+  const value = clamp(Math.trunc(Number(score) || 0), 0, 100);
+  return openingRushConfig.grades.find((grade) => value >= grade.min) ?? openingRushConfig.grades.at(-1);
+}
+
+function getOpeningRushMilestone(id) {
+  return openingRushConfig.milestones.find((milestone) => milestone.id === id) ?? null;
+}
+
+function calculateOpeningRushScore(completedIds = []) {
+  const completed = new Set(Array.isArray(completedIds) ? completedIds : []);
+  return clamp(
+    openingRushConfig.milestones.reduce((sum, milestone) => (
+      completed.has(milestone.id) ? sum + milestone.score : sum
+    ), 0),
+    0,
+    100,
+  );
+}
+
+function createOpeningRushState(value = {}) {
+  const completedIds = Array.isArray(value.completedIds)
+    ? [...new Set(value.completedIds.filter((id) => getOpeningRushMilestone(id)))]
+    : [];
+  const score = calculateOpeningRushScore(completedIds);
+  const gradeInfo = getOpeningRushGrade(score);
+  const elapsed = Math.max(0, Number(value.elapsed) || 0);
+  return {
+    id: "first-30-rush",
+    active: value.active === undefined ? true : Boolean(value.active),
+    windowSeconds: openingRushConfig.windowSeconds,
+    elapsed,
+    completedIds,
+    score,
+    grade: gradeInfo.grade,
+    gradeTitle: gradeInfo.title,
+    gradeText: gradeInfo.text,
+    bestAt: Number(value.bestAt) || null,
+    flash: Math.max(0, Number(value.flash) || 0),
+    lastMilestone: typeof value.lastMilestone === "string" ? value.lastMilestone : "",
+  };
+}
+
+function normalizeOpeningRushState(savedRush = null) {
+  if (!savedRush || typeof savedRush !== "object") {
+    return createOpeningRushState();
+  }
+  const normalized = createOpeningRushState(savedRush);
+  normalized.active = Boolean(savedRush.active) && normalized.elapsed < openingRushConfig.windowSeconds;
+  return normalized;
+}
+
+function getOpeningRushSnapshot(rush = runStats?.openingRush) {
+  if (!rush) {
+    return normalizeOpeningRushArchive(null);
+  }
+  const normalized = createOpeningRushState(rush);
+  return normalizeOpeningRushArchive({
+    score: normalized.score,
+    grade: normalized.grade,
+    gradeTitle: normalized.gradeTitle,
+    gradeText: normalized.gradeText,
+    elapsed: normalized.elapsed,
+    completedIds: normalized.completedIds,
+    at: normalized.bestAt ?? Date.now(),
+  });
+}
+
+function normalizeOpeningRushArchive(value = null) {
+  if (!value || typeof value !== "object") {
+    const gradeInfo = getOpeningRushGrade(0);
+    return {
+      score: 0,
+      grade: gradeInfo.grade,
+      gradeTitle: gradeInfo.title,
+      gradeText: gradeInfo.text,
+      elapsed: 0,
+      completedIds: [],
+      at: null,
+    };
+  }
+  const completedIds = Array.isArray(value.completedIds)
+    ? [...new Set(value.completedIds.filter((id) => getOpeningRushMilestone(id)))]
+    : [];
+  const score = clamp(Math.trunc(Number(value.score) || calculateOpeningRushScore(completedIds)), 0, 100);
+  const gradeInfo = getOpeningRushGrade(score);
+  return {
+    score,
+    grade: ["S", "A", "B", "C", "D"].includes(value.grade) ? value.grade : gradeInfo.grade,
+    gradeTitle: typeof value.gradeTitle === "string" ? value.gradeTitle : gradeInfo.title,
+    gradeText: typeof value.gradeText === "string" ? value.gradeText : gradeInfo.text,
+    elapsed: Math.max(0, Number(value.elapsed) || 0),
+    completedIds,
+    at: Number(value.at) || null,
+  };
+}
+
+function completeOpeningRushMilestone(id) {
+  const milestone = getOpeningRushMilestone(id);
+  const rush = runStats?.openingRush;
+  if (!milestone || !rush || currentChapterIndex !== 0) {
+    return null;
+  }
+  if ((rush.elapsed ?? 0) > openingRushConfig.windowSeconds || rush.completedIds?.includes(id)) {
+    return createOpeningRushState(rush);
+  }
+
+  rush.completedIds = [...new Set([...(rush.completedIds ?? []), id])];
+  const refreshed = createOpeningRushState({
+    ...rush,
+    completedIds: rush.completedIds,
+    flash: 1.6,
+    lastMilestone: milestone.label,
+    bestAt: Date.now(),
+  });
+  runStats.openingRush = {
+    ...rush,
+    ...refreshed,
+    active: refreshed.elapsed < openingRushConfig.windowSeconds,
+  };
+  return runStats.openingRush;
+}
+
+function updateOpeningRush(dt = 0) {
+  const rush = runStats?.openingRush;
+  if (!rush || currentChapterIndex !== 0 || world.mode !== "playing") {
+    return;
+  }
+  rush.elapsed = Math.max(0, (rush.elapsed ?? 0) + Math.max(0, dt));
+  rush.flash = Math.max(0, (rush.flash ?? 0) - dt);
+  if (rush.elapsed >= openingRushConfig.windowSeconds) {
+    rush.active = false;
+  }
+  const refreshed = createOpeningRushState(rush);
+  Object.assign(rush, {
+    score: refreshed.score,
+    grade: refreshed.grade,
+    gradeTitle: refreshed.gradeTitle,
+    gradeText: refreshed.gradeText,
+  });
+}
+
+function recordOpeningRushInArchive(rush = runStats?.openingRush) {
+  if (!archiveState) {
+    archiveState = loadArchive();
+  }
+  const snapshot = getOpeningRushSnapshot(rush);
+  archiveState.lastOpeningRush = snapshot;
+  if (snapshot.score > Math.max(0, Math.trunc(Number(archiveState.bestOpeningRushScore) || 0))) {
+    archiveState.bestOpeningRushScore = snapshot.score;
+    archiveState.bestOpeningRushGrade = snapshot.grade;
+    archiveState.bestOpeningRushAt = Date.now();
+  }
+  return snapshot;
+}
+
+function formatOpeningRushScore(rush = runStats?.openingRush) {
+  const snapshot = getOpeningRushSnapshot(rush);
+  if (!snapshot.score) {
+    return "未评级";
+  }
+  const seconds = snapshot.elapsed > 0 ? ` · ${Math.round(snapshot.elapsed)}s` : "";
+  return `${snapshot.grade} ${snapshot.score}/100${seconds}`;
+}
+
+function formatOpeningRushArchiveBest(archive = archiveState) {
+  const score = Math.max(0, Math.trunc(Number(archive?.bestOpeningRushScore) || 0));
+  if (!score) {
+    return "未评级";
+  }
+  const grade = archive?.bestOpeningRushGrade || getOpeningRushGrade(score).grade;
+  return `${grade} ${score}/100`;
+}
+
 function getOpeningSprintProgress(step, sprint = runStats?.openingSprint) {
   if (!step || !sprint || !runStats) {
     return { value: 0, target: 1, complete: false };
@@ -3511,6 +3713,9 @@ function completeOpeningSprintStep(sprint, step) {
   const isFinal = sprint.completedStepIds.length >= openingSprintSteps.length;
   sprint.completed = isFinal;
   sprint.active = !isFinal;
+  if (step.id === "first-anomaly") {
+    completeOpeningRushMilestone("anomaly");
+  }
   burst(player.x, player.y, isFinal ? "#5de2d1" : "#72a5ff", isFinal ? 24 : 14);
   playAudioCue(isFinal ? "upgrade-select" : "pickup");
   const retryText = retryBonusBugPoints > 0 ? `（复盘 +${retryBonusBugPoints}）` : "";
@@ -3643,6 +3848,7 @@ function completeOpeningSurge(surge = runStats?.openingSprint?.surge) {
     addExperience(openingSurgeConfig.rewardXp);
   }
   const momentum = applyOpeningSurgeMomentum(surge);
+  completeOpeningRushMilestone("surge");
   world.spawnTimer = Math.min(world.spawnTimer ?? 0, 0.25);
   burst(player.x, player.y, "#f1c15b", 18);
   burst(player.x, player.y, "#72a5ff", momentum.ignitionCredited ? 18 : 10);
@@ -3933,6 +4139,7 @@ function restoreRunSave(save) {
     deviceGuide: normalizeDeviceGuideState(save.runStats?.deviceGuide),
     retryBoost: normalizeRetryBoost(save.runStats?.retryBoost),
     retryPlan: normalizeRetryPlan(save.runStats?.retryPlan),
+    openingRush: normalizeOpeningRushState(save.runStats?.openingRush),
     openingShowcase: normalizeOpeningShowcaseState(save.runStats?.openingShowcase),
     chapterShowcase: normalizeChapterShowcaseState(save.runStats?.chapterShowcase),
     fairWarning: normalizeFairWarningState(save.runStats?.fairWarning),
@@ -4199,6 +4406,7 @@ function applyRetryPlan(plan) {
     radius: 204,
     retryPlan: normalized,
   });
+  completeOpeningRushMilestone("retry-route");
   setLog(normalized.log);
   saveRunCheckpoint("retry-plan");
   return runStats.retryPlan;
@@ -4274,6 +4482,7 @@ function createRunReview(victory) {
   const defeats = runStats?.enemiesDefeated ?? 0;
   const openingComplete = Boolean(runStats?.openingSprint?.completed);
   const starterComplete = Boolean(runStats?.starterIgnition?.completed);
+  const openingRush = getOpeningRushSnapshot(runStats?.openingRush);
   const deviceCount = runStats?.mapInteractivesActivated?.length ?? 0;
   const build = chooseReviewStarterBuild(victory);
   const weapon = getWeaponById(build?.weaponId);
@@ -4282,9 +4491,15 @@ function createRunReview(victory) {
   let highlightText = openingComplete
     ? "开场牵引链完整完成，玩家已经经历了目标、击破和构筑成型。"
     : `本局处理 ${eventsResolved} 个异常、击破 ${defeats} 个实体，已经留下局外收益。`;
-  if (starterComplete) {
+  if (openingRush.score >= 90) {
+    highlightTitle = openingRush.gradeTitle;
+    highlightText = openingRush.gradeText;
+  } else if (starterComplete) {
     highlightTitle = "流派已经起火";
     highlightText = "推荐流派完成启动超频，下一把可以直接围绕它拿强化。";
+  } else if (openingRush.score >= 75) {
+    highlightTitle = openingRush.gradeTitle;
+    highlightText = openingRush.gradeText;
   } else if (deviceCount > 0) {
     highlightTitle = `装置启动 x${deviceCount}`;
     highlightText = "本局已经把地图装置转化成战斗收益，探索路线开始反哺构筑节奏。";
@@ -4304,6 +4519,9 @@ function createRunReview(victory) {
   } else if (bestStreak < combatTempoConfig.rewardEvery) {
     pressureTitle = "连段还没滚起来";
     pressureText = `尽量把击破间隔压进 ${combatTempoConfig.window.toFixed(1)} 秒窗口，先吃到第一份连段补给。`;
+  } else if (openingRush.score < 55) {
+    pressureTitle = "开场没串起来";
+    pressureText = "下一把 30 秒内优先完成首个异常、清掉快递裂隙，再把推荐流派超频点亮。";
   } else if (!starterComplete) {
     pressureTitle = "构筑差一步成型";
     pressureText = "按推荐流派目标打完第一波，武器会获得一次明显超频。";
@@ -4335,6 +4553,7 @@ function createRunReview(victory) {
     retryBoost,
     retryPlan,
     failureReplay,
+    openingRush,
     at: Date.now(),
   };
 }
@@ -4348,6 +4567,7 @@ function recordRunEnd(victory) {
   archiveState.totalEnemiesDefeated = (archiveState.totalEnemiesDefeated ?? 0) + (runStats?.enemiesDefeated ?? 0);
   archiveState.totalEventsResolved = (archiveState.totalEventsResolved ?? 0) + (runStats?.eventsResolved ?? 0);
   archiveState.bestTempoStreak = Math.max(archiveState.bestTempoStreak ?? 0, runStats?.tempo?.bestStreak ?? 0);
+  recordOpeningRushInArchive(runStats?.openingRush);
   archiveState.lastBuild = getBuildSummary();
   archiveState.lastRunReview = createRunReview(victory);
   grantCalibrationShards(shardReward, victory ? "五章通关奖励" : `${currentChapter().title} 结算`);
@@ -4494,6 +4714,7 @@ function completeStarterIgnition(ignition, build) {
     addExperience(xpReward);
   }
   const overclockText = applyStarterOverclock(ignition, build);
+  completeOpeningRushMilestone("overclock");
   burst(player.x, player.y, "#f1c15b", 22);
   burst(player.x, player.y, "#5de2d1", 18);
   playAudioCue("upgrade-select");
@@ -4644,6 +4865,16 @@ function createStoreArchiveState() {
     completedNightHooks: ["delivery-save-90", "metro-fast-line"],
     nightHookCompletions: 7,
     bestTempoStreak: 18,
+    bestOpeningRushScore: 92,
+    bestOpeningRushGrade: "S",
+    bestOpeningRushAt: Date.now(),
+    lastOpeningRush: normalizeOpeningRushArchive({
+      score: 92,
+      grade: "S",
+      elapsed: 24,
+      completedIds: ["anomaly", "surge", "overclock"],
+      at: Date.now(),
+    }),
     discoveredEchoes: getAllDiscoveryEchoes().slice(0, 7).map((echo) => echo.id),
     completedEchoChapters: chapterMaps.slice(0, 3).map((map) => map.id),
     activatedMapInteractives: getAllMapInteractives().slice(0, 3).map((device) => device.id),
@@ -6229,6 +6460,7 @@ function renderStartMenu() {
     ["存档", getStorageDisplayLabel()],
     ["爆点委托", `${archiveState.nightHookCompletions ?? 0} 次`],
     ["最佳连段", `x${archiveState.bestTempoStreak ?? 0}`],
+    ["最佳开场", formatOpeningRushArchiveBest(archiveState)],
     ["成就", `${readUnlockedAchievements().length}/${achievements.length}`],
   ];
   ui.startStats.innerHTML = "";
@@ -6468,6 +6700,11 @@ function renderOpeningSprintTracker() {
     : surge?.completed
       ? `${openingSurgeConfig.label}已清场 · 连段与流派提速`
       : null;
+  const rush = runStats?.openingRush;
+  const rushText = rush
+    ? `开场评级 ${rush.grade ?? "D"} ${rush.score ?? 0}/100 · ${Math.max(0, Math.ceil(openingRushConfig.windowSeconds - (rush.elapsed ?? 0)))}s`
+    : null;
+  const detailText = showcaseText ?? surgeText ?? planText ?? rewardText;
 
   ui.openingTracker.style.setProperty("--opening-progress", `${Math.round(totalProgress * 100)}%`);
   ui.openingTracker.className = [
@@ -6477,11 +6714,12 @@ function renderOpeningSprintTracker() {
     showcase ? "is-showcase" : "",
     showcase?.phase === "retry" ? "is-retry-route" : "",
     showcase?.phase === "combat" ? "is-combat-shot" : "",
+    (rush?.score ?? 0) >= 75 ? "is-rush-hot" : "",
   ].filter(Boolean).join(" ");
   ui.openingTracker.innerHTML = `
     <span>${showcase?.phase === "combat" ? "实战镜头" : showcase?.phase === "retry" ? "推荐再来" : showcase ? "第一波卖点" : "开场牵引"}</span>
     <strong>${showcase ? showcase.title : sprint.completed ? "第一条路线已接通" : step.title}</strong>
-    <small>${showcaseText ?? surgeText ?? planText ?? rewardText}</small>
+    <small>${[rushText, detailText].filter(Boolean).join(" · ")}</small>
   `;
 }
 
@@ -6680,6 +6918,7 @@ function updatePlaying(dt) {
   updateStarterIgnition(dt);
   updateOpeningSurge(dt);
   updateOpeningSprint(dt);
+  updateOpeningRush(dt);
   updateOpeningShowcase(dt);
   updateChapterShowcase(dt);
   if (world.mode !== "playing") {
@@ -8924,6 +9163,7 @@ function renderResultStats(victory) {
     ["升级", `${runStats?.upgradesChosen?.length ?? 0} / 信物 ${runStats?.relicsChosen?.length ?? 0}`],
     ["共鸣", `${runStats?.synergiesUnlocked?.length ?? 0} 次`],
     ["最佳连段", `x${runStats?.tempo?.bestStreak ?? 0}`],
+    ["开场评级", formatOpeningRushScore(runStats?.openingRush)],
     ["耗时", `${minutes}:${String(seconds).padStart(2, "0")}`],
     ["构筑", getBuildSummary()],
     ["委托", getRunHookResultText()],
@@ -8960,6 +9200,14 @@ function renderResultInsights(review = archiveState?.lastRunReview) {
       normalized.failureReplay.title,
       `${normalized.failureReplay.summary} 反制：${normalized.failureReplay.counter}`,
       "is-danger",
+    ]);
+  }
+  if (normalized.openingRush?.score > 0) {
+    cards.push([
+      "开场评级",
+      `${normalized.openingRush.grade} ${normalized.openingRush.score}/100`,
+      `${normalized.openingRush.gradeText} 已写入档案最佳开场记录。`,
+      normalized.openingRush.score >= 75 ? "is-boost" : "",
     ]);
   }
   cards.push(["下一把", normalized.nextTitle, normalized.nextText, "is-next"]);
@@ -12771,6 +13019,7 @@ function installAutomationTestHooks() {
         activatedMapInteractives: mapInteractiveArchive.activated,
         totalMapInteractives: mapInteractiveArchive.total,
         completedMapInteractiveChapters: mapInteractiveArchive.completedChapters,
+        bestOpeningRush: formatOpeningRushArchiveBest(archiveState),
       },
       nightHook: runStats?.activeHook ? {
         id: runStats.activeHook.id,
@@ -12799,6 +13048,7 @@ function installAutomationTestHooks() {
         completedStepIds: cloneForSave(runStats.openingSprint.completedStepIds, []),
         surge: cloneForSave(runStats.openingSprint.surge, null),
       } : null,
+      openingRush: runStats?.openingRush ? getOpeningRushSnapshot(runStats.openingRush) : null,
       counts: {
         bugNodes: bugNodes?.length ?? 0,
         enemies: enemies?.length ?? 0,
@@ -13146,6 +13396,63 @@ function installAutomationTestHooks() {
     ui.storyPanel.classList.add("hidden");
     ui.eventPanel.classList.add("hidden");
     activeEvent = null;
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
+    return result;
+  }
+
+  function runOpeningRushRatingProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 80, xp: 0, weaponIndex: 0 });
+    archiveState = {
+      ...createArchiveFallback(),
+      calibrationShards: 0,
+      bestOpeningRushScore: 0,
+      bestOpeningRushGrade: "D",
+      lastOpeningRush: null,
+    };
+    runStats.openingRush = createOpeningRushState();
+    runStats.openingSprint = createOpeningSprintState();
+    world.mode = "playing";
+
+    completeOpeningRushMilestone("anomaly");
+    updateOpeningRush(7.5);
+    completeOpeningRushMilestone("surge");
+    updateOpeningRush(8.4);
+    completeOpeningRushMilestone("overclock");
+    updateOpeningRush(4.6);
+    completeOpeningRushMilestone("retry-route");
+    syncHud();
+    const trackerText = ui.openingTracker?.textContent ?? "";
+    const rushBeforeArchive = getOpeningRushSnapshot(runStats.openingRush);
+    const archived = recordOpeningRushInArchive(runStats.openingRush);
+    saveArchive();
+    world.mode = "menu";
+    renderStartMenu();
+    const startStatsText = ui.startStats?.textContent ?? "";
+
+    const result = {
+      ok: rushBeforeArchive.score === 100
+        && rushBeforeArchive.grade === "S"
+        && rushBeforeArchive.completedIds.length === openingRushConfig.milestones.length
+        && trackerText.includes("开场评级")
+        && trackerText.includes("100/100")
+        && archived.score === 100
+        && archiveState.bestOpeningRushScore === 100
+        && archiveState.bestOpeningRushGrade === "S"
+        && startStatsText.includes("最佳开场")
+        && startStatsText.includes("S 100/100"),
+      rush: rushBeforeArchive,
+      archived,
+      trackerText,
+      startStatsText,
+      archive: {
+        bestOpeningRushScore: archiveState.bestOpeningRushScore,
+        bestOpeningRushGrade: archiveState.bestOpeningRushGrade,
+        lastOpeningRush: cloneForSave(archiveState.lastOpeningRush, null),
+      },
+    };
+    deleteRunSave();
     archiveState = previousArchive ?? loadArchive();
     saveArchive();
     return result;
@@ -14016,6 +14323,7 @@ function installAutomationTestHooks() {
     const openingSprint = runOpeningSprintProbe();
     const openingSurge = runOpeningSurgeProbe();
     const openingGuidance = runOpeningGuidanceProbe();
+    const openingRushRating = runOpeningRushRatingProbe();
     const hitFeedback = runHitFeedbackProbe();
     const fairWarning = runFairWarningProbe();
     const failureReplay = runFailureReplayProbe();
@@ -14045,6 +14353,9 @@ function installAutomationTestHooks() {
     }
     if (!openingGuidance.ok) {
       failures.push("opening weapon and anomaly guidance failed");
+    }
+    if (!openingRushRating.ok) {
+      failures.push("opening rush rating failed");
     }
     if (!hitFeedback.ok) {
       failures.push("weapon hit feedback failed");
@@ -14154,6 +14465,7 @@ function installAutomationTestHooks() {
       openingSprint,
       openingSurge,
       openingGuidance,
+      openingRushRating,
       hitFeedback,
       fairWarning,
       failureReplay,
@@ -14180,6 +14492,7 @@ function installAutomationTestHooks() {
     runOpeningSprintProbe,
     runOpeningSurgeProbe,
     runOpeningGuidanceProbe,
+    runOpeningRushRatingProbe,
     runHitFeedbackProbe,
     runFairWarningProbe,
     runFailureReplayProbe,
