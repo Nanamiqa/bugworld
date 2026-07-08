@@ -1380,10 +1380,11 @@ const openingSurgeConfig = {
 const openingRushConfig = {
   windowSeconds: 30,
   milestones: [
-    { id: "anomaly", label: "首个异常", score: 28 },
-    { id: "surge", label: "裂隙清场", score: 30 },
-    { id: "overclock", label: "武器超频", score: 32 },
-    { id: "retry-route", label: "推荐路线", score: 10 },
+    { id: "anomaly", label: "首个异常", shortLabel: "首异常", score: 28 },
+    { id: "surge", label: "裂隙清场", shortLabel: "裂隙", score: 30 },
+    { id: "first-strike", label: "先手截击", shortLabel: "先手", score: 8 },
+    { id: "overclock", label: "武器超频", shortLabel: "超频", score: 32 },
+    { id: "retry-route", label: "推荐路线", shortLabel: "路线", score: 10 },
   ],
   grades: [
     { grade: "S", min: 90, title: "S级开场", text: "首个异常、裂隙清场和武器超频在 30 秒内连成了完整爽点。" },
@@ -3571,6 +3572,25 @@ function calculateOpeningRushScore(completedIds = []) {
   );
 }
 
+function getOpeningRushSourceText(rush = runStats?.openingRush) {
+  const snapshot = getOpeningRushSnapshot(rush);
+  const labels = openingRushConfig.milestones
+    .filter((milestone) => snapshot.completedIds.includes(milestone.id))
+    .map((milestone) => `${milestone.shortLabel ?? milestone.label}+${milestone.score}`);
+  return labels.length ? labels.join(" / ") : "尚未形成得分来源";
+}
+
+function canCoachOpeningRushMilestone(milestone, rush = runStats?.openingRush) {
+  if (milestone?.id !== "first-strike") {
+    return true;
+  }
+  const surge = runStats?.openingSprint?.surge;
+  if (!surge || surge.completed || surge.failed || surge.firstStrikeClaimed) {
+    return false;
+  }
+  return enemies.some((enemy) => enemy.openingSurge && (enemy.openingSurgeArmTime ?? 0) > 0);
+}
+
 function createOpeningRushState(value = {}) {
   const completedIds = Array.isArray(value.completedIds)
     ? [...new Set(value.completedIds.filter((id) => getOpeningRushMilestone(id)))]
@@ -3734,7 +3754,9 @@ function getOpeningRushCoachText(rush = runStats?.openingRush) {
   if (snapshot.score >= 90) {
     return `S级已达成 · ${secondsLeft}s 内继续滚连段`;
   }
-  const nextMilestone = openingRushConfig.milestones.find((milestone) => !snapshot.completedIds.includes(milestone.id));
+  const nextMilestone = openingRushConfig.milestones.find((milestone) => (
+    !snapshot.completedIds.includes(milestone.id) && canCoachOpeningRushMilestone(milestone, rush)
+  ));
   if (!nextMilestone) {
     return `追S还差 ${Math.max(0, 90 - snapshot.score)} 分 · 继续清最近异常`;
   }
@@ -3747,6 +3769,9 @@ function getOpeningRushCoachText(rush = runStats?.openingRush) {
         ? "清黄框裂隙"
         : "准备第一波裂隙";
     return `追S：${nextMilestone.label} +${nextMilestone.score} · ${routeHint} · ${secondsLeft}s`;
+  }
+  if (nextMilestone.id === "first-strike") {
+    return `追S：${nextMilestone.label} +${nextMilestone.score} · 接怪窗口内先命中 · ${secondsLeft}s`;
   }
   const shortfall = Math.max(0, 90 - snapshot.score);
   return `追S：${nextMilestone.label} +${nextMilestone.score} · 还差 ${shortfall} 分 · ${secondsLeft}s`;
@@ -3961,6 +3986,7 @@ function claimOpeningSurgeFirstStrike(enemy, source = "weapon") {
   burst(player.x, player.y, "#5de2d1", 10);
   playAudioCue("pickup");
   setLog(`先手截击：在接怪窗口命中裂隙异常，+${bugReward} bug点数${hpReward ? `，+${hpReward} 生命` : ""}。`);
+  completeOpeningRushMilestone("first-strike");
   saveRunCheckpoint("opening-surge-first-strike");
   return true;
 }
@@ -4620,6 +4646,7 @@ function createRunReview(victory) {
   const openingComplete = Boolean(runStats?.openingSprint?.completed);
   const starterComplete = Boolean(runStats?.starterIgnition?.completed);
   const openingRush = getOpeningRushSnapshot(runStats?.openingRush);
+  const openingFirstStrike = openingRush.completedIds.includes("first-strike");
   const deviceCount = runStats?.mapInteractivesActivated?.length ?? 0;
   const build = chooseReviewStarterBuild(victory);
   const weapon = getWeaponById(build?.weaponId);
@@ -4630,13 +4657,16 @@ function createRunReview(victory) {
     : `本局处理 ${eventsResolved} 个异常、击破 ${defeats} 个实体，已经留下局外收益。`;
   if (openingRush.score >= 90) {
     highlightTitle = openingRush.gradeTitle;
-    highlightText = openingRush.gradeText;
+    highlightText = `${openingRush.gradeText} 得分来源：${getOpeningRushSourceText(openingRush)}。`;
+  } else if (openingFirstStrike) {
+    highlightTitle = "先手截击抢到窗口";
+    highlightText = "快递裂隙落地时完成窗口内命中，已经把第一波从被动接怪变成主动抢节奏。";
   } else if (starterComplete) {
     highlightTitle = "流派已经起火";
     highlightText = "推荐流派完成启动超频，下一把可以直接围绕它拿强化。";
   } else if (openingRush.score >= 75) {
     highlightTitle = openingRush.gradeTitle;
-    highlightText = openingRush.gradeText;
+    highlightText = `${openingRush.gradeText} 得分来源：${getOpeningRushSourceText(openingRush)}。`;
   } else if (deviceCount > 0) {
     highlightTitle = `装置启动 x${deviceCount}`;
     highlightText = "本局已经把地图装置转化成战斗收益，探索路线开始反哺构筑节奏。";
@@ -6871,8 +6901,11 @@ function renderOpeningSprintTracker() {
       ? `${openingSurgeConfig.label}已清场 · ${surge.firstStrikeClaimed ? "先手截击 · " : ""}连段与流派提速`
       : null;
   const rush = runStats?.openingRush;
+  const rushMilestoneText = rush?.lastMilestone && (rush.flash ?? 0) > 0
+    ? ` · 点亮 ${rush.lastMilestone}`
+    : "";
   const rushText = rush
-    ? `开场评级 ${rush.grade ?? "D"} ${rush.score ?? 0}/100 · ${Math.max(0, Math.ceil(openingRushConfig.windowSeconds - (rush.elapsed ?? 0)))}s`
+    ? `开场评级 ${rush.grade ?? "D"} ${rush.score ?? 0}/100${rushMilestoneText} · ${Math.max(0, Math.ceil(openingRushConfig.windowSeconds - (rush.elapsed ?? 0)))}s`
     : null;
   const rushCoachText = getOpeningRushCoachText(rush);
   const detailText = [showcaseText ?? surgeText ?? planText ?? rewardText, rushCoachText].filter(Boolean).join(" · ");
@@ -9343,6 +9376,7 @@ function renderResultStats(victory) {
     ["共鸣", `${runStats?.synergiesUnlocked?.length ?? 0} 次`],
     ["最佳连段", `x${runStats?.tempo?.bestStreak ?? 0}`],
     ["开场评级", formatOpeningRushScore(runStats?.openingRush)],
+    ["评级来源", getOpeningRushSourceText(runStats?.openingRush)],
     ["耗时", `${minutes}:${String(seconds).padStart(2, "0")}`],
     ["构筑", getBuildSummary()],
     ["委托", getRunHookResultText()],
@@ -9385,7 +9419,7 @@ function renderResultInsights(review = archiveState?.lastRunReview) {
     cards.push([
       "开场评级",
       `${normalized.openingRush.grade} ${normalized.openingRush.score}/100`,
-      `${normalized.openingRush.gradeText} 已写入档案最佳开场记录。`,
+      `${normalized.openingRush.gradeText} 得分来源：${getOpeningRushSourceText(normalized.openingRush)}。已写入档案最佳开场记录。`,
       normalized.openingRush.score >= 75 ? "is-boost" : "",
     ]);
   }
@@ -13580,6 +13614,7 @@ function installAutomationTestHooks() {
     syncHud();
     const firstStrikeTrackerText = ui.openingTracker?.textContent ?? "";
     const firstStrikeSnapshot = cloneForSave(runStats.openingSprint?.surge, null);
+    const firstStrikeRush = getOpeningRushSnapshot(runStats.openingRush);
     const firstStrikeBugGain = player.bugPoints - beforeFirstStrikeBugPoints;
     const firstStrikeHpGain = player.hp - beforeFirstStrikeHp;
     for (const enemy of spawned.slice(0, openingSurgeConfig.targetDefeats)) {
@@ -13604,6 +13639,7 @@ function installAutomationTestHooks() {
         && spawnGraceReady
         && firstStrikeClaimed
         && Boolean(firstStrikeSnapshot?.firstStrikeClaimed)
+        && firstStrikeRush.completedIds.includes("first-strike")
         && firstStrikeTrackerText.includes("先手截击")
         && firstStrikeBugGain >= openingSurgeConfig.firstStrikeBugPoints
         && firstStrikeHpGain >= openingSurgeConfig.firstStrikeHp
@@ -13623,6 +13659,7 @@ function installAutomationTestHooks() {
       spawnedCount: spawned.length,
       spawnGraceReady,
       surge: cloneForSave(surge, null),
+      firstStrikeRush,
       openingShowcase: {
         spawned: spawnedShowcase,
         firstStrike: firstStrikeSnapshot,
@@ -13813,6 +13850,9 @@ function installAutomationTestHooks() {
     syncHud();
     const coachAfterAnomaly = ui.openingTracker?.textContent ?? "";
     updateOpeningRush(7.5);
+    completeOpeningRushMilestone("first-strike");
+    syncHud();
+    const trackerAfterFirstStrike = ui.openingTracker?.textContent ?? "";
     completeOpeningRushMilestone("surge");
     updateOpeningRush(8.4);
     completeOpeningRushMilestone("overclock");
@@ -13821,29 +13861,53 @@ function installAutomationTestHooks() {
     syncHud();
     const trackerText = ui.openingTracker?.textContent ?? "";
     const rushBeforeArchive = getOpeningRushSnapshot(runStats.openingRush);
+    const sourceText = getOpeningRushSourceText(runStats.openingRush);
     const archived = recordOpeningRushInArchive(runStats.openingRush);
     saveArchive();
     world.mode = "menu";
     renderStartMenu();
     const startStatsText = ui.startStats?.textContent ?? "";
+    const review = normalizeLastRunReview({
+      outcome: "defeat",
+      chapterTitle: currentChapter().title,
+      highlightTitle: rushBeforeArchive.gradeTitle,
+      highlightText: rushBeforeArchive.gradeText,
+      pressureTitle: "继续追先手",
+      pressureText: "下一把继续在接怪窗口内抢第一击。",
+      nextTitle: "再追一把 S",
+      nextText: "首个异常、裂隙、先手截击和超频都能在 30 秒内串起来。",
+      recommendedStarterBuildId: "queue-barrage",
+      openingRush: rushBeforeArchive,
+      at: Date.now(),
+    });
+    renderResultInsights(review);
+    const insightsText = ui.resultInsights?.textContent ?? "";
 
     const result = {
       ok: rushBeforeArchive.score === 100
         && rushBeforeArchive.grade === "S"
         && rushBeforeArchive.completedIds.length === openingRushConfig.milestones.length
+        && rushBeforeArchive.completedIds.includes("first-strike")
         && coachAfterAnomaly.includes("追S")
         && coachAfterAnomaly.includes("裂隙清场")
+        && trackerAfterFirstStrike.includes("先手截击")
         && trackerText.includes("开场评级")
         && trackerText.includes("100/100")
+        && sourceText.includes("先手+8")
         && archived.score === 100
         && archived.grade === "S"
+        && insightsText.includes("得分来源")
+        && insightsText.includes("先手+8")
         && Math.max(archived.score, Math.trunc(Number(archiveState.bestOpeningRushScore) || 0)) >= 90
         && startStatsText.includes("最佳开场")
         && startStatsText.includes("S "),
       rush: rushBeforeArchive,
       archived,
       coachAfterAnomaly,
+      trackerAfterFirstStrike,
       trackerText,
+      sourceText,
+      insightsText,
       startStatsText,
       archive: {
         bestOpeningRushScore: archiveState.bestOpeningRushScore,
@@ -13851,6 +13915,7 @@ function installAutomationTestHooks() {
         lastOpeningRush: cloneForSave(archiveState.lastOpeningRush, null),
       },
     };
+    ui.resultInsights.innerHTML = "";
     deleteRunSave();
     archiveState = previousArchive ?? loadArchive();
     saveArchive();
