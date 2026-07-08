@@ -1404,6 +1404,54 @@ const chapterShowcaseConfigs = {
     bossLabel: "申诉窗口",
   },
 };
+const chapterCombatStoreShotConfigs = {
+  "chapter-2-combat": {
+    chapterIndex: 1,
+    enemyType: "deadline",
+    weaponIndex: 1,
+    enemyOffset: { x: 142, y: -44 },
+    bossOffset: { x: 328, y: 74 },
+    hazardType: "enemyTrail",
+    hazardColor: "#ef6a70",
+    objective: "第二章实战镜头：读准闸门节拍，穿过冲刺红线",
+    log: "商店截图：准点闸门、冲刺红线、二拍落点和键盘宏弹幕必须同屏可读。",
+  },
+  "chapter-3-combat": {
+    chapterIndex: 2,
+    enemyType: "queueSnake",
+    weaponIndex: 1,
+    enemyOffset: { x: 150, y: 50 },
+    bossOffset: { x: 320, y: -88 },
+    hazardType: "enemyTrail",
+    hazardColor: "#f1c15b",
+    objective: "第三章实战镜头：在盐雨拖尾里找索引锁窗口",
+    log: "商店截图：盐值灯串、队列拖尾、索引锁弱点和弹幕覆盖展示夜市场景。",
+  },
+  "chapter-4-combat": {
+    chapterIndex: 3,
+    enemyType: "promise",
+    weaponIndex: 2,
+    allies: ["qiao-you"],
+    enemyOffset: { x: 132, y: 92 },
+    bossOffset: { x: 316, y: 66 },
+    hazardType: "enemyTrail",
+    hazardColor: "#96e072",
+    objective: "第四章实战镜头：用叶灯中继拆开承诺护盾",
+    log: "商店截图：叶灯中继、承诺护盾、责任锚窗口和修正液命中展示根层压迫。",
+  },
+  "chapter-5-combat": {
+    chapterIndex: 4,
+    enemyType: "inspectionProbe",
+    weaponIndex: 0,
+    allies: ["qiao-you", "whitebox"],
+    enemyOffset: { x: 138, y: -52 },
+    bossOffset: { x: 332, y: 76 },
+    hazardType: "scanLock",
+    hazardColor: "#72a5ff",
+    objective: "第五章实战镜头：在点名扫描里提交申诉窗口",
+    log: "商店截图：差异控制台、点名扫描、申诉窗口和断点特效说明终局反制方式。",
+  },
+};
 const starterBuilds = [
   {
     id: "precision-breakpoint",
@@ -4735,6 +4783,147 @@ function addStoreBullets(target = enemies[0] ?? cleaners[0] ?? boss) {
   }
 }
 
+function getChapterCombatStoreShotConfig(mode = storeShotMode) {
+  return chapterCombatStoreShotConfigs[mode] ?? null;
+}
+
+function addChapterCombatStoreHazard(config, target) {
+  const anchor = target ?? player;
+  if (!anchor) {
+    return;
+  }
+  const radius = config.hazardType === "scanLock" ? 108 : 82;
+  enemyHazards.push({
+    type: config.hazardType ?? "enemyTrail",
+    x: anchor.x,
+    y: anchor.y,
+    radius,
+    life: 3.8,
+    maxLife: 4.2,
+    color: config.hazardColor ?? "#72a5ff",
+    armed: true,
+    damage: 0,
+    hitCooldown: 0,
+  });
+}
+
+function stageChapterCombatStoreBoss(config) {
+  startBossFight(chapters[config.chapterIndex]?.boss?.id);
+  if (!boss) {
+    return null;
+  }
+
+  const offset = config.bossOffset ?? { x: 320, y: 72 };
+  const bossPoint = findNearestFreePoint(
+    clamp(player.x + (offset.x ?? 320), 84, world.width - 84),
+    clamp(player.y + (offset.y ?? 72), 118, world.height - 84),
+    boss.radius ?? 34
+  );
+  boss.x = bossPoint.x;
+  boss.y = bossPoint.y;
+  resolveDeskCollision(boss);
+  boss.hp = Math.max(1, boss.maxHp * (config.bossHpRatio ?? 0.62));
+  boss.attackCooldown = Math.max(boss.attackCooldown ?? 0, 4);
+  boss.hitFlash = Math.max(boss.hitFlash ?? 0, 0.78);
+  updateBoss(0.16);
+  boss.lastRoute = {
+    x1: boss.x - 240,
+    y1: boss.y - 76,
+    x2: boss.x + 220,
+    y2: boss.y + 92,
+  };
+  protocolHazards.push({
+    type: "retransmit",
+    x1: boss.x - 270,
+    y1: boss.y + 132,
+    x2: boss.x + 230,
+    y2: boss.y + 132,
+    activeTime: 1.4,
+    maxActiveTime: 1.4,
+    radius: 40,
+    damage: 0,
+  });
+  return boss;
+}
+
+function configureChapterCombatStoreShotMode(mode = storeShotMode) {
+  const config = getChapterCombatStoreShotConfig(mode);
+  if (!config) {
+    return false;
+  }
+
+  const chapterIndex = clamp(config.chapterIndex, 1, chapters.length - 1);
+  const map = chapterMaps[chapterIndex] ?? chapterMaps[0];
+  const device = getMapInteractives(map)[0] ?? null;
+  const focusAnchor = device ?? map.start ?? { x: 170, y: 560 };
+  resetStoreRun(chapterIndex, {
+    focus: focusAnchor,
+    weaponIndex: config.weaponIndex ?? 1,
+    allies: config.allies ?? ["qiao-you"],
+    objective: config.objective,
+    log: config.log,
+    projectileCount: config.projectileCount ?? 4,
+    level: config.level ?? 8,
+    xp: 0,
+    bugPoints: config.bugPoints ?? 8,
+    fixed: config.fixed ?? 5,
+    backlash: config.backlash ?? 28 + chapterIndex * 3,
+    stepIndex: 2,
+  });
+  runStats.chapterShowcase = null;
+  activateChapterShowcase("store-shot", { hold: 28, callout: "商店截图实战镜头" });
+
+  const liveDevice = getMapInteractives()[0] ?? null;
+  if (liveDevice) {
+    const devicePoint = findNearestFreePoint(liveDevice.x, liveDevice.y, player.radius);
+    player.x = devicePoint.x;
+    player.y = devicePoint.y;
+    centerCameraOnPlayer();
+    activateMapInteractive(liveDevice);
+  }
+  player.pendingLevelUps = 0;
+  hidePanels();
+  world.mode = "playing";
+
+  const stagedBoss = stageChapterCombatStoreBoss({ ...config, chapterIndex });
+  const enemyOffset = config.enemyOffset ?? { x: 142, y: -48 };
+  const enemyPoint = findNearestFreePoint(
+    clamp(player.x + (enemyOffset.x ?? 142), 72, world.width - 72),
+    clamp(player.y + (enemyOffset.y ?? -48), 104, world.height - 72),
+    28
+  );
+  const target = spawnEnemyNear(enemyPoint.x, enemyPoint.y, config.enemyType ?? "deadline", {
+    hpMultiplier: 0.64,
+    speedMultiplier: 0.68,
+    mechanicDepth: 1,
+  });
+  addChapterCombatStoreHazard(config, target);
+  if (target?.mechanic) {
+    markChapterShowcase("mechanic", {
+      trigger: "store-shot-enemy",
+      callout: getChapterShowcaseConfig(chapterIndex)?.hook ?? "敌人机制已入镜",
+      x: target.x,
+      y: target.y,
+    });
+  }
+  centerCameraOnPlayer();
+  const hitTarget = target ?? enemies[0] ?? cleaners[0] ?? stagedBoss;
+  if (hitTarget && player.weapon) {
+    const profile = getWeaponImpactProfile(player.weapon.id, false);
+    spawnWeaponImpactFeedback(hitTarget, {
+      weaponId: player.weapon.id,
+      charged: false,
+      impactProfile: profile,
+      vx: player.weapon.bulletSpeed ?? 0,
+      vy: 0,
+    }, 24);
+  }
+  updateChapterShowcase(0.35);
+  syncHud();
+  window.__variableCityStoreShotReady = true;
+  return true;
+}
+
 function configureStoreShotMode() {
   document.documentElement.dataset.storeShot = storeShotMode;
   gameSettings = {
@@ -4824,6 +5013,10 @@ function configureStoreShotMode() {
     centerCameraOnPlayer();
     syncHud();
     window.__variableCityStoreShotReady = true;
+    return;
+  }
+
+  if (configureChapterCombatStoreShotMode(storeShotMode)) {
     return;
   }
 
@@ -13367,6 +13560,67 @@ function installAutomationTestHooks() {
     };
   }
 
+  function runChapterCombatStoreShotProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    const previousReady = window.__variableCityStoreShotReady;
+    const results = [];
+
+    for (const [mode, config] of Object.entries(chapterCombatStoreShotConfigs)) {
+      window.__variableCityStoreShotReady = false;
+      const configured = configureChapterCombatStoreShotMode(mode);
+      const expectedMapId = chapterMaps[config.chapterIndex]?.id ?? null;
+      const showcase = cloneForSave(runStats?.chapterShowcase, null);
+      const checklist = showcase?.checklist ?? {};
+      const visibleBoss = Boolean(boss && isPointInCurrentCamera(boss.x, boss.y, -60));
+      const visibleEnemy = enemies.some((enemy) => enemy.type === config.enemyType && isPointInCurrentCamera(enemy.x, enemy.y, -60));
+      const visibleHazard = enemyHazards.some((hazard) => hazard.type === config.hazardType && isPointInCurrentCamera(hazard.x, hazard.y, -60));
+      const visibleEffect = particles.some((particle) => particle.type === "impact" && isPointInCurrentCamera(particle.x, particle.y, -60));
+      results.push({
+        ok: configured
+          && window.__variableCityStoreShotReady === true
+          && currentChapterIndex === config.chapterIndex
+          && world.mode === "playing"
+          && player.weapon?.id
+          && boss?.phase >= 2
+          && showcase?.mapId === expectedMapId
+          && checklist.device
+          && checklist.mechanic
+          && checklist.boss
+          && checklist.effect
+          && checklist.ready
+          && Boolean(showcase?.completed)
+          && visibleBoss
+          && visibleEnemy
+          && visibleHazard
+          && visibleEffect,
+        mode,
+        chapterIndex: config.chapterIndex,
+        mapId: expectedMapId,
+        weaponId: player.weapon?.id ?? null,
+        enemyType: config.enemyType,
+        bossId: boss?.id ?? null,
+        bossPhase: boss?.phase ?? 0,
+        visible: {
+          boss: visibleBoss,
+          enemy: visibleEnemy,
+          hazard: visibleHazard,
+          effect: visibleEffect,
+        },
+        checklist,
+        showcase,
+      });
+    }
+
+    deleteRunSave();
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
+    window.__variableCityStoreShotReady = previousReady;
+    return {
+      ok: results.length === Object.keys(chapterCombatStoreShotConfigs).length && results.every((result) => result.ok),
+      results,
+    };
+  }
+
   function runStarterBuildProbe() {
     const previousArchive = cloneForSave(archiveState, null);
     const build = starterBuilds[0];
@@ -13768,6 +14022,7 @@ function installAutomationTestHooks() {
     const resultReview = runResultReviewProbe();
     const retryCombatShowcase = runRetryCombatShowcaseProbe();
     const chapterShowcase = runChapterShowcaseProbe();
+    const chapterCombatStoreShots = runChapterCombatStoreShotProbe();
     const starterBuild = runStarterBuildProbe();
 
     if (!metaProgression.ok) {
@@ -13808,6 +14063,9 @@ function installAutomationTestHooks() {
     }
     if (!chapterShowcase.ok) {
       failures.push("chapter combat showcase failed");
+    }
+    if (!chapterCombatStoreShots.ok) {
+      failures.push("chapter combat storeShot routes failed");
     }
     if (!starterBuild.ok) {
       failures.push("starter build quick start failed");
@@ -13902,6 +14160,7 @@ function installAutomationTestHooks() {
       resultReview,
       retryCombatShowcase,
       chapterShowcase,
+      chapterCombatStoreShots,
       starterBuild,
       chapters: chaptersCovered,
       finalSnapshot: snapshot({ action: "routePressureComplete" }),
@@ -13928,6 +14187,7 @@ function installAutomationTestHooks() {
     runResultReviewProbe,
     runRetryCombatShowcaseProbe,
     runChapterShowcaseProbe,
+    runChapterCombatStoreShotProbe,
     runStarterBuildProbe,
     runRoutePressureTest,
   };
