@@ -435,6 +435,55 @@ h1 {
   font-size: 0.76rem;
 }
 
+.opening-rush-chips {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.opening-rush-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+  min-width: 0;
+  padding: 4px 5px;
+  border: 1px solid rgba(52, 65, 94, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.opening-rush-chip b {
+  color: inherit;
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
+.opening-rush-chip.is-done {
+  border-color: rgba(15, 159, 149, 0.28);
+  background: rgba(239, 250, 249, 0.9);
+  color: var(--cyan);
+}
+
+.opening-rush-chip.is-hot {
+  border-color: rgba(201, 132, 22, 0.45);
+  background: rgba(255, 248, 232, 0.96);
+  color: var(--amber);
+  box-shadow: 0 6px 16px rgba(201, 132, 22, 0.12);
+}
+
+.opening-rush-chip.is-missed {
+  border-color: rgba(52, 65, 94, 0.12);
+  background: rgba(235, 238, 244, 0.68);
+  color: rgba(73, 86, 112, 0.72);
+}
+
 .hook-tracker.is-completed {
   border-color: rgba(201, 132, 22, 0.38);
   background: rgba(255, 248, 232, 0.82);
@@ -1822,5 +1871,9 @@ h1 {
   .system-choice-grid,
   .system-choice-grid.compact {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .opening-rush-chips {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

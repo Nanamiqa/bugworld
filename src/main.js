@@ -3580,6 +3580,43 @@ function getOpeningRushSourceText(rush = runStats?.openingRush) {
   return labels.length ? labels.join(" / ") : "尚未形成得分来源";
 }
 
+function getOpeningRushChipState(milestone, rush = runStats?.openingRush) {
+  const completedIds = Array.isArray(rush?.completedIds) ? rush.completedIds : [];
+  const completed = completedIds.includes(milestone.id);
+  const hot = completed && rush?.lastMilestone === milestone.label && (rush.flash ?? 0) > 0;
+  const surge = runStats?.openingSprint?.surge;
+  const missed = milestone.id === "first-strike"
+    && !completed
+    && Boolean(surge?.spawned)
+    && !canCoachOpeningRushMilestone(milestone, rush);
+  return { completed, hot, missed };
+}
+
+function renderOpeningRushChips(rush = runStats?.openingRush) {
+  if (!rush) {
+    return "";
+  }
+  return `
+    <div class="opening-rush-chips" aria-label="开场评级来源">
+      ${openingRushConfig.milestones.map((milestone) => {
+        const state = getOpeningRushChipState(milestone, rush);
+        const className = [
+          "opening-rush-chip",
+          state.completed ? "is-done" : "",
+          state.hot ? "is-hot" : "",
+          state.missed ? "is-missed" : "",
+        ].filter(Boolean).join(" ");
+        return `
+          <span class="${className}">
+            ${state.completed ? "✓" : state.missed ? "×" : "·"} ${milestone.shortLabel ?? milestone.label}
+            <b>+${milestone.score}</b>
+          </span>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 function canCoachOpeningRushMilestone(milestone, rush = runStats?.openingRush) {
   if (milestone?.id !== "first-strike") {
     return true;
@@ -6908,6 +6945,7 @@ function renderOpeningSprintTracker() {
     ? `开场评级 ${rush.grade ?? "D"} ${rush.score ?? 0}/100${rushMilestoneText} · ${Math.max(0, Math.ceil(openingRushConfig.windowSeconds - (rush.elapsed ?? 0)))}s`
     : null;
   const rushCoachText = getOpeningRushCoachText(rush);
+  const rushChips = renderOpeningRushChips(rush);
   const detailText = [showcaseText ?? surgeText ?? planText ?? rewardText, rushCoachText].filter(Boolean).join(" · ");
 
   ui.openingTracker.style.setProperty("--opening-progress", `${Math.round(totalProgress * 100)}%`);
@@ -6924,6 +6962,7 @@ function renderOpeningSprintTracker() {
     <span>${showcase?.phase === "preview" ? "裂隙预告" : showcase?.phase === "combat" ? "实战镜头" : showcase?.phase === "retry" ? "推荐再来" : showcase ? "第一波卖点" : "开场牵引"}</span>
     <strong>${showcase ? showcase.title : sprint.completed ? "第一条路线已接通" : step.title}</strong>
     <small>${[rushText, detailText].filter(Boolean).join(" · ")}</small>
+    ${rushChips}
   `;
 }
 
@@ -13807,6 +13846,9 @@ function installAutomationTestHooks() {
         && previewTrackerText.includes("后刷新")
         && previewTrackerText.includes("追S")
         && previewTrackerText.includes("裂隙清场")
+        && previewTrackerText.includes("首异常")
+        && previewTrackerText.includes("先手")
+        && previewTrackerText.includes("+8")
         && previewDelay !== null
         && previewDelay >= 0.8
         && previewLandingPoints.length === openingSurgeConfig.targetDefeats
@@ -13815,6 +13857,8 @@ function installAutomationTestHooks() {
         && spawnedTrackerText.includes("第一波卖点")
         && spawnedTrackerText.includes("接怪窗口")
         && spawnedTrackerText.includes("命中触发先手截击")
+        && spawnedTrackerText.includes("裂隙")
+        && spawnedTrackerText.includes("超频")
         && spawnGraceReady
         && spawned.length >= openingSurgeConfig.targetDefeats,
       previewShowcase,
@@ -13890,7 +13934,11 @@ function installAutomationTestHooks() {
         && rushBeforeArchive.completedIds.includes("first-strike")
         && coachAfterAnomaly.includes("追S")
         && coachAfterAnomaly.includes("裂隙清场")
+        && coachAfterAnomaly.includes("首异常")
+        && coachAfterAnomaly.includes("先手")
         && trackerAfterFirstStrike.includes("先手截击")
+        && trackerAfterFirstStrike.includes("先手")
+        && trackerAfterFirstStrike.includes("+8")
         && trackerText.includes("开场评级")
         && trackerText.includes("100/100")
         && sourceText.includes("先手+8")
