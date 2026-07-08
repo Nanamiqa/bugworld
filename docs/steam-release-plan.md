@@ -132,4 +132,5 @@
 - [x] 将第二至五章章节实战镜头转成可复用商店截图素材：新增 `chapter-combat-showcase-candidates-v1.png`，每章展示装置、敌人机制、Boss 窗口和武器特效四项卖点，并纳入商店素材 manifest 与复核校验。
 - [x] 将章节实战候选图拆成可排序的单张商店截图：新增第二至五章 4 张 1920x1080 ready 截图，更新 Steam 截图顺序为 10 张，并重建 contact sheet 复核图。
 - [x] 将新增章节实战截图从生成候选进一步接入真实 `storeShot=chapter-X-combat` 捕获路由：第二至五章会从可玩版本直接搭建装置、章节敌人机制、Boss 弱点窗口和武器特效，并由 `runChapterCombatStoreShotProbe` 纳入路线压测；已重新捕获 10 张 1920x1080 商店截图。
-- [ ] 下一轮继续提升 Steam 页面第一眼说服力：让截图捕获脚本等待 `window.__variableCityStoreShotReady` 并支持按截图 ID 局部捕获，同时复核四张章节实战图在 contact sheet 中的首屏卖点密度。
+- [x] 升级商店截图捕获脚本：新增 Node/CDP 捕获器，等待 `window.__variableCityStoreShotReady` 后截图，并支持 `-OnlyId` 按截图 ID 局部重捕；`npm run check` 已纳入新捕获器语法检查。
+- [ ] 下一轮继续提升 Steam 页面第一眼说服力：复核四张章节实战图在 contact sheet 中的首屏卖点密度，并继续压测首局 30 秒钩子是否稳定形成“再来一把”的爽点。

@@ -12,7 +12,7 @@
 - `desktop/steam/store-assets/store-assets.json`：capsule、截图、宣传片镜头和中英文短描述清单。
 - `desktop/steam/store-assets/capsules.html`：使用现有 key art 排版的 capsule source board。
 - `desktop/tools/export-store-capsules.ps1`：使用现有 key art 和 manifest 导出 Steam capsule PNG。
-- `desktop/tools/capture-store-screenshots.ps1`：启动本地静态服务器，用 Edge / Chrome headless 捕获商店截图。
+- `desktop/tools/capture-store-screenshots.ps1`：转发到 Node/CDP 捕获器，启动本地静态服务器，用 Edge / Chrome headless 等待 `window.__variableCityStoreShotReady` 后捕获商店截图。
 - `desktop/tools/export-store-contact-sheet.ps1`：把最终截图展示顺序导出为 1920 x 1080 复核图。
 - `desktop/tools/export-store-content-preview.ps1`：把中英文商店页文案导出为人工复核预览图。
 - `desktop/tools/export-steam-announcement-assets.ps1`：导出 Demo 公告 cover/header 图。
@@ -74,6 +74,14 @@ npm run export:store-capsules
 ```powershell
 npm run capture:store-screenshots
 ```
+
+只重捕某一张截图时使用截图 ID：
+
+```powershell
+npm run capture:store-screenshots -- screenshot_07_metro_combat_showcase
+```
+
+直接运行 PowerShell 脚本时也可以使用 `-OnlyId screenshot_07_metro_combat_showcase`。
 
 输出文件：
 
