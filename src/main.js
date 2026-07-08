@@ -3125,7 +3125,7 @@ function createOpeningShowcaseChecklist(value = {}) {
 }
 
 function normalizeOpeningShowcasePhase(phase) {
-  if (phase === "cleared" || phase === "retry" || phase === "combat") {
+  if (phase === "preview" || phase === "cleared" || phase === "retry" || phase === "combat") {
     return phase;
   }
   return "spawned";
@@ -3141,9 +3141,12 @@ function createOpeningShowcaseState(phase = "spawned", options = {}) {
       ? "推荐再来 30 秒路线"
       : normalizedPhase === "combat"
         ? "推荐再来实战镜头"
+        : normalizedPhase === "preview"
+          ? "下一波裂隙预告"
       : "第一波截图高光";
   const defaultFocus = `${weapon.name ?? "当前武器"}、快递裂隙、开场牵引和连段奖励同屏可读。`;
-  const focus = options.screenshotFocus ?? plan?.screenshotFocus ?? defaultFocus;
+  const previewFocus = `${weapon.name ?? "当前武器"}准备好，下一波快递裂隙将在黄框处刷新。`;
+  const focus = options.screenshotFocus ?? plan?.screenshotFocus ?? (normalizedPhase === "preview" ? previewFocus : defaultFocus);
   return {
     id: "opening-first-wave-showcase",
     phase: normalizedPhase,
@@ -3159,6 +3162,8 @@ function createOpeningShowcaseState(phase = "spawned", options = {}) {
           ? "复盘路线已带入，先按这条线打"
           : normalizedPhase === "combat"
             ? "同屏检查：目标 / 敌群 / 特效 / 奖励"
+            : normalizedPhase === "preview"
+              ? "黄框预告：下一波裂隙马上刷新"
           : "先看裂隙，再看武器特效"
     ),
     weaponName: weapon.name ?? "初始武器",
@@ -3169,8 +3174,8 @@ function createOpeningShowcaseState(phase = "spawned", options = {}) {
     defeats: clamp(Math.trunc(Number(options.defeats) || 0), 0, openingSurgeConfig.targetDefeats),
     targetDefeats: openingSurgeConfig.targetDefeats,
     checklist: createOpeningShowcaseChecklist(options.checklist),
-    flash: normalizedPhase === "cleared" ? 2.2 : normalizedPhase === "retry" ? 1.9 : normalizedPhase === "combat" ? 2 : 1.6,
-    hold: normalizedPhase === "cleared" ? 8 : normalizedPhase === "retry" ? 14 : normalizedPhase === "combat" ? 12 : 12,
+    flash: normalizedPhase === "cleared" ? 2.2 : normalizedPhase === "retry" ? 1.9 : normalizedPhase === "combat" ? 2 : normalizedPhase === "preview" ? 1.4 : 1.6,
+    hold: normalizedPhase === "cleared" ? 8 : normalizedPhase === "retry" ? 14 : normalizedPhase === "combat" ? 12 : normalizedPhase === "preview" ? 5 : 12,
     completed: normalizedPhase === "cleared",
   };
 }
@@ -3221,6 +3226,36 @@ function activateOpeningShowcase(phase, surge, options = {}) {
   });
   runStats.openingShowcase = state;
   return state;
+}
+
+function getOpeningSurgePreviewPoint() {
+  const map = currentMap();
+  const anchor = map.stepTargets?.[0]?.[0] ?? {
+    x: player.x + 260,
+    y: player.y,
+  };
+  return findNearestFreePoint(
+    clamp((player.x + anchor.x) / 2 + 42, player.radius + 72, world.width - player.radius - 72),
+    clamp((player.y + anchor.y) / 2, 112, world.height - player.radius - 72),
+    64,
+  );
+}
+
+function activateOpeningSurgePreview(sprint = runStats?.openingSprint) {
+  const surge = sprint?.surge;
+  if (!surge || currentChapterIndex !== 0 || world.mode !== "playing" || surge.spawned || surge.completed || surge.failed) {
+    return null;
+  }
+  const point = getOpeningSurgePreviewPoint();
+  surge.x = point.x;
+  surge.y = point.y;
+  return activateOpeningShowcase("preview", surge, {
+    x: point.x,
+    y: point.y,
+    radius: 190,
+    callout: "黄框预告：下一波裂隙马上刷新",
+    screenshotFocus: `${player.weapon?.name ?? "当前武器"}准备好，沿黄框路线接第一波追击。`,
+  });
 }
 
 function isPointInCurrentCamera(x, y, margin = 28) {
@@ -3678,6 +3713,15 @@ function getOpeningRushCoachText(rush = runStats?.openingRush) {
   if (!nextMilestone) {
     return `追S还差 ${Math.max(0, 90 - snapshot.score)} 分 · 继续清最近异常`;
   }
+  if (nextMilestone.id === "surge") {
+    const phase = runStats?.openingShowcase?.active ? runStats.openingShowcase.phase : "";
+    const routeHint = phase === "preview"
+      ? "跟黄框接第一波"
+      : phase === "spawned" || phase === "combat"
+        ? "清黄框裂隙"
+        : "准备第一波裂隙";
+    return `追S：${nextMilestone.label} +${nextMilestone.score} · ${routeHint} · ${secondsLeft}s`;
+  }
   const shortfall = Math.max(0, 90 - snapshot.score);
   return `追S：${nextMilestone.label} +${nextMilestone.score} · 还差 ${shortfall} 分 · ${secondsLeft}s`;
 }
@@ -3732,6 +3776,7 @@ function completeOpeningSprintStep(sprint, step) {
   sprint.active = !isFinal;
   if (step.id === "first-anomaly") {
     completeOpeningRushMilestone("anomaly");
+    activateOpeningSurgePreview(sprint);
   }
   burst(player.x, player.y, isFinal ? "#5de2d1" : "#72a5ff", isFinal ? 24 : 14);
   playAudioCue(isFinal ? "upgrade-select" : "pickup");
@@ -3762,15 +3807,7 @@ function spawnOpeningSurge(sprint = runStats?.openingSprint) {
     return false;
   }
 
-  const anchor = currentMap().stepTargets?.[0]?.[0] ?? {
-    x: player.x + 260,
-    y: player.y,
-  };
-  const center = findNearestFreePoint(
-    clamp((player.x + anchor.x) / 2 + 42, player.radius + 72, world.width - player.radius - 72),
-    clamp((player.y + anchor.y) / 2, 112, world.height - player.radius - 72),
-    64,
-  );
+  const center = getOpeningSurgePreviewPoint();
   let spawnedCount = 0;
   for (const [index, pattern] of openingSurgeConfig.enemyPattern.entries()) {
     const point = findNearestFreePoint(center.x + pattern.dx - 260, center.y + pattern.dy, 28);
@@ -6756,7 +6793,7 @@ function renderOpeningSprintTracker() {
     (rush?.score ?? 0) >= 75 ? "is-rush-hot" : "",
   ].filter(Boolean).join(" ");
   ui.openingTracker.innerHTML = `
-    <span>${showcase?.phase === "combat" ? "实战镜头" : showcase?.phase === "retry" ? "推荐再来" : showcase ? "第一波卖点" : "开场牵引"}</span>
+    <span>${showcase?.phase === "preview" ? "裂隙预告" : showcase?.phase === "combat" ? "实战镜头" : showcase?.phase === "retry" ? "推荐再来" : showcase ? "第一波卖点" : "开场牵引"}</span>
     <strong>${showcase ? showcase.title : sprint.completed ? "第一条路线已接通" : step.title}</strong>
     <small>${[rushText, detailText].filter(Boolean).join(" · ")}</small>
   `;
@@ -12108,13 +12145,16 @@ function drawOpeningShowcaseOverlay(camera) {
   const hasChecklist = ["retry", "combat"].includes(showcase.phase);
   const checklist = createOpeningShowcaseChecklist(showcase.checklist);
   const checklistReadyCount = openingShowcaseChecklistItems.filter((item) => checklist[item.key]).length;
-  const progress = showcase.phase === "retry"
-    ? 0.34
-    : showcase.phase === "combat"
-      ? checklistReadyCount / openingShowcaseChecklistItems.length
-    : clamp((showcase.defeats ?? 0) / Math.max(1, showcase.targetDefeats ?? openingSurgeConfig.targetDefeats), 0, 1);
+  const previewDelay = runStats?.openingSprint?.surge?.delayRemaining ?? openingSurgeConfig.spawnDelay;
+  const progress = showcase.phase === "preview"
+    ? clamp(1 - previewDelay / Math.max(0.1, openingSurgeConfig.spawnDelay), 0.08, 0.94)
+    : showcase.phase === "retry"
+      ? 0.34
+      : showcase.phase === "combat"
+        ? checklistReadyCount / openingShowcaseChecklistItems.length
+      : clamp((showcase.defeats ?? 0) / Math.max(1, showcase.targetDefeats ?? openingSurgeConfig.targetDefeats), 0, 1);
   const accent = showcase.completed ? "#5de2d1" : showcase.phase === "retry" ? "#72a5ff" : showcase.phase === "combat" ? "#f1c15b" : "#f1c15b";
-  const label = showcase.phase === "retry" ? "RETRY ROUTE" : showcase.phase === "combat" ? "COMBAT SHOT" : "FIRST WAVE";
+  const label = showcase.phase === "preview" ? "NEXT RIFT" : showcase.phase === "retry" ? "RETRY ROUTE" : showcase.phase === "combat" ? "COMBAT SHOT" : "FIRST WAVE";
 
   ctx.save();
   ctx.globalAlpha = 0.54 + flash * 0.08;
@@ -12126,6 +12166,39 @@ function drawOpeningShowcaseOverlay(camera) {
   ctx.globalAlpha = 0.12 + flash * 0.05;
   ctx.fillStyle = accent;
   ctx.fillRect(frameX, frameY, frameW, frameH);
+  if (showcase.phase === "preview") {
+    const playerScreenX = player.x - camera.x;
+    const playerScreenY = player.y - camera.y;
+    const routeAngle = Math.atan2(screenY - playerScreenY, screenX - playerScreenX);
+    ctx.globalAlpha = 0.66 + flash * 0.06;
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 4;
+    ctx.setLineDash([10, 9]);
+    ctx.beginPath();
+    ctx.moveTo(playerScreenX, playerScreenY - 8);
+    ctx.lineTo(screenX, screenY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    [0.38, 0.58, 0.78].forEach((t) => {
+      const arrowX = playerScreenX + (screenX - playerScreenX) * t;
+      const arrowY = playerScreenY + (screenY - playerScreenY) * t - 4;
+      ctx.save();
+      ctx.translate(arrowX, arrowY);
+      ctx.rotate(routeAngle);
+      ctx.fillStyle = accent;
+      ctx.globalAlpha = 0.88;
+      ctx.beginPath();
+      ctx.moveTo(13, 0);
+      ctx.lineTo(-7, -8);
+      ctx.lineTo(-3, 0);
+      ctx.lineTo(-7, 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    });
+    ctx.globalAlpha = 0.94;
+    drawSmallText("下一波裂隙", clamp(screenX - 42, 18, world.viewWidth - 136), clamp(screenY - radius * 0.54, 112, world.viewHeight - 28), "#26364d", 13);
+  }
 
   const cardW = Math.min(420, world.viewWidth - 36);
   const cardH = hasChecklist ? 136 : 92;
@@ -13464,6 +13537,58 @@ function installAutomationTestHooks() {
     return result;
   }
 
+  function runOpeningRouteReadabilityProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 80, xp: 0, weaponIndex: 0 });
+    runStats.eventsResolved = 0;
+    runStats.openingRush = createOpeningRushState();
+    runStats.openingSprint = createOpeningSprintState();
+    player.xp = 0;
+    player.xpToNext = 99;
+    world.mode = "playing";
+
+    runStats.eventsResolved += 1;
+    updateOpeningSprint(0.1);
+    updateOpeningSurge(0.12);
+    syncHud();
+    const previewShowcase = cloneForSave(runStats.openingShowcase, null);
+    const previewTrackerText = ui.openingTracker?.textContent ?? "";
+    const previewDelay = runStats.openingSprint?.surge?.delayRemaining ?? null;
+
+    updateOpeningSurge(openingSurgeConfig.spawnDelay + 0.08);
+    syncHud();
+    const spawnedShowcase = cloneForSave(runStats.openingShowcase, null);
+    const spawnedTrackerText = ui.openingTracker?.textContent ?? "";
+    const spawned = enemies.filter((enemy) => enemy.openingSurge);
+
+    const result = {
+      ok: previewShowcase?.phase === "preview"
+        && Number.isFinite(previewShowcase.x)
+        && Number.isFinite(previewShowcase.y)
+        && previewShowcase.callout.includes("黄框")
+        && previewShowcase.focus.includes("第一波")
+        && previewTrackerText.includes("裂隙预告")
+        && previewTrackerText.includes("黄框")
+        && previewTrackerText.includes("追S")
+        && previewTrackerText.includes("裂隙清场")
+        && previewDelay !== null
+        && previewDelay > 0
+        && spawnedShowcase?.phase === "spawned"
+        && spawnedTrackerText.includes("第一波卖点")
+        && spawned.length >= openingSurgeConfig.targetDefeats,
+      previewShowcase,
+      spawnedShowcase,
+      previewTrackerText,
+      spawnedTrackerText,
+      previewDelay,
+      spawnedCount: spawned.length,
+    };
+    deleteRunSave();
+    archiveState = previousArchive ?? loadArchive();
+    saveArchive();
+    return result;
+  }
+
   function runOpeningRushRatingProbe() {
     const previousArchive = cloneForSave(archiveState, null);
     resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 80, xp: 0, weaponIndex: 0 });
@@ -13601,7 +13726,8 @@ function installAutomationTestHooks() {
             && rush.score >= 90
             && rush.elapsed <= openingRushConfig.windowSeconds
             && Boolean(ignition?.completed)
-            && coachAfterAnomaly.includes("追S"),
+            && coachAfterAnomaly.includes("追S")
+            && coachAfterAnomaly.includes("黄框"),
           weaponId: weapon.id,
           buildId: build?.id ?? null,
           cadence: profile.id,
@@ -14494,6 +14620,7 @@ function installAutomationTestHooks() {
     const openingSprint = runOpeningSprintProbe();
     const openingSurge = runOpeningSurgeProbe();
     const openingGuidance = runOpeningGuidanceProbe();
+    const openingRouteReadability = runOpeningRouteReadabilityProbe();
     const openingRushRating = runOpeningRushRatingProbe();
     const openingRushTiming = runOpeningRushTimingProbe();
     const hitFeedback = runHitFeedbackProbe();
@@ -14525,6 +14652,9 @@ function installAutomationTestHooks() {
     }
     if (!openingGuidance.ok) {
       failures.push("opening weapon and anomaly guidance failed");
+    }
+    if (!openingRouteReadability.ok) {
+      failures.push("opening route readability failed");
     }
     if (!openingRushRating.ok) {
       failures.push("opening rush rating failed");
@@ -14640,6 +14770,7 @@ function installAutomationTestHooks() {
       openingSprint,
       openingSurge,
       openingGuidance,
+      openingRouteReadability,
       openingRushRating,
       openingRushTiming,
       hitFeedback,
@@ -14668,6 +14799,7 @@ function installAutomationTestHooks() {
     runOpeningSprintProbe,
     runOpeningSurgeProbe,
     runOpeningGuidanceProbe,
+    runOpeningRouteReadabilityProbe,
     runOpeningRushRatingProbe,
     runOpeningRushTimingProbe,
     runHitFeedbackProbe,
