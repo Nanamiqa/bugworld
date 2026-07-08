@@ -3665,6 +3665,23 @@ function formatOpeningRushArchiveBest(archive = archiveState) {
   return `${grade} ${score}/100`;
 }
 
+function getOpeningRushCoachText(rush = runStats?.openingRush) {
+  if (!rush) {
+    return "";
+  }
+  const snapshot = getOpeningRushSnapshot(rush);
+  const secondsLeft = Math.max(0, Math.ceil(openingRushConfig.windowSeconds - (rush.elapsed ?? snapshot.elapsed ?? 0)));
+  if (snapshot.score >= 90) {
+    return `S级已达成 · ${secondsLeft}s 内继续滚连段`;
+  }
+  const nextMilestone = openingRushConfig.milestones.find((milestone) => !snapshot.completedIds.includes(milestone.id));
+  if (!nextMilestone) {
+    return `追S还差 ${Math.max(0, 90 - snapshot.score)} 分 · 继续清最近异常`;
+  }
+  const shortfall = Math.max(0, 90 - snapshot.score);
+  return `追S：${nextMilestone.label} +${nextMilestone.score} · 还差 ${shortfall} 分 · ${secondsLeft}s`;
+}
+
 function getOpeningSprintProgress(step, sprint = runStats?.openingSprint) {
   if (!step || !sprint || !runStats) {
     return { value: 0, target: 1, complete: false };
@@ -4603,6 +4620,10 @@ function getStarterBuildById(id) {
   return starterBuilds.find((build) => build.id === id) ?? null;
 }
 
+function getStarterBuildForWeaponId(weaponId) {
+  return starterBuilds.find((build) => build.weaponId === weaponId) ?? null;
+}
+
 function getWeaponById(id) {
   return weaponDefinitions.find((weapon) => weapon.id === id) ?? null;
 }
@@ -4612,6 +4633,19 @@ function getWeaponOpeningHook(weapon) {
     return null;
   }
   return weaponOpeningHooks[weapon.id] ?? null;
+}
+
+function applyStarterBuildForWeaponChoice(weapon) {
+  if (!runStats || currentChapterIndex !== 0 || runStats.starterBuild || !weapon?.id) {
+    return null;
+  }
+  const build = getStarterBuildForWeaponId(weapon.id);
+  if (!build) {
+    return null;
+  }
+  runStats.starterBuild = build.id;
+  runStats.starterIgnition = createStarterIgnitionState(build);
+  return build;
 }
 
 function createStarterIgnitionState(build) {
@@ -5503,6 +5537,10 @@ function openWeaponSelect() {
     button.innerHTML = `${icon}<span class="choice-copy"><span class="choice-title">${weapon.name} · ${weapon.role}</span><span class="choice-effect">${weapon.desc}<br>${weapon.traitText}${specializationLine}${openingHookLine}</span></span>`;
     button.addEventListener("click", () => {
       equipWeapon(weapon);
+      const build = applyStarterBuildForWeaponChoice(weapon);
+      if (build) {
+        setLog(`${build.log} ${build.perkText} 开场评级：30秒内完成首个异常、裂隙清场和武器超频可追 S。`);
+      }
       saveRunCheckpoint("weapon-selected");
       ui.storyPanel.classList.add("hidden");
       openStory(currentChapter().opening);
@@ -6704,7 +6742,8 @@ function renderOpeningSprintTracker() {
   const rushText = rush
     ? `开场评级 ${rush.grade ?? "D"} ${rush.score ?? 0}/100 · ${Math.max(0, Math.ceil(openingRushConfig.windowSeconds - (rush.elapsed ?? 0)))}s`
     : null;
-  const detailText = showcaseText ?? surgeText ?? planText ?? rewardText;
+  const rushCoachText = getOpeningRushCoachText(rush);
+  const detailText = [showcaseText ?? surgeText ?? planText ?? rewardText, rushCoachText].filter(Boolean).join(" · ");
 
   ui.openingTracker.style.setProperty("--opening-progress", `${Math.round(totalProgress * 100)}%`);
   ui.openingTracker.className = [
@@ -13356,6 +13395,27 @@ function installAutomationTestHooks() {
         return weaponChoiceText.includes(hook.title)
           && weaponChoiceText.includes(hook.tag);
       });
+    const weaponChoiceIgnitionSamples = weaponDefinitions.map((weapon, index) => {
+      resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 80, weaponIndex: index });
+      runStats.starterBuild = null;
+      runStats.starterIgnition = null;
+      equipWeapon(weapon);
+      const build = applyStarterBuildForWeaponChoice(weapon);
+      return {
+        weaponId: weapon.id,
+        buildId: build?.id ?? null,
+        starterBuild: runStats.starterBuild,
+        hasIgnition: Boolean(runStats.starterIgnition),
+        targetDefeats: runStats.starterIgnition?.targetDefeats ?? 0,
+      };
+    });
+    const weaponChoiceIgnitionOk = weaponChoiceIgnitionSamples.length > 0
+      && weaponChoiceIgnitionSamples.every((sample) => (
+        sample.buildId
+        && sample.starterBuild === sample.buildId
+        && sample.hasIgnition
+        && sample.targetDefeats >= openingSurgeConfig.targetDefeats
+      ));
 
     resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 80, weaponIndex: 0 });
     runStats.eventsResolved = 0;
@@ -13375,6 +13435,7 @@ function installAutomationTestHooks() {
     const eventChoiceText = ui.eventChoices?.textContent ?? "";
     const result = {
       ok: hookCoverage
+        && weaponChoiceIgnitionOk
         && Boolean(focusNode)
         && firstTarget?.label === "首个异常"
         && ui.log?.textContent.includes("首个异常已标记")
@@ -13382,6 +13443,8 @@ function installAutomationTestHooks() {
         && eventChoiceText.includes("开场链推进")
         && eventChoiceText.includes("第一波裂隙"),
       hookCoverage,
+      weaponChoiceIgnitionOk,
+      weaponChoiceIgnitionSamples,
       weaponChoiceText,
       eventChoiceText,
       focusNode: focusNode ? {
@@ -13416,6 +13479,8 @@ function installAutomationTestHooks() {
     world.mode = "playing";
 
     completeOpeningRushMilestone("anomaly");
+    syncHud();
+    const coachAfterAnomaly = ui.openingTracker?.textContent ?? "";
     updateOpeningRush(7.5);
     completeOpeningRushMilestone("surge");
     updateOpeningRush(8.4);
@@ -13435,6 +13500,8 @@ function installAutomationTestHooks() {
       ok: rushBeforeArchive.score === 100
         && rushBeforeArchive.grade === "S"
         && rushBeforeArchive.completedIds.length === openingRushConfig.milestones.length
+        && coachAfterAnomaly.includes("追S")
+        && coachAfterAnomaly.includes("裂隙清场")
         && trackerText.includes("开场评级")
         && trackerText.includes("100/100")
         && archived.score === 100
@@ -13444,6 +13511,7 @@ function installAutomationTestHooks() {
         && startStatsText.includes("S 100/100"),
       rush: rushBeforeArchive,
       archived,
+      coachAfterAnomaly,
       trackerText,
       startStatsText,
       archive: {
