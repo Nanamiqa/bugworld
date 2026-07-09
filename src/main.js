@@ -1379,6 +1379,8 @@ const openingSurgeConfig = {
 };
 const openingRushConfig = {
   windowSeconds: 30,
+  sRewardBugPoints: 2,
+  sRewardHp: 6,
   milestones: [
     { id: "anomaly", label: "首个异常", shortLabel: "首异常", score: 28 },
     { id: "surge", label: "裂隙清场", shortLabel: "裂隙", score: 30 },
@@ -3648,6 +3650,8 @@ function createOpeningRushState(value = {}) {
     bestAt: Number(value.bestAt) || null,
     flash: Math.max(0, Number(value.flash) || 0),
     lastMilestone: typeof value.lastMilestone === "string" ? value.lastMilestone : "",
+    sRewardClaimed: Boolean(value.sRewardClaimed),
+    sRewardAt: Number.isFinite(value.sRewardAt) ? Math.max(0, value.sRewardAt) : null,
   };
 }
 
@@ -3705,6 +3709,36 @@ function normalizeOpeningRushArchive(value = null) {
   };
 }
 
+function getOpeningRushSRewardText() {
+  return `S补给 +${openingRushConfig.sRewardBugPoints} bug点数 / +${openingRushConfig.sRewardHp} 生命`;
+}
+
+function claimOpeningRushSReward(rush = runStats?.openingRush) {
+  if (
+    !rush
+    || !player
+    || currentChapterIndex !== 0
+    || world.mode !== "playing"
+    || rush.sRewardClaimed
+    || (rush.score ?? 0) < 90
+    || (rush.elapsed ?? 0) > openingRushConfig.windowSeconds
+  ) {
+    return false;
+  }
+
+  rush.sRewardClaimed = true;
+  rush.sRewardAt = Math.round((rush.elapsed ?? 0) * 100) / 100;
+  rush.flash = Math.max(rush.flash ?? 0, 2.2);
+  player.bugPoints += Math.max(0, Math.trunc(Number(openingRushConfig.sRewardBugPoints) || 0));
+  player.hp = clamp(player.hp + Math.max(0, Number(openingRushConfig.sRewardHp) || 0), 1, player.maxHp);
+  burst(player.x, player.y, "#f1c15b", 22);
+  burst(player.x, player.y, "#5de2d1", 16);
+  playAudioCue("upgrade-select");
+  setLog(`S级开场补给已入账：+${openingRushConfig.sRewardBugPoints} bug点数，+${openingRushConfig.sRewardHp} 生命。`);
+  saveRunCheckpoint("opening-rush-s-reward");
+  return true;
+}
+
 function completeOpeningRushMilestone(id) {
   const milestone = getOpeningRushMilestone(id);
   const rush = runStats?.openingRush;
@@ -3728,6 +3762,7 @@ function completeOpeningRushMilestone(id) {
     ...refreshed,
     active: refreshed.elapsed < openingRushConfig.windowSeconds,
   };
+  claimOpeningRushSReward(runStats.openingRush);
   return runStats.openingRush;
 }
 
@@ -3748,6 +3783,7 @@ function updateOpeningRush(dt = 0) {
     gradeTitle: refreshed.gradeTitle,
     gradeText: refreshed.gradeText,
   });
+  claimOpeningRushSReward(rush);
 }
 
 function recordOpeningRushInArchive(rush = runStats?.openingRush) {
@@ -3789,7 +3825,8 @@ function getOpeningRushCoachText(rush = runStats?.openingRush) {
   const snapshot = getOpeningRushSnapshot(rush);
   const secondsLeft = Math.max(0, Math.ceil(openingRushConfig.windowSeconds - (rush.elapsed ?? snapshot.elapsed ?? 0)));
   if (snapshot.score >= 90) {
-    return `S级已达成 · ${secondsLeft}s 内继续滚连段`;
+    const rewardText = rush.sRewardClaimed ? `${getOpeningRushSRewardText()}已入账` : "S补给待领取";
+    return `S级已达成 · ${rewardText} · ${secondsLeft}s 内继续滚连段`;
   }
   const nextMilestone = openingRushConfig.milestones.find((milestone) => (
     !snapshot.completedIds.includes(milestone.id) && canCoachOpeningRushMilestone(milestone, rush)
@@ -4694,7 +4731,8 @@ function createRunReview(victory) {
     : `本局处理 ${eventsResolved} 个异常、击破 ${defeats} 个实体，已经留下局外收益。`;
   if (openingRush.score >= 90) {
     highlightTitle = openingRush.gradeTitle;
-    highlightText = `${openingRush.gradeText} 得分来源：${getOpeningRushSourceText(openingRush)}。`;
+    const rewardText = runStats?.openingRush?.sRewardClaimed ? ` ${getOpeningRushSRewardText()}。` : "";
+    highlightText = `${openingRush.gradeText} 得分来源：${getOpeningRushSourceText(openingRush)}。${rewardText}`;
   } else if (openingFirstStrike) {
     highlightTitle = "先手截击抢到窗口";
     highlightText = "快递裂隙落地时完成窗口内命中，已经把第一波从被动接怪变成主动抢节奏。";
@@ -13889,6 +13927,8 @@ function installAutomationTestHooks() {
     runStats.openingRush = createOpeningRushState();
     runStats.openingSprint = createOpeningSprintState();
     world.mode = "playing";
+    const startBugPoints = player.bugPoints;
+    const startHp = player.hp;
 
     completeOpeningRushMilestone("anomaly");
     syncHud();
@@ -13904,6 +13944,7 @@ function installAutomationTestHooks() {
     completeOpeningRushMilestone("retry-route");
     syncHud();
     const trackerText = ui.openingTracker?.textContent ?? "";
+    const finalRushState = cloneForSave(runStats.openingRush, null);
     const rushBeforeArchive = getOpeningRushSnapshot(runStats.openingRush);
     const sourceText = getOpeningRushSourceText(runStats.openingRush);
     const archived = recordOpeningRushInArchive(runStats.openingRush);
@@ -13941,7 +13982,11 @@ function installAutomationTestHooks() {
         && trackerAfterFirstStrike.includes("+8")
         && trackerText.includes("开场评级")
         && trackerText.includes("100/100")
+        && trackerText.includes("S补给")
         && sourceText.includes("先手+8")
+        && Boolean(finalRushState?.sRewardClaimed)
+        && player.bugPoints >= startBugPoints + openingRushConfig.sRewardBugPoints
+        && player.hp >= Math.min(player.maxHp, startHp + openingRushConfig.sRewardHp)
         && archived.score === 100
         && archived.grade === "S"
         && insightsText.includes("得分来源")
@@ -13950,11 +13995,16 @@ function installAutomationTestHooks() {
         && startStatsText.includes("最佳开场")
         && startStatsText.includes("S "),
       rush: rushBeforeArchive,
+      finalRushState,
       archived,
       coachAfterAnomaly,
       trackerAfterFirstStrike,
       trackerText,
       sourceText,
+      reward: {
+        bugPoints: player.bugPoints - startBugPoints,
+        hp: round(player.hp - startHp),
+      },
       insightsText,
       startStatsText,
       archive: {
