@@ -4065,6 +4065,7 @@ function recordOpeningRushInArchive(rush = runStats?.openingRush) {
         at: Date.now(),
       });
       archiveState.lastOpeningRushStreakReward = streakReward;
+      unlockLocalAchievement("ACH_OPENING_S_STREAK", { playCue: false });
     }
   }
   const leaderboardEntry = upsertOpeningRushLeaderboard(snapshot, {
@@ -14557,6 +14558,11 @@ function installAutomationTestHooks() {
   function runChiefOpeningChallengeProbe() {
     const previousArchive = cloneForSave(archiveState, null);
     const previousRunStats = cloneForSave(runStats, null);
+    const previousAchievements = [...readUnlockedAchievements()];
+    writePlatformJson(
+      ACHIEVEMENT_STORAGE_KEY,
+      previousAchievements.filter((id) => id !== "ACH_OPENING_S_STREAK"),
+    );
     resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 80, xp: 0, weaponIndex: 0 });
     archiveState = {
       ...createArchiveFallback(),
@@ -14596,6 +14602,7 @@ function installAutomationTestHooks() {
     const archived = recordOpeningRushInArchive(runStats.openingRush);
     const challengeReward = normalizeChiefOpeningChallengeReward(archiveState.lastChiefOpeningChallengeReward);
     const streakReward = normalizeOpeningRushStreakReward(archiveState.lastOpeningRushStreakReward);
+    const streakAchievementUnlocked = readUnlockedAchievements().includes("ACH_OPENING_S_STREAK");
     const leaderboardEntry = normalizeOpeningRushLeaderboardEntry(archiveState.lastOpeningRushLeaderboardEntry);
     saveArchive();
     world.mode = "menu";
@@ -14643,6 +14650,7 @@ function installAutomationTestHooks() {
         && archived.streakReward?.amount === openingRushConfig.sStreakRewardShards
         && streakReward?.amount === openingRushConfig.sStreakRewardShards
         && streakReward?.streak === 3
+        && streakAchievementUnlocked
         && archiveState.chiefOpeningChallengeCompletions === 1
         && archiveState.bestChiefOpeningChallengeScore === 100
         && archiveState.openingRushSStreak === 3
@@ -14673,6 +14681,7 @@ function installAutomationTestHooks() {
       archived,
       challengeReward,
       streakReward,
+      streakAchievementUnlocked,
       leaderboardEntry,
       startStatsAfter,
       metaSummaryAfter,
@@ -14690,6 +14699,7 @@ function installAutomationTestHooks() {
     };
     ui.resultInsights.innerHTML = "";
     deleteRunSave();
+    writePlatformJson(ACHIEVEMENT_STORAGE_KEY, previousAchievements);
     archiveState = previousArchive ?? loadArchive();
     runStats = previousRunStats ?? createRunStats();
     saveArchive();

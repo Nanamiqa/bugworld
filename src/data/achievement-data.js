@@ -63,5 +63,12 @@
       steamApiName: "ACH_S_RANK_OPENER",
       trigger: "meta_upgrade",
     },
+    {
+      id: "ACH_OPENING_S_STREAK",
+      title: "三连S开场",
+      description: "在首席夜巡印记生效后，连续 3 次打出 S级开场。",
+      steamApiName: "ACH_OPENING_S_STREAK",
+      trigger: "opening_streak",
+    },
   ];
 })();

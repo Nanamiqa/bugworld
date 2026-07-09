@@ -55,6 +55,12 @@
       "displayName": "首席夜巡",
       "description": "拿到 S级开场徽章，并购买首席夜巡印记。",
       "hidden": false
+    },
+    {
+      "apiName": "ACH_OPENING_S_STREAK",
+      "displayName": "三连S开场",
+      "description": "在首席夜巡印记生效后，连续 3 次打出 S级开场。",
+      "hidden": false
     }
   ]
 }
