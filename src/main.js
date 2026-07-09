@@ -128,7 +128,7 @@ const ARCHIVE_STORAGE_KEY = "variableCityArchive";
 const RUN_SAVE_STORAGE_KEY = "variableCityRunSave";
 const SETTINGS_STORAGE_KEY = "variableCitySettings";
 const ACHIEVEMENT_STORAGE_KEY = "variableCityAchievements";
-const ARCHIVE_VERSION = 6;
+const ARCHIVE_VERSION = 7;
 const RUN_SAVE_VERSION = 2;
 const achievements = window.variableCityAchievementCatalog ?? [];
 const urlParams = new URLSearchParams(window.location.search);
@@ -1381,6 +1381,7 @@ const openingRushConfig = {
   windowSeconds: 30,
   sRewardBugPoints: 2,
   sRewardHp: 6,
+  sArchiveRewardShards: 3,
   milestones: [
     { id: "anomaly", label: "首个异常", shortLabel: "首异常", score: 28 },
     { id: "surge", label: "裂隙清场", shortLabel: "裂隙", score: 30 },
@@ -2079,6 +2080,10 @@ function createArchiveFallback() {
     bestOpeningRushGrade: "D",
     bestOpeningRushAt: null,
     lastOpeningRush: null,
+    openingRushSBadgeUnlocked: false,
+    openingRushSBadgeAt: null,
+    openingRushSBadgeScore: 0,
+    lastOpeningRushSBadgeReward: null,
     discoveredEchoes: [],
     completedEchoChapters: [],
     lastEchoDiscovery: null,
@@ -2228,6 +2233,23 @@ function normalizeLastRunShardGain(value) {
   };
 }
 
+function normalizeOpeningRushSBadgeReward(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const amount = Math.max(0, Math.trunc(Number(value.amount) || 0));
+  if (amount <= 0) {
+    return null;
+  }
+  return {
+    amount,
+    score: clamp(Math.trunc(Number(value.score) || 0), 0, 100),
+    grade: "S",
+    reason: typeof value.reason === "string" ? value.reason : "S级开场徽章",
+    at: Number(value.at) || Date.now(),
+  };
+}
+
 function normalizeRetryBoost(value) {
   if (!value || typeof value !== "object") {
     return null;
@@ -2330,6 +2352,7 @@ function normalizeLastRunReview(value) {
     retryPlan: normalizeRetryPlan(value.retryPlan),
     failureReplay: normalizeFailureReplay(value.failureReplay),
     openingRush: normalizeOpeningRushArchive(value.openingRush),
+    openingRushSBadgeReward: normalizeOpeningRushSBadgeReward(value.openingRushSBadgeReward),
     at: Number(value.at) || Date.now(),
   };
 }
@@ -2386,6 +2409,7 @@ function loadArchive() {
       completedMapInteractiveChapters: normalizeMapInteractiveChapterIds(saved.completedMapInteractiveChapters),
       lastMapInteractiveDiscovery: normalizeLastMapInteractiveDiscovery(saved.lastMapInteractiveDiscovery),
       lastOpeningRush: normalizeOpeningRushArchive(saved.lastOpeningRush),
+      lastOpeningRushSBadgeReward: normalizeOpeningRushSBadgeReward(saved.lastOpeningRushSBadgeReward),
     };
     normalized.archiveVersion = ARCHIVE_VERSION;
     normalized.bestChapter = clamp(Number(normalized.bestChapter) || 1, 1, chapters.length);
@@ -2404,6 +2428,13 @@ function loadArchive() {
       ? normalized.bestOpeningRushGrade
       : getOpeningRushGrade(normalized.bestOpeningRushScore).grade;
     normalized.bestOpeningRushAt = Number(normalized.bestOpeningRushAt) || null;
+    normalized.openingRushSBadgeUnlocked = Boolean(normalized.openingRushSBadgeUnlocked)
+      || normalized.bestOpeningRushScore >= 90;
+    normalized.openingRushSBadgeAt = Number(normalized.openingRushSBadgeAt)
+      || (normalized.openingRushSBadgeUnlocked ? normalized.bestOpeningRushAt : null);
+    normalized.openingRushSBadgeScore = normalized.openingRushSBadgeUnlocked
+      ? clamp(Math.trunc(Number(normalized.openingRushSBadgeScore) || normalized.bestOpeningRushScore), 90, 100)
+      : 0;
     if (!normalized.unlockedChapters.includes(0)) {
       normalized.unlockedChapters.unshift(0);
     }
@@ -3790,14 +3821,42 @@ function recordOpeningRushInArchive(rush = runStats?.openingRush) {
   if (!archiveState) {
     archiveState = loadArchive();
   }
+  const hadSBadge = hasOpeningRushSBadge(archiveState);
   const snapshot = getOpeningRushSnapshot(rush);
+  archiveState.lastOpeningRushSBadgeReward = null;
   archiveState.lastOpeningRush = snapshot;
   if (snapshot.score > Math.max(0, Math.trunc(Number(archiveState.bestOpeningRushScore) || 0))) {
     archiveState.bestOpeningRushScore = snapshot.score;
     archiveState.bestOpeningRushGrade = snapshot.grade;
     archiveState.bestOpeningRushAt = Date.now();
   }
-  return snapshot;
+  let sBadgeReward = null;
+  if (snapshot.score >= 90 && !hadSBadge) {
+    const amount = grantCalibrationShards(openingRushConfig.sArchiveRewardShards, "S级开场徽章");
+    archiveState.openingRushSBadgeUnlocked = true;
+    archiveState.openingRushSBadgeAt = Date.now();
+    archiveState.openingRushSBadgeScore = snapshot.score;
+    sBadgeReward = normalizeOpeningRushSBadgeReward({
+      amount,
+      score: snapshot.score,
+      grade: snapshot.grade,
+      reason: "S级开场徽章",
+      at: archiveState.openingRushSBadgeAt,
+    });
+    archiveState.lastOpeningRushSBadgeReward = sBadgeReward;
+  } else if (hadSBadge && !archiveState.openingRushSBadgeUnlocked) {
+    archiveState.openingRushSBadgeUnlocked = true;
+    archiveState.openingRushSBadgeAt = archiveState.openingRushSBadgeAt || archiveState.bestOpeningRushAt || Date.now();
+    archiveState.openingRushSBadgeScore = clamp(
+      Math.trunc(Number(archiveState.openingRushSBadgeScore) || archiveState.bestOpeningRushScore || 90),
+      90,
+      100,
+    );
+  }
+  return {
+    ...snapshot,
+    sBadgeReward,
+  };
 }
 
 function formatOpeningRushScore(rush = runStats?.openingRush) {
@@ -3816,6 +3875,19 @@ function formatOpeningRushArchiveBest(archive = archiveState) {
   }
   const grade = archive?.bestOpeningRushGrade || getOpeningRushGrade(score).grade;
   return `${grade} ${score}/100`;
+}
+
+function hasOpeningRushSBadge(archive = archiveState) {
+  return Boolean(archive?.openingRushSBadgeUnlocked)
+    || Math.trunc(Number(archive?.bestOpeningRushScore) || 0) >= 90;
+}
+
+function formatOpeningRushSBadge(archive = archiveState) {
+  if (!hasOpeningRushSBadge(archive)) {
+    return "未解锁";
+  }
+  const score = clamp(Math.trunc(Number(archive.openingRushSBadgeScore) || archive.bestOpeningRushScore || 90), 90, 100);
+  return `徽章已归档 · ${score}/100`;
 }
 
 function getOpeningRushCoachText(rush = runStats?.openingRush) {
@@ -4796,6 +4868,7 @@ function createRunReview(victory) {
     retryPlan,
     failureReplay,
     openingRush,
+    openingRushSBadgeReward: normalizeOpeningRushSBadgeReward(archiveState?.lastOpeningRushSBadgeReward),
     at: Date.now(),
   };
 }
@@ -4809,10 +4882,17 @@ function recordRunEnd(victory) {
   archiveState.totalEnemiesDefeated = (archiveState.totalEnemiesDefeated ?? 0) + (runStats?.enemiesDefeated ?? 0);
   archiveState.totalEventsResolved = (archiveState.totalEventsResolved ?? 0) + (runStats?.eventsResolved ?? 0);
   archiveState.bestTempoStreak = Math.max(archiveState.bestTempoStreak ?? 0, runStats?.tempo?.bestStreak ?? 0);
-  recordOpeningRushInArchive(runStats?.openingRush);
+  const openingArchive = recordOpeningRushInArchive(runStats?.openingRush);
   archiveState.lastBuild = getBuildSummary();
   archiveState.lastRunReview = createRunReview(victory);
   grantCalibrationShards(shardReward, victory ? "五章通关奖励" : `${currentChapter().title} 结算`);
+  if ((openingArchive?.sBadgeReward?.amount ?? 0) > 0) {
+    archiveState.lastRunShardGain = {
+      amount: shardReward + openingArchive.sBadgeReward.amount,
+      reason: `${archiveState.lastRunShardGain?.reason ?? "夜巡结算"} + S级开场徽章`,
+      at: Date.now(),
+    };
+  }
   if (victory) {
     unlockLocalAchievement("ACH_FULL_CLEAR");
     if ((runStats?.damageTaken ?? 0) <= 80) {
@@ -6725,6 +6805,7 @@ function renderStartMenu() {
     ["爆点委托", `${archiveState.nightHookCompletions ?? 0} 次`],
     ["最佳连段", `x${archiveState.bestTempoStreak ?? 0}`],
     ["最佳开场", formatOpeningRushArchiveBest(archiveState)],
+    ["S级开场", formatOpeningRushSBadge(archiveState)],
     ["成就", `${readUnlockedAchievements().length}/${achievements.length}`],
   ];
   ui.startStats.innerHTML = "";
@@ -9493,11 +9574,22 @@ function renderResultInsights(review = archiveState?.lastRunReview) {
     ]);
   }
   if (normalized.openingRush?.score > 0) {
+    const badgeText = normalized.openingRushSBadgeReward
+      ? ` 首次S徽章 +${normalized.openingRushSBadgeReward.amount}校准碎片已归档。`
+      : "";
     cards.push([
       "开场评级",
       `${normalized.openingRush.grade} ${normalized.openingRush.score}/100`,
-      `${normalized.openingRush.gradeText} 得分来源：${getOpeningRushSourceText(normalized.openingRush)}。已写入档案最佳开场记录。`,
+      `${normalized.openingRush.gradeText} 得分来源：${getOpeningRushSourceText(normalized.openingRush)}。已写入档案最佳开场记录。${badgeText}`,
       normalized.openingRush.score >= 75 ? "is-boost" : "",
+    ]);
+  }
+  if (normalized.openingRushSBadgeReward) {
+    cards.push([
+      "档案徽章",
+      "S级开场已归档",
+      `第一次把首局 30 秒打到 S，永久点亮开场徽章，并获得 +${normalized.openingRushSBadgeReward.amount} 校准碎片。`,
+      "is-boost",
     ]);
   }
   cards.push(["下一把", normalized.nextTitle, normalized.nextText, "is-next"]);
@@ -13405,6 +13497,7 @@ function installAutomationTestHooks() {
         totalMapInteractives: mapInteractiveArchive.total,
         completedMapInteractiveChapters: mapInteractiveArchive.completedChapters,
         bestOpeningRush: formatOpeningRushArchiveBest(archiveState),
+        openingRushSBadge: formatOpeningRushSBadge(archiveState),
       },
       nightHook: runStats?.activeHook ? {
         id: runStats.activeHook.id,
@@ -13948,6 +14041,7 @@ function installAutomationTestHooks() {
     const rushBeforeArchive = getOpeningRushSnapshot(runStats.openingRush);
     const sourceText = getOpeningRushSourceText(runStats.openingRush);
     const archived = recordOpeningRushInArchive(runStats.openingRush);
+    const badgeReward = normalizeOpeningRushSBadgeReward(archiveState.lastOpeningRushSBadgeReward);
     saveArchive();
     world.mode = "menu";
     renderStartMenu();
@@ -13963,6 +14057,7 @@ function installAutomationTestHooks() {
       nextText: "首个异常、裂隙、先手截击和超频都能在 30 秒内串起来。",
       recommendedStarterBuildId: "queue-barrage",
       openingRush: rushBeforeArchive,
+      openingRushSBadgeReward: badgeReward,
       at: Date.now(),
     });
     renderResultInsights(review);
@@ -13989,11 +14084,19 @@ function installAutomationTestHooks() {
         && player.hp >= Math.min(player.maxHp, startHp + openingRushConfig.sRewardHp)
         && archived.score === 100
         && archived.grade === "S"
+        && Boolean(archiveState.openingRushSBadgeUnlocked)
+        && archiveState.openingRushSBadgeScore === 100
+        && archiveState.calibrationShards >= openingRushConfig.sArchiveRewardShards
+        && badgeReward?.amount === openingRushConfig.sArchiveRewardShards
         && insightsText.includes("得分来源")
         && insightsText.includes("先手+8")
+        && insightsText.includes("S级开场已归档")
+        && insightsText.includes(`+${openingRushConfig.sArchiveRewardShards} 校准碎片`)
         && Math.max(archived.score, Math.trunc(Number(archiveState.bestOpeningRushScore) || 0)) >= 90
         && startStatsText.includes("最佳开场")
-        && startStatsText.includes("S "),
+        && startStatsText.includes("S ")
+        && startStatsText.includes("S级开场")
+        && startStatsText.includes("徽章已归档"),
       rush: rushBeforeArchive,
       finalRushState,
       archived,
@@ -14010,6 +14113,10 @@ function installAutomationTestHooks() {
       archive: {
         bestOpeningRushScore: archiveState.bestOpeningRushScore,
         bestOpeningRushGrade: archiveState.bestOpeningRushGrade,
+        openingRushSBadgeUnlocked: archiveState.openingRushSBadgeUnlocked,
+        openingRushSBadgeScore: archiveState.openingRushSBadgeScore,
+        calibrationShards: archiveState.calibrationShards,
+        lastOpeningRushSBadgeReward: badgeReward,
         lastOpeningRush: cloneForSave(archiveState.lastOpeningRush, null),
       },
     };
