@@ -1225,6 +1225,14 @@ h1 {
   opacity: 0.56;
 }
 
+.choice-button.meta-node.is-recommended:not(:disabled) {
+  border-color: rgba(241, 193, 91, 0.58);
+  background:
+    linear-gradient(135deg, rgba(241, 193, 91, 0.18), rgba(114, 165, 255, 0.13)),
+    rgba(255, 255, 255, 0.86);
+  box-shadow: 0 8px 22px rgba(114, 165, 255, 0.12);
+}
+
 .choice-button.meta-node.is-just-unlocked {
   animation: meta-unlock-pulse 740ms ease-out;
 }

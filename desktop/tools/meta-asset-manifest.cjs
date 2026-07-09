@@ -64,5 +64,14 @@ module.exports = {
       secondary: [93, 226, 209],
       accent: [255, 255, 255],
     },
+    {
+      id: "s-rank-opener",
+      assetKey: "metaOpeningSBadge",
+      file: "src/assets/ui/meta-opening-s-badge-v1.png",
+      symbol: "s-badge",
+      primary: [241, 193, 91],
+      secondary: [114, 165, 255],
+      accent: [255, 255, 255],
+    },
   ],
 };

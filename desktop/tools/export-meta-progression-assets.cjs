@@ -209,6 +209,46 @@ function drawSymbol(buffer, width, asset) {
     line(buffer, width, 88, 51, 110, 55, 4, secondary, 0.95);
     line(buffer, width, 87, 56, 103, 72, 4, secondary, 0.95);
     fillCircle(buffer, width, 52, 77, 8, primary, 0.72);
+  } else if (asset.symbol === "s-badge") {
+    for (let point = 0; point < 12; point += 1) {
+      const angle = -Math.PI / 2 + point * Math.PI / 6;
+      const outer = point % 2 === 0 ? 46 : 36;
+      const inner = point % 2 === 0 ? 22 : 18;
+      line(
+        buffer,
+        width,
+        64 + Math.cos(angle) * inner,
+        64 + Math.sin(angle) * inner,
+        64 + Math.cos(angle) * outer,
+        64 + Math.sin(angle) * outer,
+        12,
+        point % 2 === 0 ? primary : secondary,
+        0.86,
+      );
+    }
+    fillCircle(buffer, width, 64, 64, 38, white, 0.9);
+    strokeCircle(buffer, width, 64, 64, 32, 5, primary, 0.92);
+    line(buffer, width, 82, 45, 54, 45, 9, secondary, 0.96);
+    line(buffer, width, 54, 45, 48, 63, 9, secondary, 0.96);
+    line(buffer, width, 48, 63, 78, 63, 9, secondary, 0.96);
+    line(buffer, width, 78, 63, 72, 83, 9, secondary, 0.96);
+    line(buffer, width, 72, 83, 43, 83, 9, secondary, 0.96);
+    for (let mark = 0; mark < 6; mark += 1) {
+      const angle = -Math.PI / 2 + mark * Math.PI / 3;
+      line(
+        buffer,
+        width,
+        64 + Math.cos(angle) * 25,
+        64 + Math.sin(angle) * 25,
+        64 + Math.cos(angle) * 30,
+        64 + Math.sin(angle) * 30,
+        3,
+        accent,
+        0.82,
+      );
+    }
+    roundedRect(buffer, width, 48, 93, 32, 12, 5, primary, 0.9);
+    line(buffer, width, 54, 99, 74, 99, 3, accent, 0.88);
   }
 }
 

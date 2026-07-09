@@ -251,6 +251,16 @@ const metaProgressNodes = [
     summary: "每级修正液射程 +22，减速更久",
     detail: "强化近距控场的容错，让 Boss 召唤物和高速敌人更容易被压住。",
   },
+  {
+    id: "s-rank-opener",
+    title: "首席夜巡印记",
+    maxLevel: 2,
+    costs: [3, 9],
+    requirement: { openingRushSBadge: true },
+    iconKey: "metaOpeningSBadge",
+    summary: "每级首章开局 bug点数 +1，快递裂隙提前 8%",
+    detail: "把 S 级开场徽章变成下一把立刻能感觉到的起步优势，鼓励继续追更稳定的首 30 秒路线。",
+  },
 ];
 
 const nightwatchHooks = [
@@ -1758,6 +1768,7 @@ const assetSources = {
   metaPaperclipSpecialist: "src/assets/ui/meta-paperclip-specialist-v1.png",
   metaKeyboardSpecialist: "src/assets/ui/meta-keyboard-specialist-v1.png",
   metaCorrectionSpecialist: "src/assets/ui/meta-correction-specialist-v1.png",
+  metaOpeningSBadge: "src/assets/ui/meta-opening-s-badge-v1.png",
   abilityIntegerPrecision: "src/assets/abilities/integer-precision-v2.png",
   abilityFloatingPointError: "src/assets/abilities/floating-point-error-v2.png",
   abilityArrayBarrage: "src/assets/abilities/array-barrage-v2.png",
@@ -2466,10 +2477,13 @@ function getMetaNodeCost(node) {
 
 function getMetaRequirementText(node) {
   const requiredChapter = node.requirement?.bestChapter;
-  if (!requiredChapter || (archiveState?.bestChapter ?? 1) >= requiredChapter) {
-    return "";
+  if (requiredChapter && (archiveState?.bestChapter ?? 1) < requiredChapter) {
+    return `最远到达第 ${requiredChapter} 章后解锁`;
   }
-  return `最远到达第 ${requiredChapter} 章后解锁`;
+  if (node.requirement?.openingRushSBadge && !hasOpeningRushSBadge(archiveState)) {
+    return "首次拿到 S级开场徽章后解锁";
+  }
+  return "";
 }
 
 function buyMetaUpgrade(id) {
@@ -3581,6 +3595,8 @@ function normalizeOpeningSprintState(savedSprint = null) {
     startUpgrades: Math.max(0, Math.trunc(Number(savedSprint.startUpgrades) || 0)),
     startTempoRewards: Math.max(0, Math.trunc(Number(savedSprint.startTempoRewards) || 0)),
     retryBonusBugPoints: clamp(Math.trunc(Number(savedSprint.retryBonusBugPoints) || 0), 0, 2),
+    sRankOpenerLevel: clamp(Math.trunc(Number(savedSprint.sRankOpenerLevel) || 0), 0, 2),
+    sRankOpenerDelayMultiplier: clamp(Number(savedSprint.sRankOpenerDelayMultiplier) || 1, 0.76, 1),
     surge: normalizeOpeningSurgeState(savedSprint.surge),
   };
 }
@@ -4246,10 +4262,12 @@ function getMetaProgressionBonuses(chapterIndex = 0) {
   const warmCache = getMetaLevel("warm-cache");
   const routeShoes = getMetaLevel("route-shoes");
   const chapterInsurance = chapterIndex > 0 ? getMetaLevel("chapter-insurance") : 0;
+  const sRankOpener = chapterIndex === 0 ? getMetaLevel("s-rank-opener") : 0;
   return {
     maxHp: steadyHeart * 8 + chapterInsurance * 8,
-    bugPoints: warmCache + chapterInsurance,
+    bugPoints: warmCache + chapterInsurance + sRankOpener,
     dashPower: routeShoes * 12,
+    openingSurgeDelayMultiplier: clamp(1 - sRankOpener * 0.08, 0.76, 1),
   };
 }
 
@@ -4259,6 +4277,21 @@ function applyMetaProgressionBonuses(chapterIndex = 0) {
   player.hp = player.maxHp;
   player.bugPoints += bonuses.bugPoints;
   player.dashPower += bonuses.dashPower;
+}
+
+function applyOpeningSBadgeMetaToSprint(sprint = runStats?.openingSprint, chapterIndex = currentChapterIndex) {
+  if (!sprint?.surge || chapterIndex !== 0) {
+    return null;
+  }
+  const level = getMetaLevel("s-rank-opener");
+  if (level <= 0) {
+    return null;
+  }
+  const multiplier = getMetaProgressionBonuses(chapterIndex).openingSurgeDelayMultiplier;
+  sprint.sRankOpenerLevel = level;
+  sprint.sRankOpenerDelayMultiplier = multiplier;
+  sprint.surge.delayRemaining = Math.max(0.35, (sprint.surge.delayRemaining ?? openingSurgeConfig.spawnDelay) * multiplier);
+  return { level, multiplier };
 }
 
 function getWeaponSpecializationNode(weaponId) {
@@ -5115,6 +5148,7 @@ function startNewRun(chapterIndex = 0, options = {}) {
   hidePanels();
   storyState = null;
   runStats.openingSprint = createOpeningSprintState();
+  applyOpeningSBadgeMetaToSprint(runStats.openingSprint, currentChapterIndex);
   seedOfficeBugPickups();
   setChapterObjective(currentChapter().initialObjective ?? "调查办公室异常");
   setLog(currentChapter().startLog ?? "凌晨 03:32，安渡从键盘上醒来。手机显示：外卖订单已超时 999 分钟。");
@@ -5207,6 +5241,9 @@ function createStoreArchiveState() {
     bestOpeningRushScore: 92,
     bestOpeningRushGrade: "S",
     bestOpeningRushAt: Date.now(),
+    openingRushSBadgeUnlocked: true,
+    openingRushSBadgeAt: Date.now(),
+    openingRushSBadgeScore: 92,
     lastOpeningRush: normalizeOpeningRushArchive({
       score: 92,
       grade: "S",
@@ -5244,6 +5281,7 @@ function createStoreArchiveState() {
       "paperclip-specialist": 2,
       "keyboard-specialist": 2,
       "correction-specialist": 1,
+      "s-rank-opener": 1,
     },
   };
 }
@@ -6532,7 +6570,10 @@ function renderMetaProgression() {
   const lastGain = archiveState?.lastRunShardGain?.amount
     ? ` · 上轮 +${archiveState.lastRunShardGain.amount}`
     : "";
-  ui.metaSummary.textContent = `碎片 ${shards} · 节点 ${totalLevels}/${maxLevels}${lastGain}`;
+  const sBadgeSuggestion = hasOpeningRushSBadge(archiveState) && getMetaLevel("s-rank-opener") <= 0
+    ? " · 建议：首席夜巡印记"
+    : "";
+  ui.metaSummary.textContent = `碎片 ${shards} · 节点 ${totalLevels}/${maxLevels}${lastGain}${sBadgeSuggestion}`;
   ui.metaProgression.innerHTML = "";
 
   for (const node of metaProgressNodes) {
@@ -6541,6 +6582,9 @@ function renderMetaProgression() {
     const lockedText = getMetaRequirementText(node);
     const maxed = level >= node.maxLevel;
     const affordable = cost !== null && shards >= cost;
+    const recommended = node.id === "s-rank-opener"
+      && hasOpeningRushSBadge(archiveState)
+      && level <= 0;
     const disabled = Boolean(lockedText) || maxed || !affordable;
     const status = maxed
       ? "已满级"
@@ -6550,6 +6594,7 @@ function renderMetaProgression() {
       node.iconKey ? "with-media" : "",
       maxed ? "is-maxed" : "",
       lockedText ? "is-locked" : "",
+      recommended ? "is-recommended" : "",
       metaUnlockPulseNodeId === node.id ? "is-just-unlocked" : "",
     ].filter(Boolean).join(" ");
     const button = createMenuButton("", "", className, () => buyMetaUpgrade(node.id), disabled);
@@ -13549,6 +13594,8 @@ function installAutomationTestHooks() {
 
   function runMetaProgressionProbe() {
     const previousArchive = cloneForSave(archiveState, null);
+    const previousRunStats = cloneForSave(runStats, null);
+    const previousChapterIndex = currentChapterIndex;
     archiveState = {
       ...createArchiveFallback(),
       bestChapter: 3,
@@ -13571,22 +13618,75 @@ function installAutomationTestHooks() {
     applyWeaponSpecializationToWeapon(paperclip);
     applyWeaponSpecializationToWeapon(keyboard);
     applyWeaponSpecializationToWeapon(correction);
+    const sNode = metaProgressNodes.find((node) => node.id === "s-rank-opener");
+    archiveState = {
+      ...createArchiveFallback(),
+      calibrationShards: 3,
+      metaUpgrades: normalizeMetaUpgrades({}),
+    };
+    const sLockedText = getMetaRequirementText(sNode);
+    archiveState = {
+      ...createArchiveFallback(),
+      calibrationShards: 3,
+      bestOpeningRushScore: 100,
+      bestOpeningRushGrade: "S",
+      openingRushSBadgeUnlocked: true,
+      openingRushSBadgeScore: 100,
+      metaUpgrades: normalizeMetaUpgrades({}),
+    };
+    renderMetaProgression();
+    const sSuggestionText = ui.metaSummary?.textContent ?? "";
+    const sRecommended = Boolean(ui.metaProgression?.querySelector(".meta-node.is-recommended"));
+    const sBought = buyMetaUpgrade("s-rank-opener");
+    const sLevel = getMetaLevel("s-rank-opener");
+    const sBonuses = getMetaProgressionBonuses(0);
+    currentChapterIndex = 0;
+    runStats = createRunStats();
+    runStats.openingSprint = createOpeningSprintState();
+    const surgeDelayBefore = runStats.openingSprint.surge.delayRemaining;
+    const sApplied = applyOpeningSBadgeMetaToSprint(runStats.openingSprint, 0);
+    const surgeDelayAfter = runStats.openingSprint.surge.delayRemaining;
     archiveState = previousArchive ?? loadArchive();
+    runStats = previousRunStats ?? createRunStats();
+    currentChapterIndex = previousChapterIndex;
+    saveArchive();
     return {
       ok: firstChapter.maxHp === 16
         && firstChapter.bugPoints === 1
         && firstChapter.dashPower === 12
+        && firstChapter.openingSurgeDelayMultiplier === 1
         && practiceChapter.maxHp === 24
         && practiceChapter.bugPoints === 2
         && practiceChapter.dashPower === 12
+        && practiceChapter.openingSurgeDelayMultiplier === 1
         && paperclip.damage === 37
         && paperclip.trait.every === 3
         && keyboard.trait.force === 28
         && keyboard.cooldown < 0.46
         && correction.range === 354
-        && correction.trait.factor < 0.55,
+        && correction.trait.factor < 0.55
+        && sLockedText.includes("S级开场徽章")
+        && sSuggestionText.includes("建议：首席夜巡印记")
+        && sRecommended
+        && sBought
+        && sLevel === 1
+        && sBonuses.bugPoints === 1
+        && sBonuses.openingSurgeDelayMultiplier < 1
+        && sApplied?.level === 1
+        && surgeDelayAfter < surgeDelayBefore,
       firstChapter,
       practiceChapter,
+      sRankOpener: {
+        lockedText: sLockedText,
+        suggestion: sSuggestionText,
+        recommended: sRecommended,
+        bought: sBought,
+        level: sLevel,
+        bugPoints: sBonuses.bugPoints,
+        delayMultiplier: sBonuses.openingSurgeDelayMultiplier,
+        surgeDelayBefore: round(surgeDelayBefore),
+        surgeDelayAfter: round(surgeDelayAfter),
+      },
       weaponSpecializations: {
         paperclip: { damage: paperclip.damage, chargedEvery: paperclip.trait.every },
         keyboard: { cooldown: round(keyboard.cooldown), force: keyboard.trait.force },
