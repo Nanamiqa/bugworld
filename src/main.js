@@ -128,7 +128,7 @@ const ARCHIVE_STORAGE_KEY = "variableCityArchive";
 const RUN_SAVE_STORAGE_KEY = "variableCityRunSave";
 const SETTINGS_STORAGE_KEY = "variableCitySettings";
 const ACHIEVEMENT_STORAGE_KEY = "variableCityAchievements";
-const ARCHIVE_VERSION = 7;
+const ARCHIVE_VERSION = 8;
 const RUN_SAVE_VERSION = 2;
 const achievements = window.variableCityAchievementCatalog ?? [];
 const urlParams = new URLSearchParams(window.location.search);
@@ -1392,6 +1392,7 @@ const openingRushConfig = {
   sRewardBugPoints: 2,
   sRewardHp: 6,
   sArchiveRewardShards: 3,
+  chiefChallengeRewardShards: 1,
   milestones: [
     { id: "anomaly", label: "首个异常", shortLabel: "首异常", score: 28 },
     { id: "surge", label: "裂隙清场", shortLabel: "裂隙", score: 30 },
@@ -2097,6 +2098,9 @@ function createArchiveFallback() {
     openingRushSBadgeAt: null,
     openingRushSBadgeScore: 0,
     lastOpeningRushSBadgeReward: null,
+    chiefOpeningChallengeCompletions: 0,
+    bestChiefOpeningChallengeScore: 0,
+    lastChiefOpeningChallengeReward: null,
     discoveredEchoes: [],
     completedEchoChapters: [],
     lastEchoDiscovery: null,
@@ -2263,6 +2267,24 @@ function normalizeOpeningRushSBadgeReward(value) {
   };
 }
 
+function normalizeChiefOpeningChallengeReward(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const amount = Math.max(0, Math.trunc(Number(value.amount) || 0));
+  if (amount <= 0) {
+    return null;
+  }
+  return {
+    amount,
+    score: clamp(Math.trunc(Number(value.score) || 0), 0, 100),
+    grade: "S",
+    completionCount: Math.max(1, Math.trunc(Number(value.completionCount) || 1)),
+    reason: typeof value.reason === "string" ? value.reason : "首席再巡挑战",
+    at: Number(value.at) || Date.now(),
+  };
+}
+
 function normalizeRetryBoost(value) {
   if (!value || typeof value !== "object") {
     return null;
@@ -2366,6 +2388,7 @@ function normalizeLastRunReview(value) {
     failureReplay: normalizeFailureReplay(value.failureReplay),
     openingRush: normalizeOpeningRushArchive(value.openingRush),
     openingRushSBadgeReward: normalizeOpeningRushSBadgeReward(value.openingRushSBadgeReward),
+    chiefOpeningChallengeReward: normalizeChiefOpeningChallengeReward(value.chiefOpeningChallengeReward),
     at: Number(value.at) || Date.now(),
   };
 }
@@ -2423,6 +2446,7 @@ function loadArchive() {
       lastMapInteractiveDiscovery: normalizeLastMapInteractiveDiscovery(saved.lastMapInteractiveDiscovery),
       lastOpeningRush: normalizeOpeningRushArchive(saved.lastOpeningRush),
       lastOpeningRushSBadgeReward: normalizeOpeningRushSBadgeReward(saved.lastOpeningRushSBadgeReward),
+      lastChiefOpeningChallengeReward: normalizeChiefOpeningChallengeReward(saved.lastChiefOpeningChallengeReward),
     };
     normalized.archiveVersion = ARCHIVE_VERSION;
     normalized.bestChapter = clamp(Number(normalized.bestChapter) || 1, 1, chapters.length);
@@ -2448,6 +2472,15 @@ function loadArchive() {
     normalized.openingRushSBadgeScore = normalized.openingRushSBadgeUnlocked
       ? clamp(Math.trunc(Number(normalized.openingRushSBadgeScore) || normalized.bestOpeningRushScore), 90, 100)
       : 0;
+    normalized.chiefOpeningChallengeCompletions = Math.max(
+      0,
+      Math.trunc(Number(normalized.chiefOpeningChallengeCompletions) || 0),
+    );
+    normalized.bestChiefOpeningChallengeScore = clamp(
+      Math.trunc(Number(normalized.bestChiefOpeningChallengeScore) || 0),
+      0,
+      100,
+    );
     if (!normalized.unlockedChapters.includes(0)) {
       normalized.unlockedChapters.unshift(0);
     }
@@ -2468,8 +2501,16 @@ function saveArchive() {
   }
 }
 
+function getMetaLevelFromArchive(archive, id) {
+  return clamp(
+    Math.trunc(Number(archive?.metaUpgrades?.[id]) || 0),
+    0,
+    metaProgressNodes.find((node) => node.id === id)?.maxLevel ?? 0,
+  );
+}
+
 function getMetaLevel(id) {
-  return clamp(Math.trunc(Number(archiveState?.metaUpgrades?.[id]) || 0), 0, metaProgressNodes.find((node) => node.id === id)?.maxLevel ?? 0);
+  return getMetaLevelFromArchive(archiveState, id);
 }
 
 function getMetaNodeCost(node) {
@@ -3843,8 +3884,10 @@ function recordOpeningRushInArchive(rush = runStats?.openingRush) {
     archiveState = loadArchive();
   }
   const hadSBadge = hasOpeningRushSBadge(archiveState);
+  const chiefChallengeActive = hasChiefOpeningChallenge(archiveState);
   const snapshot = getOpeningRushSnapshot(rush);
   archiveState.lastOpeningRushSBadgeReward = null;
+  archiveState.lastChiefOpeningChallengeReward = null;
   archiveState.lastOpeningRush = snapshot;
   if (snapshot.score > Math.max(0, Math.trunc(Number(archiveState.bestOpeningRushScore) || 0))) {
     archiveState.bestOpeningRushScore = snapshot.score;
@@ -3874,9 +3917,31 @@ function recordOpeningRushInArchive(rush = runStats?.openingRush) {
       100,
     );
   }
+  let chiefChallengeReward = null;
+  if (snapshot.score >= 90 && chiefChallengeActive) {
+    const amount = grantCalibrationShards(openingRushConfig.chiefChallengeRewardShards, "首席再巡挑战");
+    archiveState.chiefOpeningChallengeCompletions = Math.max(
+      0,
+      Math.trunc(Number(archiveState.chiefOpeningChallengeCompletions) || 0),
+    ) + 1;
+    archiveState.bestChiefOpeningChallengeScore = Math.max(
+      Math.trunc(Number(archiveState.bestChiefOpeningChallengeScore) || 0),
+      snapshot.score,
+    );
+    chiefChallengeReward = normalizeChiefOpeningChallengeReward({
+      amount,
+      score: snapshot.score,
+      grade: snapshot.grade,
+      completionCount: archiveState.chiefOpeningChallengeCompletions,
+      reason: "首席再巡挑战",
+      at: Date.now(),
+    });
+    archiveState.lastChiefOpeningChallengeReward = chiefChallengeReward;
+  }
   return {
     ...snapshot,
     sBadgeReward,
+    chiefChallengeReward,
   };
 }
 
@@ -3911,6 +3976,27 @@ function formatOpeningRushSBadge(archive = archiveState) {
   return `徽章已归档 · ${score}/100`;
 }
 
+function hasChiefOpeningChallenge(archive = archiveState) {
+  return hasOpeningRushSBadge(archive) && getMetaLevelFromArchive(archive, "s-rank-opener") > 0;
+}
+
+function formatChiefOpeningChallenge(archive = archiveState) {
+  if (!hasChiefOpeningChallenge(archive)) {
+    return "未解锁";
+  }
+  const completions = Math.max(0, Math.trunc(Number(archive?.chiefOpeningChallengeCompletions) || 0));
+  const bestScore = Math.max(0, Math.trunc(Number(archive?.bestChiefOpeningChallengeScore) || 0));
+  return completions > 0 ? `${completions}次 · 最佳${bestScore}` : `待完成 · +${openingRushConfig.chiefChallengeRewardShards}碎片`;
+}
+
+function getChiefOpeningChallengePrompt(archive = archiveState) {
+  if (!hasChiefOpeningChallenge(archive)) {
+    return "";
+  }
+  const completions = Math.max(0, Math.trunc(Number(archive?.chiefOpeningChallengeCompletions) || 0));
+  return `首席再巡挑战：下一把 30 秒内再打出 S，完成 +${openingRushConfig.chiefChallengeRewardShards} 碎片；已完成 ${completions} 次。`;
+}
+
 function getOpeningRushCoachText(rush = runStats?.openingRush) {
   if (!rush) {
     return "";
@@ -3919,7 +4005,8 @@ function getOpeningRushCoachText(rush = runStats?.openingRush) {
   const secondsLeft = Math.max(0, Math.ceil(openingRushConfig.windowSeconds - (rush.elapsed ?? snapshot.elapsed ?? 0)));
   if (snapshot.score >= 90) {
     const rewardText = rush.sRewardClaimed ? `${getOpeningRushSRewardText()}已入账` : "S补给待领取";
-    return `S级已达成 · ${rewardText} · ${secondsLeft}s 内继续滚连段`;
+    const chiefText = hasChiefOpeningChallenge() ? ` · 首席再巡 +${openingRushConfig.chiefChallengeRewardShards}碎片待结算` : "";
+    return `S级已达成 · ${rewardText}${chiefText} · ${secondsLeft}s 内继续滚连段`;
   }
   const nextMilestone = openingRushConfig.milestones.find((milestone) => (
     !snapshot.completedIds.includes(milestone.id) && canCoachOpeningRushMilestone(milestone, rush)
@@ -4907,6 +4994,7 @@ function createRunReview(victory) {
     failureReplay,
     openingRush,
     openingRushSBadgeReward: normalizeOpeningRushSBadgeReward(archiveState?.lastOpeningRushSBadgeReward),
+    chiefOpeningChallengeReward: normalizeChiefOpeningChallengeReward(archiveState?.lastChiefOpeningChallengeReward),
     at: Date.now(),
   };
 }
@@ -4924,10 +5012,16 @@ function recordRunEnd(victory) {
   archiveState.lastBuild = getBuildSummary();
   archiveState.lastRunReview = createRunReview(victory);
   grantCalibrationShards(shardReward, victory ? "五章通关奖励" : `${currentChapter().title} 结算`);
-  if ((openingArchive?.sBadgeReward?.amount ?? 0) > 0) {
+  const openingBonusRewards = [
+    openingArchive?.sBadgeReward?.amount ? "S级开场徽章" : "",
+    openingArchive?.chiefChallengeReward?.amount ? "首席再巡挑战" : "",
+  ].filter(Boolean);
+  const openingBonusShards = (openingArchive?.sBadgeReward?.amount ?? 0)
+    + (openingArchive?.chiefChallengeReward?.amount ?? 0);
+  if (openingBonusShards > 0) {
     archiveState.lastRunShardGain = {
-      amount: shardReward + openingArchive.sBadgeReward.amount,
-      reason: `${archiveState.lastRunShardGain?.reason ?? "夜巡结算"} + S级开场徽章`,
+      amount: shardReward + openingBonusShards,
+      reason: `${archiveState.lastRunShardGain?.reason ?? "夜巡结算"} + ${openingBonusRewards.join(" + ")}`,
       at: Date.now(),
     };
   }
@@ -6578,7 +6672,10 @@ function renderMetaProgression() {
   const sBadgeSuggestion = hasOpeningRushSBadge(archiveState) && getMetaLevel("s-rank-opener") <= 0
     ? " · 建议：首席夜巡印记"
     : "";
-  ui.metaSummary.textContent = `碎片 ${shards} · 节点 ${totalLevels}/${maxLevels}${lastGain}${sBadgeSuggestion}`;
+  const chiefChallengeHint = hasChiefOpeningChallenge(archiveState)
+    ? ` · 首席再巡 ${formatChiefOpeningChallenge(archiveState)}`
+    : "";
+  ui.metaSummary.textContent = `碎片 ${shards} · 节点 ${totalLevels}/${maxLevels}${lastGain}${sBadgeSuggestion}${chiefChallengeHint}`;
   ui.metaProgression.innerHTML = "";
 
   for (const node of metaProgressNodes) {
@@ -6833,11 +6930,13 @@ function renderStartMenu() {
   const lastReview = normalizeLastRunReview(archiveState.lastRunReview);
   const reviewBoostText = lastReview?.retryBoost ? `${lastReview.retryBoost.title}已备好。` : "";
   const reviewPlanText = lastReview?.retryPlan ? `${lastReview.retryPlan.title}已排好。` : "";
+  const chiefChallengePrompt = getChiefOpeningChallengePrompt(archiveState);
+  const chiefChallengeSuffix = chiefChallengePrompt ? ` ${chiefChallengePrompt}` : "";
   ui.startSummary.textContent = runSave
     ? `检测到 ${formatSaveTime(runSave.savedAt)} 的跑局存档：${chapters[runSave.currentChapterIndex]?.title ?? "未知章节"}，${runSave.objective ?? "继续夜巡"}。`
     : lastReview
-      ? `上轮复盘：${lastReview.highlightTitle}。下一把建议：${lastReview.nextTitle}。${reviewPlanText}${reviewBoostText}`
-      : "档案已就绪。可以从第一章重新出发，也可以进入已解锁章节练习。";
+      ? `上轮复盘：${lastReview.highlightTitle}。下一把建议：${lastReview.nextTitle}。${reviewPlanText}${reviewBoostText}${chiefChallengeSuffix}`
+      : `档案已就绪。可以从第一章重新出发，也可以进入已解锁章节练习。${chiefChallengeSuffix}`;
   renderTonightHook();
 
   const stats = [
@@ -6856,6 +6955,7 @@ function renderStartMenu() {
     ["最佳连段", `x${archiveState.bestTempoStreak ?? 0}`],
     ["最佳开场", formatOpeningRushArchiveBest(archiveState)],
     ["S级开场", formatOpeningRushSBadge(archiveState)],
+    ["首席再巡", formatChiefOpeningChallenge(archiveState)],
     ["成就", `${readUnlockedAchievements().length}/${achievements.length}`],
   ];
   ui.startStats.innerHTML = "";
@@ -9575,6 +9675,7 @@ function renderResultStats(victory) {
   const durationSeconds = Math.max(1, Math.round((Date.now() - (runStats?.startedAt ?? Date.now())) / 1000));
   const minutes = Math.floor(durationSeconds / 60);
   const seconds = durationSeconds % 60;
+  const chiefReward = normalizeChiefOpeningChallengeReward(archiveState?.lastChiefOpeningChallengeReward);
   const stats = [
     ["章节", `${runStats?.chaptersCleared ?? 0}/${chapters.length}`],
     ["等级", `Lv.${runStats?.highestLevel ?? player.level}`],
@@ -9584,6 +9685,7 @@ function renderResultStats(victory) {
     ["共鸣", `${runStats?.synergiesUnlocked?.length ?? 0} 次`],
     ["最佳连段", `x${runStats?.tempo?.bestStreak ?? 0}`],
     ["开场评级", formatOpeningRushScore(runStats?.openingRush)],
+    ["首席再巡", chiefReward ? `+${chiefReward.amount}碎片` : formatChiefOpeningChallenge(archiveState)],
     ["评级来源", getOpeningRushSourceText(runStats?.openingRush)],
     ["耗时", `${minutes}:${String(seconds).padStart(2, "0")}`],
     ["构筑", getBuildSummary()],
@@ -9627,10 +9729,13 @@ function renderResultInsights(review = archiveState?.lastRunReview) {
     const badgeText = normalized.openingRushSBadgeReward
       ? ` 首次S徽章 +${normalized.openingRushSBadgeReward.amount}校准碎片已归档。`
       : "";
+    const chiefText = normalized.chiefOpeningChallengeReward
+      ? ` 首席再巡 +${normalized.chiefOpeningChallengeReward.amount}校准碎片。`
+      : "";
     cards.push([
       "开场评级",
       `${normalized.openingRush.grade} ${normalized.openingRush.score}/100`,
-      `${normalized.openingRush.gradeText} 得分来源：${getOpeningRushSourceText(normalized.openingRush)}。已写入档案最佳开场记录。${badgeText}`,
+      `${normalized.openingRush.gradeText} 得分来源：${getOpeningRushSourceText(normalized.openingRush)}。已写入档案最佳开场记录。${badgeText}${chiefText}`,
       normalized.openingRush.score >= 75 ? "is-boost" : "",
     ]);
   }
@@ -9639,6 +9744,14 @@ function renderResultInsights(review = archiveState?.lastRunReview) {
       "档案徽章",
       "S级开场已归档",
       `第一次把首局 30 秒打到 S，永久点亮开场徽章，并获得 +${normalized.openingRushSBadgeReward.amount} 校准碎片。`,
+      "is-boost",
+    ]);
+  }
+  if (normalized.chiefOpeningChallengeReward) {
+    cards.push([
+      "首席再巡",
+      `第 ${normalized.chiefOpeningChallengeReward.completionCount} 次完成`,
+      `已在首席夜巡印记生效后再次打出 S 级开场，获得 +${normalized.chiefOpeningChallengeReward.amount} 校准碎片。下一把继续追更快裂隙路线。`,
       "is-boost",
     ]);
   }
@@ -14241,6 +14354,109 @@ function installAutomationTestHooks() {
     return result;
   }
 
+  function runChiefOpeningChallengeProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    const previousRunStats = cloneForSave(runStats, null);
+    resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 80, xp: 0, weaponIndex: 0 });
+    archiveState = {
+      ...createArchiveFallback(),
+      calibrationShards: 0,
+      bestOpeningRushScore: 95,
+      bestOpeningRushGrade: "S",
+      bestOpeningRushAt: Date.now(),
+      openingRushSBadgeUnlocked: true,
+      openingRushSBadgeAt: Date.now(),
+      openingRushSBadgeScore: 95,
+      metaUpgrades: normalizeMetaUpgrades({ "s-rank-opener": 1 }),
+      chiefOpeningChallengeCompletions: 0,
+      bestChiefOpeningChallengeScore: 0,
+      lastChiefOpeningChallengeReward: null,
+    };
+    saveArchive();
+    world.mode = "menu";
+    renderStartMenu();
+    const startSummaryBefore = ui.startSummary?.textContent ?? "";
+    const startStatsBefore = ui.startStats?.textContent ?? "";
+    const metaSummaryBefore = ui.metaSummary?.textContent ?? "";
+    runStats = createRunStats();
+    runStats.openingRush = createOpeningRushState();
+    runStats.openingSprint = createOpeningSprintState();
+    world.mode = "playing";
+    completeOpeningRushMilestone("anomaly");
+    completeOpeningRushMilestone("first-strike");
+    completeOpeningRushMilestone("surge");
+    completeOpeningRushMilestone("overclock");
+    completeOpeningRushMilestone("retry-route");
+    syncHud();
+    const coachAfterS = ui.openingTracker?.textContent ?? "";
+    const rushBeforeArchive = getOpeningRushSnapshot(runStats.openingRush);
+    const archived = recordOpeningRushInArchive(runStats.openingRush);
+    const challengeReward = normalizeChiefOpeningChallengeReward(archiveState.lastChiefOpeningChallengeReward);
+    saveArchive();
+    world.mode = "menu";
+    renderStartMenu();
+    const startStatsAfter = ui.startStats?.textContent ?? "";
+    const metaSummaryAfter = ui.metaSummary?.textContent ?? "";
+    const review = normalizeLastRunReview({
+      outcome: "defeat",
+      chapterTitle: currentChapter().title,
+      highlightTitle: rushBeforeArchive.gradeTitle,
+      highlightText: rushBeforeArchive.gradeText,
+      pressureTitle: "继续压缩裂隙路线",
+      pressureText: "首席印记已经让裂隙提前，下一把继续追更快 S。",
+      nextTitle: "首席再巡",
+      nextText: "继续用 30 秒路线刷稳定 S，碎片会变成局外成长。",
+      recommendedStarterBuildId: "queue-barrage",
+      openingRush: rushBeforeArchive,
+      chiefOpeningChallengeReward: challengeReward,
+      at: Date.now(),
+    });
+    renderResultInsights(review);
+    const insightsText = ui.resultInsights?.textContent ?? "";
+    const result = {
+      ok: hasChiefOpeningChallenge(archiveState)
+        && startSummaryBefore.includes("首席再巡挑战")
+        && startStatsBefore.includes("首席再巡")
+        && startStatsBefore.includes("待完成")
+        && metaSummaryBefore.includes("首席再巡")
+        && coachAfterS.includes("首席再巡")
+        && coachAfterS.includes(`+${openingRushConfig.chiefChallengeRewardShards}碎片`)
+        && rushBeforeArchive.grade === "S"
+        && archived.chiefChallengeReward?.amount === openingRushConfig.chiefChallengeRewardShards
+        && challengeReward?.amount === openingRushConfig.chiefChallengeRewardShards
+        && challengeReward?.completionCount === 1
+        && archiveState.chiefOpeningChallengeCompletions === 1
+        && archiveState.bestChiefOpeningChallengeScore === 100
+        && archiveState.calibrationShards >= openingRushConfig.chiefChallengeRewardShards
+        && startStatsAfter.includes("1次")
+        && metaSummaryAfter.includes("1次")
+        && insightsText.includes("首席再巡")
+        && insightsText.includes(`+${openingRushConfig.chiefChallengeRewardShards} 校准碎片`),
+      startSummaryBefore,
+      startStatsBefore,
+      metaSummaryBefore,
+      coachAfterS,
+      rush: rushBeforeArchive,
+      archived,
+      challengeReward,
+      startStatsAfter,
+      metaSummaryAfter,
+      insightsText,
+      archive: {
+        calibrationShards: archiveState.calibrationShards,
+        completions: archiveState.chiefOpeningChallengeCompletions,
+        bestScore: archiveState.bestChiefOpeningChallengeScore,
+        lastReward: challengeReward,
+      },
+    };
+    ui.resultInsights.innerHTML = "";
+    deleteRunSave();
+    archiveState = previousArchive ?? loadArchive();
+    runStats = previousRunStats ?? createRunStats();
+    saveArchive();
+    return result;
+  }
+
   function runOpeningRushTimingProbe() {
     const previousArchive = cloneForSave(archiveState, null);
     const cadenceProfiles = [
@@ -15216,6 +15432,7 @@ function installAutomationTestHooks() {
     const openingGuidance = runOpeningGuidanceProbe();
     const openingRouteReadability = runOpeningRouteReadabilityProbe();
     const openingRushRating = runOpeningRushRatingProbe();
+    const chiefOpeningChallenge = runChiefOpeningChallengeProbe();
     const openingRushTiming = runOpeningRushTimingProbe();
     const hitFeedback = runHitFeedbackProbe();
     const fairWarning = runFairWarningProbe();
@@ -15252,6 +15469,9 @@ function installAutomationTestHooks() {
     }
     if (!openingRushRating.ok) {
       failures.push("opening rush rating failed");
+    }
+    if (!chiefOpeningChallenge.ok) {
+      failures.push("chief opening challenge failed");
     }
     if (!openingRushTiming.ok) {
       failures.push("opening rush timing failed");
@@ -15366,6 +15586,7 @@ function installAutomationTestHooks() {
       openingGuidance,
       openingRouteReadability,
       openingRushRating,
+      chiefOpeningChallenge,
       openingRushTiming,
       hitFeedback,
       fairWarning,
@@ -15395,6 +15616,7 @@ function installAutomationTestHooks() {
     runOpeningGuidanceProbe,
     runOpeningRouteReadabilityProbe,
     runOpeningRushRatingProbe,
+    runChiefOpeningChallengeProbe,
     runOpeningRushTimingProbe,
     runHitFeedbackProbe,
     runFairWarningProbe,
