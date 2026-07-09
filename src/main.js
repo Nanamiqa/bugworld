@@ -128,7 +128,7 @@ const ARCHIVE_STORAGE_KEY = "variableCityArchive";
 const RUN_SAVE_STORAGE_KEY = "variableCityRunSave";
 const SETTINGS_STORAGE_KEY = "variableCitySettings";
 const ACHIEVEMENT_STORAGE_KEY = "variableCityAchievements";
-const ARCHIVE_VERSION = 8;
+const ARCHIVE_VERSION = 9;
 const RUN_SAVE_VERSION = 2;
 const achievements = window.variableCityAchievementCatalog ?? [];
 const urlParams = new URLSearchParams(window.location.search);
@@ -2101,6 +2101,8 @@ function createArchiveFallback() {
     chiefOpeningChallengeCompletions: 0,
     bestChiefOpeningChallengeScore: 0,
     lastChiefOpeningChallengeReward: null,
+    openingRushLeaderboard: [],
+    lastOpeningRushLeaderboardEntry: null,
     discoveredEchoes: [],
     completedEchoChapters: [],
     lastEchoDiscovery: null,
@@ -2389,6 +2391,7 @@ function normalizeLastRunReview(value) {
     openingRush: normalizeOpeningRushArchive(value.openingRush),
     openingRushSBadgeReward: normalizeOpeningRushSBadgeReward(value.openingRushSBadgeReward),
     chiefOpeningChallengeReward: normalizeChiefOpeningChallengeReward(value.chiefOpeningChallengeReward),
+    openingRushLeaderboardEntry: normalizeOpeningRushLeaderboardEntry(value.openingRushLeaderboardEntry),
     at: Number(value.at) || Date.now(),
   };
 }
@@ -2447,6 +2450,8 @@ function loadArchive() {
       lastOpeningRush: normalizeOpeningRushArchive(saved.lastOpeningRush),
       lastOpeningRushSBadgeReward: normalizeOpeningRushSBadgeReward(saved.lastOpeningRushSBadgeReward),
       lastChiefOpeningChallengeReward: normalizeChiefOpeningChallengeReward(saved.lastChiefOpeningChallengeReward),
+      openingRushLeaderboard: normalizeOpeningRushLeaderboard(saved.openingRushLeaderboard),
+      lastOpeningRushLeaderboardEntry: normalizeOpeningRushLeaderboardEntry(saved.lastOpeningRushLeaderboardEntry),
     };
     normalized.archiveVersion = ARCHIVE_VERSION;
     normalized.bestChapter = clamp(Number(normalized.bestChapter) || 1, 1, chapters.length);
@@ -3802,6 +3807,72 @@ function normalizeOpeningRushArchive(value = null) {
   };
 }
 
+function compareOpeningRushLeaderboardEntry(a, b) {
+  return (b.score ?? 0) - (a.score ?? 0)
+    || (a.elapsed ?? 0) - (b.elapsed ?? 0)
+    || (b.at ?? 0) - (a.at ?? 0);
+}
+
+function normalizeOpeningRushLeaderboardEntry(value, index = 0) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const archive = normalizeOpeningRushArchive(value);
+  if (archive.score <= 0) {
+    return null;
+  }
+  const at = Number(value.at) || Date.now();
+  return {
+    id: typeof value.id === "string" && value.id ? value.id : `opening-rush-${at}-${index}`,
+    score: archive.score,
+    grade: archive.grade,
+    gradeTitle: archive.gradeTitle,
+    gradeText: archive.gradeText,
+    elapsed: Math.max(0, Math.round((Number(value.elapsed) || archive.elapsed || 0) * 10) / 10),
+    completedIds: archive.completedIds,
+    sourceText: typeof value.sourceText === "string" && value.sourceText
+      ? value.sourceText
+      : getOpeningRushSourceText(archive),
+    chiefChallenge: Boolean(value.chiefChallenge),
+    at,
+    rank: Math.max(0, Math.trunc(Number(value.rank) || 0)),
+  };
+}
+
+function normalizeOpeningRushLeaderboard(value = []) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((entry, index) => normalizeOpeningRushLeaderboardEntry(entry, index))
+    .filter(Boolean)
+    .sort(compareOpeningRushLeaderboardEntry)
+    .slice(0, 5)
+    .map((entry, index) => ({ ...entry, rank: index + 1 }));
+}
+
+function upsertOpeningRushLeaderboard(snapshot, options = {}) {
+  const entry = normalizeOpeningRushLeaderboardEntry({
+    ...snapshot,
+    id: `opening-rush-${Date.now()}-${Math.max(0, Math.trunc(Number(snapshot?.score) || 0))}`,
+    sourceText: getOpeningRushSourceText(snapshot),
+    chiefChallenge: Boolean(options.chiefChallenge),
+    at: Date.now(),
+  });
+  if (!entry) {
+    archiveState.lastOpeningRushLeaderboardEntry = null;
+    return null;
+  }
+  const leaderboard = normalizeOpeningRushLeaderboard([
+    ...(archiveState.openingRushLeaderboard ?? []),
+    entry,
+  ]);
+  archiveState.openingRushLeaderboard = leaderboard;
+  const rankedEntry = leaderboard.find((item) => item.id === entry.id) ?? null;
+  archiveState.lastOpeningRushLeaderboardEntry = rankedEntry;
+  return rankedEntry;
+}
+
 function getOpeningRushSRewardText() {
   return `S补给 +${openingRushConfig.sRewardBugPoints} bug点数 / +${openingRushConfig.sRewardHp} 生命`;
 }
@@ -3938,10 +4009,14 @@ function recordOpeningRushInArchive(rush = runStats?.openingRush) {
     });
     archiveState.lastChiefOpeningChallengeReward = chiefChallengeReward;
   }
+  const leaderboardEntry = upsertOpeningRushLeaderboard(snapshot, {
+    chiefChallenge: Boolean(chiefChallengeReward),
+  });
   return {
     ...snapshot,
     sBadgeReward,
     chiefChallengeReward,
+    leaderboardEntry,
   };
 }
 
@@ -3995,6 +4070,26 @@ function getChiefOpeningChallengePrompt(archive = archiveState) {
   }
   const completions = Math.max(0, Math.trunc(Number(archive?.chiefOpeningChallengeCompletions) || 0));
   return `首席再巡挑战：下一把 30 秒内再打出 S，完成 +${openingRushConfig.chiefChallengeRewardShards} 碎片；已完成 ${completions} 次。`;
+}
+
+function formatOpeningRushLeaderboardTop(archive = archiveState) {
+  const leaderboard = normalizeOpeningRushLeaderboard(archive?.openingRushLeaderboard);
+  if (!leaderboard.length) {
+    return "暂无记录";
+  }
+  const top = leaderboard[0];
+  const seconds = top.elapsed > 0 ? `${top.elapsed}s` : "30秒内";
+  return `#1 ${top.grade} ${top.score}/100 · ${seconds}`;
+}
+
+function formatOpeningRushLeaderboardEntry(entry) {
+  const normalized = normalizeOpeningRushLeaderboardEntry(entry);
+  if (!normalized) {
+    return "";
+  }
+  const seconds = normalized.elapsed > 0 ? `${normalized.elapsed}s` : "30秒内";
+  const chief = normalized.chiefChallenge ? " · 首席再巡" : "";
+  return `#${normalized.rank || "?"} ${normalized.grade} ${normalized.score}/100 · ${seconds}${chief}`;
 }
 
 function getOpeningRushCoachText(rush = runStats?.openingRush) {
@@ -4995,6 +5090,7 @@ function createRunReview(victory) {
     openingRush,
     openingRushSBadgeReward: normalizeOpeningRushSBadgeReward(archiveState?.lastOpeningRushSBadgeReward),
     chiefOpeningChallengeReward: normalizeChiefOpeningChallengeReward(archiveState?.lastChiefOpeningChallengeReward),
+    openingRushLeaderboardEntry: normalizeOpeningRushLeaderboardEntry(archiveState?.lastOpeningRushLeaderboardEntry),
     at: Date.now(),
   };
 }
@@ -6956,6 +7052,7 @@ function renderStartMenu() {
     ["最佳开场", formatOpeningRushArchiveBest(archiveState)],
     ["S级开场", formatOpeningRushSBadge(archiveState)],
     ["首席再巡", formatChiefOpeningChallenge(archiveState)],
+    ["开场榜首", formatOpeningRushLeaderboardTop(archiveState)],
     ["成就", `${readUnlockedAchievements().length}/${achievements.length}`],
   ];
   ui.startStats.innerHTML = "";
@@ -9676,6 +9773,7 @@ function renderResultStats(victory) {
   const minutes = Math.floor(durationSeconds / 60);
   const seconds = durationSeconds % 60;
   const chiefReward = normalizeChiefOpeningChallengeReward(archiveState?.lastChiefOpeningChallengeReward);
+  const leaderboardEntry = normalizeOpeningRushLeaderboardEntry(archiveState?.lastOpeningRushLeaderboardEntry);
   const stats = [
     ["章节", `${runStats?.chaptersCleared ?? 0}/${chapters.length}`],
     ["等级", `Lv.${runStats?.highestLevel ?? player.level}`],
@@ -9686,6 +9784,7 @@ function renderResultStats(victory) {
     ["最佳连段", `x${runStats?.tempo?.bestStreak ?? 0}`],
     ["开场评级", formatOpeningRushScore(runStats?.openingRush)],
     ["首席再巡", chiefReward ? `+${chiefReward.amount}碎片` : formatChiefOpeningChallenge(archiveState)],
+    ["开场榜", leaderboardEntry ? formatOpeningRushLeaderboardEntry(leaderboardEntry) : formatOpeningRushLeaderboardTop(archiveState)],
     ["评级来源", getOpeningRushSourceText(runStats?.openingRush)],
     ["耗时", `${minutes}:${String(seconds).padStart(2, "0")}`],
     ["构筑", getBuildSummary()],
@@ -9753,6 +9852,14 @@ function renderResultInsights(review = archiveState?.lastRunReview) {
       `第 ${normalized.chiefOpeningChallengeReward.completionCount} 次完成`,
       `已在首席夜巡印记生效后再次打出 S 级开场，获得 +${normalized.chiefOpeningChallengeReward.amount} 校准碎片。下一把继续追更快裂隙路线。`,
       "is-boost",
+    ]);
+  }
+  if (normalized.openingRushLeaderboardEntry) {
+    cards.push([
+      "开场榜",
+      formatOpeningRushLeaderboardEntry(normalized.openingRushLeaderboardEntry),
+      `本局进入档案 Top 5。得分来源：${normalized.openingRushLeaderboardEntry.sourceText}。继续压缩裂隙用时可以刷新榜首。`,
+      "is-plan",
     ]);
   }
   cards.push(["下一把", normalized.nextTitle, normalized.nextText, "is-next"]);
@@ -14392,6 +14499,7 @@ function installAutomationTestHooks() {
     const rushBeforeArchive = getOpeningRushSnapshot(runStats.openingRush);
     const archived = recordOpeningRushInArchive(runStats.openingRush);
     const challengeReward = normalizeChiefOpeningChallengeReward(archiveState.lastChiefOpeningChallengeReward);
+    const leaderboardEntry = normalizeOpeningRushLeaderboardEntry(archiveState.lastOpeningRushLeaderboardEntry);
     saveArchive();
     world.mode = "menu";
     renderStartMenu();
@@ -14409,6 +14517,7 @@ function installAutomationTestHooks() {
       recommendedStarterBuildId: "queue-barrage",
       openingRush: rushBeforeArchive,
       chiefOpeningChallengeReward: challengeReward,
+      openingRushLeaderboardEntry: leaderboardEntry,
       at: Date.now(),
     });
     renderResultInsights(review);
@@ -14418,6 +14527,8 @@ function installAutomationTestHooks() {
         && startSummaryBefore.includes("首席再巡挑战")
         && startStatsBefore.includes("首席再巡")
         && startStatsBefore.includes("待完成")
+        && startStatsBefore.includes("开场榜首")
+        && startStatsBefore.includes("暂无记录")
         && metaSummaryBefore.includes("首席再巡")
         && coachAfterS.includes("首席再巡")
         && coachAfterS.includes(`+${openingRushConfig.chiefChallengeRewardShards}碎片`)
@@ -14428,10 +14539,17 @@ function installAutomationTestHooks() {
         && archiveState.chiefOpeningChallengeCompletions === 1
         && archiveState.bestChiefOpeningChallengeScore === 100
         && archiveState.calibrationShards >= openingRushConfig.chiefChallengeRewardShards
+        && leaderboardEntry?.rank === 1
+        && leaderboardEntry?.score === 100
+        && archiveState.openingRushLeaderboard.length === 1
         && startStatsAfter.includes("1次")
+        && startStatsAfter.includes("开场榜首")
+        && startStatsAfter.includes("#1 S 100/100")
         && metaSummaryAfter.includes("1次")
         && insightsText.includes("首席再巡")
-        && insightsText.includes(`+${openingRushConfig.chiefChallengeRewardShards} 校准碎片`),
+        && insightsText.includes(`+${openingRushConfig.chiefChallengeRewardShards} 校准碎片`)
+        && insightsText.includes("开场榜")
+        && insightsText.includes("Top 5"),
       startSummaryBefore,
       startStatsBefore,
       metaSummaryBefore,
@@ -14439,6 +14557,7 @@ function installAutomationTestHooks() {
       rush: rushBeforeArchive,
       archived,
       challengeReward,
+      leaderboardEntry,
       startStatsAfter,
       metaSummaryAfter,
       insightsText,
@@ -14447,6 +14566,7 @@ function installAutomationTestHooks() {
         completions: archiveState.chiefOpeningChallengeCompletions,
         bestScore: archiveState.bestChiefOpeningChallengeScore,
         lastReward: challengeReward,
+        leaderboard: cloneForSave(archiveState.openingRushLeaderboard, []),
       },
     };
     ui.resultInsights.innerHTML = "";
