@@ -112,6 +112,30 @@ if (manifest && page) {
     errors.push(`Leaderboard/meta screenshot role should be leaderboard_meta_progression, got ${leaderboardOrder?.role}`);
   }
 
+  const leaderboardPromo = page.reviewArtifacts?.leaderboardPromo;
+  if (!leaderboardPromo) {
+    errors.push("Leaderboard promo review artifact is required");
+  } else {
+    if (leaderboardPromo.sourceScreenshot !== leaderboardMeta?.targetFile) {
+      errors.push(`Leaderboard promo should source ${leaderboardMeta?.targetFile}, got ${leaderboardPromo.sourceScreenshot}`);
+    }
+    if (leaderboardPromo.width !== 1920 || leaderboardPromo.height !== 1080) {
+      errors.push(`Leaderboard promo should be 1920x1080, got ${leaderboardPromo.width}x${leaderboardPromo.height}`);
+    }
+    for (const term of ["30秒开场榜", "三套 #1 全S", "S连胜 x6", "首榜奖励 3/3", "成就 11/11"]) {
+      const haystack = [
+        leaderboardPromo.titleZhCN,
+        leaderboardPromo.subtitleZhCN,
+        ...(leaderboardPromo.badges ?? []),
+        ...(leaderboardPromo.cardValues ?? []),
+        leaderboardPromo.footerZhCN,
+      ].map(String);
+      if (!haystack.some((item) => item.includes(term))) {
+        errors.push(`Leaderboard promo copy should include ${term}`);
+      }
+    }
+  }
+
   const capsules = new Map((manifest.capsules ?? []).map((capsule) => [capsule.id, capsule]));
   const capsuleUse = page.capsuleUse ?? {};
   for (const [slot, capsuleId] of Object.entries(capsuleUse)) {

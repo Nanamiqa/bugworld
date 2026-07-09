@@ -111,6 +111,16 @@ npm run export:store-contact-sheet
 
 - `desktop/steam/store-assets/review/store-screenshot-contact-sheet.png`
 
+生成开场榜传播图：
+
+```powershell
+npm run export:leaderboard-promo
+```
+
+输出文件：
+
+- `desktop/steam/store-assets/review/leaderboard-meta-promo.png`：30 秒开场榜传播图，突出总榜 #1、三套 #1 全 S、S 连胜、首榜奖励和成就证明。
+
 生成商店文案预览图：
 
 ```powershell

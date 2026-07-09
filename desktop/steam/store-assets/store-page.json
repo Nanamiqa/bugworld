@@ -84,6 +84,21 @@
       "height": 1080,
       "status": "ready",
       "purpose": "Second-to-fifth chapter combat screenshot candidates with device, enemy mechanic, boss window, and VFX checks."
+    },
+    "leaderboardPromo": {
+      "path": "desktop/steam/store-assets/review/leaderboard-meta-promo.png",
+      "width": 1920,
+      "height": 1080,
+      "status": "ready",
+      "purpose": "Short shareable proof image for the 30-second opening leaderboard loop.",
+      "sourceScreenshot": "desktop/steam/store-assets/screenshots/01-start-menu.png",
+      "titleZhCN": "30秒开场榜",
+      "titleEnUS": "OPENING RUSH LEADERBOARD",
+      "subtitleZhCN": "三套流派 #1 全S，首榜奖励全领。",
+      "badges": ["总榜 #1 · S 100/100", "三套 #1 全S", "S连胜 x6", "首榜奖励 3/3", "成就 11/11"],
+      "cardTitles": ["总榜冲刺", "三套流派", "重开动力", "成就证明"],
+      "cardValues": ["#1 · 18.4s", "断点 / 键盘 / 修正", "S连胜 x6", "三流派首榜"],
+      "footerZhCN": "从第一把开始就有可追的榜、可领的碎片和可晒的成就。"
     }
   }
 }
