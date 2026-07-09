@@ -149,6 +149,20 @@
           "desktop/steam/store-assets/review/leaderboard-frame-02-builds.png",
           "desktop/steam/store-assets/review/leaderboard-frame-03-rewards.png"
         ]
+      },
+      "announcementHeader": {
+        "path": "desktop/steam/store-assets/review/leaderboard-announcement-header.png",
+        "width": 1920,
+        "height": 622,
+        "status": "ready",
+        "purpose": "Steam announcement header focused on the replayable opening leaderboard hook.",
+        "sourcePromo": "desktop/steam/store-assets/review/leaderboard-meta-promo.png",
+        "sourceFrame": "desktop/steam/store-assets/review/leaderboard-frame-01-hook.png",
+        "headlineZhCN": "第一把就想追榜",
+        "headlineEnUS": "OPENING RUSH LEADERBOARD",
+        "deckZhCN": "30秒开场榜 · 三套 #1 全S · S连胜 x6",
+        "footerZhCN": "从第一把开始就有可追的榜、可领的碎片和可晒的成就。",
+        "chips": ["总榜 #1 · 18.4s", "三套 #1 全S", "S连胜 x6", "首榜奖励 3/3", "成就 11/11"]
       }
     }
   }

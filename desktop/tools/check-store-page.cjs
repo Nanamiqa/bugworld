@@ -222,6 +222,38 @@ if (manifest && page) {
         }
       }
     }
+    const announcementHeader = leaderboardPromo.announcementHeader;
+    if (!announcementHeader) {
+      errors.push("Leaderboard promo should include an announcementHeader PNG artifact");
+    } else {
+      ensureReadyImage(
+        announcementHeader,
+        announcementHeader.path,
+        announcementHeader.width,
+        announcementHeader.height,
+        "Leaderboard announcement header"
+      );
+      if (announcementHeader.width !== 1920 || announcementHeader.height !== 622) {
+        errors.push(`Leaderboard announcement header should be 1920x622, got ${announcementHeader.width}x${announcementHeader.height}`);
+      }
+      if (announcementHeader.sourcePromo !== leaderboardPromo.path) {
+        errors.push(`Leaderboard announcement header should source ${leaderboardPromo.path}, got ${announcementHeader.sourcePromo}`);
+      }
+      if (announcementHeader.sourceFrame !== frames[0]?.path) {
+        errors.push(`Leaderboard announcement header should source the first teaser frame, got ${announcementHeader.sourceFrame}`);
+      }
+      const headerCopy = [
+        announcementHeader.headlineZhCN,
+        announcementHeader.headlineEnUS,
+        announcementHeader.deckZhCN,
+        ...(announcementHeader.chips ?? []),
+      ].map(String);
+      for (const term of ["第一把就想追榜", "30秒开场榜", "三套 #1 全S", "S连胜 x6", "首榜奖励 3/3"]) {
+        if (!headerCopy.some((item) => item.includes(term))) {
+          errors.push(`Leaderboard announcement header copy should include ${term}`);
+        }
+      }
+    }
   }
 
   const capsules = new Map((manifest.capsules ?? []).map((capsule) => [capsule.id, capsule]));

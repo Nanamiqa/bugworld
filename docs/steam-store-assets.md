@@ -117,6 +117,7 @@ npm run export:store-contact-sheet
 npm run export:leaderboard-promo
 npm run export:leaderboard-frames
 npm run export:leaderboard-loop
+npm run export:leaderboard-header
 ```
 
 输出文件：
@@ -126,6 +127,7 @@ npm run export:leaderboard-loop
 - `desktop/steam/store-assets/review/leaderboard-frame-02-builds.png`：三帧短预告第 2 帧，强调三套流派 #1 全 S。
 - `desktop/steam/store-assets/review/leaderboard-frame-03-rewards.png`：三帧短预告第 3 帧，强调奖励、连胜和成就回收。
 - `desktop/steam/store-assets/review/leaderboard-teaser-loop.gif`：960 x 540 三帧循环动图，可直接作为 Steam 公告或社媒预览的轻量榜单钩子。
+- `desktop/steam/store-assets/review/leaderboard-announcement-header.png`：1920 x 622 Steam 公告头图，首屏突出“第一把就想追榜”的局外重开钩子。
 
 生成商店文案预览图：
 

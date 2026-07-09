@@ -168,4 +168,5 @@
 - [x] 把榜单闭环做成独立商店宣传图：新增 `leaderboard-meta-promo.png`，用“30秒开场榜 / 三套 #1 全S / S连胜 x6 / 首榜奖励 3/3 / 成就 11/11”压缩说明局外重开动力，并接入 `store-page.json` 复核资产、导出脚本和商店页校验。
 - [x] 将榜单闭环扩展成三帧短预告素材：新增 `leaderboard-frame-01-hook.png`、`leaderboard-frame-02-builds.png`、`leaderboard-frame-03-rewards.png`，分别讲第一把追榜、三套流派 #1 全 S、奖励/连胜/成就回收，并接入 `export:leaderboard-frames`、商店页校验和素材文档。
 - [x] 将三帧榜单预告合成为轻量循环 GIF：新增 `leaderboard-teaser-loop.gif` 和 `export:leaderboard-loop`，商店页校验会验证 GIF 尺寸、帧源和阅读节奏，可用于 Steam 公告或社媒预览。
-- [ ] 下一轮继续观察榜单传播力：如果 GIF 仍不够抓眼，就做 Steam 公告头图版式或再捕一段 6-8 秒实机短视频，强化“第一把就想追榜”的外部传播钩子。
+- [x] 追加 Steam 公告头图版式：新增 `leaderboard-announcement-header.png` 和 `export:leaderboard-header`，用 1920 x 622 首屏图强化“第一把就想追榜”的外部传播钩子，并接入商店页校验。
+- [ ] 下一轮继续观察榜单传播力：如果静态头图和 GIF 仍不够抓眼，就再捕一段 6-8 秒实机短视频，把第一异常、裂隙落点、先手截击和 S 级评分串成真实可看的短片。
