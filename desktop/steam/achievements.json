@@ -61,6 +61,12 @@
       "displayName": "三连S开场",
       "description": "在首席夜巡印记生效后，连续 3 次打出 S级开场。",
       "hidden": false
+    },
+    {
+      "apiName": "ACH_ALL_BUILD_FIRSTS",
+      "displayName": "三流派首榜",
+      "description": "让三套推荐流派都以 S级开场登上各自流派榜首。",
+      "hidden": false
     }
   ]
 }

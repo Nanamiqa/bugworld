@@ -70,5 +70,12 @@
       steamApiName: "ACH_OPENING_S_STREAK",
       trigger: "opening_streak",
     },
+    {
+      id: "ACH_ALL_BUILD_FIRSTS",
+      title: "三流派首榜",
+      description: "让三套推荐流派都以 S级开场登上各自流派榜首。",
+      steamApiName: "ACH_ALL_BUILD_FIRSTS",
+      trigger: "opening_build_mastery",
+    },
   ];
 })();

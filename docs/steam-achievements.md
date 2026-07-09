@@ -16,6 +16,7 @@
 | `ACH_LOW_DAMAGE_CLEAR` | 低噪声通关 | 以不超过 80 点总受伤完成五章 |
 | `ACH_S_RANK_OPENER` | 首席夜巡 | 拿到 S级开场徽章，并购买首席夜巡印记 |
 | `ACH_OPENING_S_STREAK` | 三连S开场 | 在首席夜巡印记生效后，连续 3 次打出 S级开场 |
+| `ACH_ALL_BUILD_FIRSTS` | 三流派首榜 | 让三套推荐流派都以 S级开场登上各自流派榜首 |
 
 ## 文件关系
 

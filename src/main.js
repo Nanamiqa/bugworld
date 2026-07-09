@@ -2567,12 +2567,13 @@ function loadArchive() {
 
 function saveArchive() {
   if (isStoreShotMode) {
-    return;
+    return true;
   }
   try {
-    writePlatformJson(ARCHIVE_STORAGE_KEY, archiveState);
+    return writePlatformJson(ARCHIVE_STORAGE_KEY, archiveState);
   } catch {
     // Local storage can be unavailable in some embedded previews.
+    return false;
   }
 }
 
@@ -4183,6 +4184,12 @@ function recordOpeningRushInArchive(rush = runStats?.openingRush) {
         buildLeaderboardReward.starterBuildId,
       ];
       archiveState.lastOpeningRushBuildLeaderboardReward = buildLeaderboardReward;
+      const completedBuildRewardCount = normalizeOpeningRushBuildRewardIds(
+        archiveState.completedOpeningRushBuildLeaderboardRewards,
+      ).length;
+      if (completedBuildRewardCount >= starterBuilds.length) {
+        unlockLocalAchievement("ACH_ALL_BUILD_FIRSTS", { playCue: false });
+      }
     }
   }
   return {
@@ -7277,12 +7284,12 @@ function renderStarterBuilds() {
   }
 }
 
-function renderStartMenu() {
+function renderStartMenu(options = {}) {
   if (!ui.startPanel) {
     return;
   }
 
-  archiveState = isStoreShotMode ? archiveState : loadArchive();
+  archiveState = isStoreShotMode || options.preserveArchive ? archiveState : loadArchive();
   const runSave = isStoreShotMode ? null : loadRunSave();
   const bestChapter = Math.min(archiveState.bestChapter ?? 1, chapters.length);
   const echoSummary = getEchoArchiveSummary();
@@ -14813,9 +14820,22 @@ function installAutomationTestHooks() {
     const leaderboardEntry = normalizeOpeningRushLeaderboardEntry(archiveState.lastOpeningRushLeaderboardEntry);
     const buildLeaderboardEntry = normalizeOpeningRushLeaderboardEntry(archiveState.lastOpeningRushBuildLeaderboardEntry);
     const buildLeaderboardReward = normalizeOpeningRushBuildLeaderboardReward(archiveState.lastOpeningRushBuildLeaderboardReward);
-    saveArchive();
+    const archiveAfterRecord = cloneForSave(archiveState, null);
+    const archiveSavedAfterRecord = saveArchive();
+    const archiveReadBackAfterRecord = loadArchive();
+    const archiveRoundTripAfterRecord = {
+      saved: Boolean(archiveSavedAfterRecord),
+      calibrationShards: archiveReadBackAfterRecord?.calibrationShards ?? 0,
+      completions: archiveReadBackAfterRecord?.chiefOpeningChallengeCompletions ?? 0,
+      streak: archiveReadBackAfterRecord?.openingRushSStreak ?? 0,
+      leaderboardCount: archiveReadBackAfterRecord?.openingRushLeaderboard?.length ?? 0,
+      buildRewardCount: normalizeOpeningRushBuildRewardIds(
+        archiveReadBackAfterRecord?.completedOpeningRushBuildLeaderboardRewards,
+      ).length,
+    };
+    archiveState = archiveAfterRecord ?? archiveState;
     world.mode = "menu";
-    renderStartMenu();
+    renderStartMenu({ preserveArchive: true });
     const startStatsAfter = ui.startStats?.textContent ?? "";
     const metaSummaryAfter = ui.metaSummary?.textContent ?? "";
     const starterBuildsAfter = ui.starterBuilds?.textContent ?? "";
@@ -14924,6 +14944,7 @@ function installAutomationTestHooks() {
       leaderboardEntry,
       buildLeaderboardEntry,
       buildLeaderboardReward,
+      archiveRoundTripAfterRecord,
       startStatsAfter,
       metaSummaryAfter,
       starterBuildsAfter,
@@ -14939,6 +14960,133 @@ function installAutomationTestHooks() {
         leaderboard: cloneForSave(archiveState.openingRushLeaderboard, []),
         buildLeaderboards: cloneForSave(archiveState.openingRushBuildLeaderboards, {}),
         buildLeaderboardRewards: cloneForSave(archiveState.completedOpeningRushBuildLeaderboardRewards, []),
+      },
+    };
+    ui.resultInsights.innerHTML = "";
+    deleteRunSave();
+    writePlatformJson(ACHIEVEMENT_STORAGE_KEY, previousAchievements);
+    archiveState = previousArchive ?? loadArchive();
+    runStats = previousRunStats ?? createRunStats();
+    saveArchive();
+    return result;
+  }
+
+  function runOpeningRushBuildMasteryAchievementProbe() {
+    const previousArchive = cloneForSave(archiveState, null);
+    const previousRunStats = cloneForSave(runStats, null);
+    const previousAchievements = [...readUnlockedAchievements()];
+    writePlatformJson(
+      ACHIEVEMENT_STORAGE_KEY,
+      previousAchievements.filter((id) => id !== "ACH_ALL_BUILD_FIRSTS"),
+    );
+    resetStoreRun(0, { stepIndex: 0, bugPoints: 0, hp: 80, xp: 0, weaponIndex: 1 });
+    archiveState = {
+      ...createArchiveFallback(),
+      calibrationShards: 0,
+      bestOpeningRushScore: 95,
+      bestOpeningRushGrade: "S",
+      bestOpeningRushAt: Date.now(),
+      openingRushSBadgeUnlocked: true,
+      openingRushSBadgeAt: Date.now(),
+      openingRushSBadgeScore: 95,
+      completedOpeningRushBuildLeaderboardRewards: ["precision-breakpoint", "close-control"],
+      lastOpeningRushBuildLeaderboardReward: null,
+    };
+    saveArchive();
+    world.mode = "menu";
+    renderStartMenu();
+    const startStatsBefore = ui.startStats?.textContent ?? "";
+    const metaSummaryBefore = ui.metaSummary?.textContent ?? "";
+    const starterBuildsBefore = ui.starterBuilds?.textContent ?? "";
+    runStats = createRunStats();
+    runStats.openingRush = createOpeningRushState();
+    runStats.openingSprint = createOpeningSprintState();
+    runStats.starterBuild = "queue-barrage";
+    runStats.starterIgnition = createStarterIgnitionState(getStarterBuildById(runStats.starterBuild));
+    world.mode = "playing";
+    completeOpeningRushMilestone("anomaly");
+    completeOpeningRushMilestone("first-strike");
+    completeOpeningRushMilestone("surge");
+    completeOpeningRushMilestone("overclock");
+    completeOpeningRushMilestone("retry-route");
+    const rushBeforeArchive = getOpeningRushSnapshot(runStats.openingRush);
+    const archived = recordOpeningRushInArchive(runStats.openingRush);
+    const buildReward = normalizeOpeningRushBuildLeaderboardReward(archiveState.lastOpeningRushBuildLeaderboardReward);
+    const masteryAchievementUnlocked = readUnlockedAchievements().includes("ACH_ALL_BUILD_FIRSTS");
+    const archiveAfterRecord = cloneForSave(archiveState, null);
+    const archiveSavedAfterRecord = saveArchive();
+    const archiveReadBackAfterRecord = loadArchive();
+    const archiveRoundTripAfterRecord = {
+      saved: Boolean(archiveSavedAfterRecord),
+      calibrationShards: archiveReadBackAfterRecord?.calibrationShards ?? 0,
+      leaderboardCount: archiveReadBackAfterRecord?.openingRushLeaderboard?.length ?? 0,
+      buildRewardCount: normalizeOpeningRushBuildRewardIds(
+        archiveReadBackAfterRecord?.completedOpeningRushBuildLeaderboardRewards,
+      ).length,
+    };
+    archiveState = archiveAfterRecord ?? archiveState;
+    world.mode = "menu";
+    renderStartMenu({ preserveArchive: true });
+    const startStatsAfter = ui.startStats?.textContent ?? "";
+    const metaSummaryAfter = ui.metaSummary?.textContent ?? "";
+    const starterBuildsAfter = ui.starterBuilds?.textContent ?? "";
+    const review = normalizeLastRunReview({
+      outcome: "defeat",
+      chapterTitle: currentChapter().title,
+      highlightTitle: rushBeforeArchive.gradeTitle,
+      highlightText: rushBeforeArchive.gradeText,
+      pressureTitle: "继续压缩三套流派榜",
+      pressureText: "三套推荐流派都已经证明能在 30 秒内打出 S。",
+      nextTitle: "三流派首榜",
+      nextText: "三套首榜已全领，下一步可以冲总榜用时和 S 连胜。",
+      recommendedStarterBuildId: "queue-barrage",
+      openingRush: rushBeforeArchive,
+      openingRushLeaderboardEntry: normalizeOpeningRushLeaderboardEntry(archiveState.lastOpeningRushLeaderboardEntry),
+      openingRushBuildLeaderboardEntry: normalizeOpeningRushLeaderboardEntry(archiveState.lastOpeningRushBuildLeaderboardEntry),
+      openingRushBuildLeaderboardReward: buildReward,
+      at: Date.now(),
+    });
+    renderResultInsights(review);
+    const insightsText = ui.resultInsights?.textContent ?? "";
+    const claimedRewards = normalizeOpeningRushBuildRewardIds(archiveState.completedOpeningRushBuildLeaderboardRewards);
+    const result = {
+      ok: startStatsBefore.includes("流派首榜")
+        && startStatsBefore.includes("2/3")
+        && metaSummaryBefore.includes("流派首榜 2/3")
+        && starterBuildsBefore.includes("键盘弹幕流")
+        && starterBuildsBefore.includes("首次S登顶")
+        && archived.buildLeaderboardReward?.starterBuildId === "queue-barrage"
+        && buildReward?.amount === openingRushConfig.buildLeaderboardRewardShards
+        && claimedRewards.length === starterBuilds.length
+        && claimedRewards.includes("precision-breakpoint")
+        && claimedRewards.includes("queue-barrage")
+        && claimedRewards.includes("close-control")
+        && masteryAchievementUnlocked
+        && archiveState.calibrationShards >= openingRushConfig.buildLeaderboardRewardShards
+        && startStatsAfter.includes("流派首榜")
+        && startStatsAfter.includes("3/3")
+        && metaSummaryAfter.includes("流派首榜已全领")
+        && starterBuildsAfter.includes("键盘弹幕流")
+        && starterBuildsAfter.includes("首榜奖励：已领取")
+        && insightsText.includes("流派首榜")
+        && insightsText.includes("键盘弹幕流")
+        && insightsText.includes(`+${openingRushConfig.buildLeaderboardRewardShards} 校准碎片`),
+      startStatsBefore,
+      metaSummaryBefore,
+      starterBuildsBefore,
+      rush: rushBeforeArchive,
+      archived,
+      buildReward,
+      masteryAchievementUnlocked,
+      archiveRoundTripAfterRecord,
+      startStatsAfter,
+      metaSummaryAfter,
+      starterBuildsAfter,
+      insightsText,
+      archive: {
+        calibrationShards: archiveState.calibrationShards,
+        buildLeaderboardRewards: cloneForSave(archiveState.completedOpeningRushBuildLeaderboardRewards, []),
+        buildLeaderboards: cloneForSave(archiveState.openingRushBuildLeaderboards, {}),
       },
     };
     ui.resultInsights.innerHTML = "";
@@ -15926,6 +16074,7 @@ function installAutomationTestHooks() {
     const openingRouteReadability = runOpeningRouteReadabilityProbe();
     const openingRushRating = runOpeningRushRatingProbe();
     const chiefOpeningChallenge = runChiefOpeningChallengeProbe();
+    const openingRushBuildMastery = runOpeningRushBuildMasteryAchievementProbe();
     const openingRushTiming = runOpeningRushTimingProbe();
     const hitFeedback = runHitFeedbackProbe();
     const fairWarning = runFairWarningProbe();
@@ -15965,6 +16114,9 @@ function installAutomationTestHooks() {
     }
     if (!chiefOpeningChallenge.ok) {
       failures.push("chief opening challenge failed");
+    }
+    if (!openingRushBuildMastery.ok) {
+      failures.push("opening rush build mastery achievement failed");
     }
     if (!openingRushTiming.ok) {
       failures.push("opening rush timing failed");
@@ -16080,6 +16232,7 @@ function installAutomationTestHooks() {
       openingRouteReadability,
       openingRushRating,
       chiefOpeningChallenge,
+      openingRushBuildMastery,
       openingRushTiming,
       hitFeedback,
       fairWarning,
@@ -16110,6 +16263,7 @@ function installAutomationTestHooks() {
     runOpeningRouteReadabilityProbe,
     runOpeningRushRatingProbe,
     runChiefOpeningChallengeProbe,
+    runOpeningRushBuildMasteryAchievementProbe,
     runOpeningRushTimingProbe,
     runHitFeedbackProbe,
     runFairWarningProbe,
