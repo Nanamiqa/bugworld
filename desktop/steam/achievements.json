@@ -49,6 +49,12 @@
       "displayName": "低噪声通关",
       "description": "以不超过 80 点总受伤完成五章。",
       "hidden": false
+    },
+    {
+      "apiName": "ACH_S_RANK_OPENER",
+      "displayName": "首席夜巡",
+      "description": "拿到 S级开场徽章，并购买首席夜巡印记。",
+      "hidden": false
     }
   ]
 }

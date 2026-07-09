@@ -1864,7 +1864,7 @@ function achievementById(id) {
   return achievements.find((achievement) => achievement.id === id);
 }
 
-function unlockLocalAchievement(id) {
+function unlockLocalAchievement(id, options = {}) {
   const achievement = achievementById(id);
   if (!achievement) {
     return false;
@@ -1872,7 +1872,9 @@ function unlockLocalAchievement(id) {
   const unlocked = platform.unlockAchievement?.(achievement.steamApiName ?? achievement.id);
   if (unlocked) {
     setLog(`成就解锁：${achievement.title}。`);
-    playAudioCue("upgrade-select");
+    if (options.playCue !== false) {
+      playAudioCue("upgrade-select");
+    }
     return true;
   }
   return false;
@@ -2513,6 +2515,9 @@ function buyMetaUpgrade(id) {
   metaUnlockPulseNodeId = node.id;
   playAudioCue("upgrade-select");
   setLog(`档案校准完成：${node.title} Lv.${level + 1}/${node.maxLevel}。`);
+  if (node.id === "s-rank-opener") {
+    unlockLocalAchievement("ACH_S_RANK_OPENER", { playCue: false });
+  }
   renderStartMenu();
   syncHud();
   return true;
@@ -13596,6 +13601,7 @@ function installAutomationTestHooks() {
     const previousArchive = cloneForSave(archiveState, null);
     const previousRunStats = cloneForSave(runStats, null);
     const previousChapterIndex = currentChapterIndex;
+    const previousAchievements = [...readUnlockedAchievements()];
     archiveState = {
       ...createArchiveFallback(),
       bestChapter: 3,
@@ -13637,7 +13643,12 @@ function installAutomationTestHooks() {
     renderMetaProgression();
     const sSuggestionText = ui.metaSummary?.textContent ?? "";
     const sRecommended = Boolean(ui.metaProgression?.querySelector(".meta-node.is-recommended"));
+    writePlatformJson(
+      ACHIEVEMENT_STORAGE_KEY,
+      previousAchievements.filter((id) => id !== "ACH_S_RANK_OPENER"),
+    );
     const sBought = buyMetaUpgrade("s-rank-opener");
+    const sAchievementUnlocked = readUnlockedAchievements().includes("ACH_S_RANK_OPENER");
     const sLevel = getMetaLevel("s-rank-opener");
     const sBonuses = getMetaProgressionBonuses(0);
     currentChapterIndex = 0;
@@ -13646,6 +13657,7 @@ function installAutomationTestHooks() {
     const surgeDelayBefore = runStats.openingSprint.surge.delayRemaining;
     const sApplied = applyOpeningSBadgeMetaToSprint(runStats.openingSprint, 0);
     const surgeDelayAfter = runStats.openingSprint.surge.delayRemaining;
+    writePlatformJson(ACHIEVEMENT_STORAGE_KEY, previousAchievements);
     archiveState = previousArchive ?? loadArchive();
     runStats = previousRunStats ?? createRunStats();
     currentChapterIndex = previousChapterIndex;
@@ -13669,6 +13681,7 @@ function installAutomationTestHooks() {
         && sSuggestionText.includes("建议：首席夜巡印记")
         && sRecommended
         && sBought
+        && sAchievementUnlocked
         && sLevel === 1
         && sBonuses.bugPoints === 1
         && sBonuses.openingSurgeDelayMultiplier < 1
@@ -13681,6 +13694,7 @@ function installAutomationTestHooks() {
         suggestion: sSuggestionText,
         recommended: sRecommended,
         bought: sBought,
+        achievementUnlocked: sAchievementUnlocked,
         level: sLevel,
         bugPoints: sBonuses.bugPoints,
         delayMultiplier: sBonuses.openingSurgeDelayMultiplier,

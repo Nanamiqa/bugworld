@@ -56,5 +56,12 @@
       steamApiName: "ACH_LOW_DAMAGE_CLEAR",
       trigger: "victory",
     },
+    {
+      id: "ACH_S_RANK_OPENER",
+      title: "首席夜巡",
+      description: "拿到 S级开场徽章，并购买首席夜巡印记。",
+      steamApiName: "ACH_S_RANK_OPENER",
+      trigger: "meta_upgrade",
+    },
   ];
 })();
