@@ -153,7 +153,7 @@
       "status": "ready",
       "targetFile": "desktop/steam/store-assets/screenshots/01-start-menu.png",
       "captureUrl": "index.html?storeShot=leaderboard",
-      "mustShow": ["开场榜首 #1", "三套流派榜首", "流派首榜 3/3", "S连胜 x6", "三流派首榜成就"]
+      "mustShow": ["开场榜首 #1", "三套流派榜首", "三套 #1 全S", "流派首榜 3/3", "S连胜 x6", "三流派首榜成就"]
     },
     {
       "id": "screenshot_02_chapter_one_map",

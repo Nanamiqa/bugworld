@@ -4300,8 +4300,30 @@ function formatOpeningRushBuildLeaderboardEntry(entry) {
   return `${normalized.starterBuildTitle} #${normalized.rank || "?"} ${normalized.grade} ${normalized.score}/100 · ${seconds}`;
 }
 
+function getStarterBuildShortTitle(build) {
+  const title = build?.title ?? "";
+  if (title.includes("断点")) {
+    return "断点";
+  }
+  if (title.includes("键盘")) {
+    return "键盘";
+  }
+  if (title.includes("修正")) {
+    return "修正";
+  }
+  return title.replace(/流$/, "").slice(0, 4) || "流派";
+}
+
 function formatOpeningRushBuildLeaderboardTop(archive = archiveState) {
   const boards = normalizeOpeningRushBuildLeaderboards(archive?.openingRushBuildLeaderboards);
+  const topByBuild = starterBuilds
+    .map((build) => ({ build, entry: boards[build.id]?.[0] ?? null }))
+    .filter((item) => item.entry);
+  if (topByBuild.length === starterBuilds.length) {
+    const allS = topByBuild.every((item) => item.entry.grade === "S");
+    const labels = topByBuild.map((item) => getStarterBuildShortTitle(item.build)).join("/");
+    return `三套 #1${allS ? " 全S" : ""} · ${labels}`;
+  }
   const topEntries = starterBuilds
     .map((build) => boards[build.id]?.[0] ?? null)
     .filter(Boolean)
@@ -15094,6 +15116,14 @@ function installAutomationTestHooks() {
       openingRushSBadgeAt: Date.now(),
       openingRushSBadgeScore: 95,
       completedOpeningRushBuildLeaderboardRewards: ["precision-breakpoint", "close-control"],
+      openingRushBuildLeaderboards: {
+        "precision-breakpoint": normalizeOpeningRushLeaderboard([
+          createStoreOpeningRushLeaderboardEntry(getStarterBuildById("precision-breakpoint"), 1),
+        ], 3),
+        "close-control": normalizeOpeningRushLeaderboard([
+          createStoreOpeningRushLeaderboardEntry(getStarterBuildById("close-control"), 2),
+        ], 3),
+      },
       lastOpeningRushBuildLeaderboardReward: null,
     };
     saveArchive();
@@ -15169,6 +15199,8 @@ function installAutomationTestHooks() {
         && archiveState.calibrationShards >= openingRushConfig.buildLeaderboardRewardShards
         && startStatsAfter.includes("流派首榜")
         && startStatsAfter.includes("3/3")
+        && startStatsAfter.includes("三套 #1")
+        && startStatsAfter.includes("断点/键盘/修正")
         && metaSummaryAfter.includes("流派首榜已全领")
         && starterBuildsAfter.includes("键盘弹幕流")
         && starterBuildsAfter.includes("首榜奖励：已领取")
