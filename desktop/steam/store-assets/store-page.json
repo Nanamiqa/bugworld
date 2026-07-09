@@ -106,8 +106,8 @@
           "width": 1920,
           "height": 1080,
           "status": "ready",
-          "titleZhCN": "第一把就追榜",
-          "subtitleZhCN": "30 秒开场，把首个异常、快递裂隙和武器超频串成 S 级冲刺。",
+          "titleZhCN": "首把追榜",
+          "subtitleZhCN": "第一把就追榜：首异常、快递裂隙和武器超频串成 S 级冲刺。",
           "metricTitle": "总榜冲刺",
           "metricValue": "#1 · 18.4s",
           "tag": "HOOK"
@@ -130,13 +130,26 @@
           "width": 1920,
           "height": 1080,
           "status": "ready",
-          "titleZhCN": "奖励 3/3 · 成就 11/11",
-          "subtitleZhCN": "S 连胜、首榜碎片和三流派首榜成就，把重开变成下一次目标。",
+          "titleZhCN": "奖励回收",
+          "subtitleZhCN": "奖励 3/3、成就 11/11、S连胜，让重开有下一目标。",
           "metricTitle": "重开动力",
           "metricValue": "S连胜 x6",
           "tag": "REWARD"
         }
-      ]
+      ],
+      "animatedLoop": {
+        "path": "desktop/steam/store-assets/review/leaderboard-teaser-loop.gif",
+        "width": 960,
+        "height": 540,
+        "status": "ready",
+        "frameDelayMs": 950,
+        "purpose": "Shareable 3-frame loop for Steam announcements and social previews of the opening leaderboard hook.",
+        "frames": [
+          "desktop/steam/store-assets/review/leaderboard-frame-01-hook.png",
+          "desktop/steam/store-assets/review/leaderboard-frame-02-builds.png",
+          "desktop/steam/store-assets/review/leaderboard-frame-03-rewards.png"
+        ]
+      }
     }
   }
 }

@@ -33,11 +33,39 @@ function readPngSize(relativePath) {
   };
 }
 
+function readGifSize(relativePath) {
+  const absolutePath = path.join(root, relativePath);
+  if (!fs.existsSync(absolutePath)) {
+    errors.push(`Missing GIF: ${relativePath}`);
+    return null;
+  }
+  const buffer = fs.readFileSync(absolutePath);
+  const header = buffer.subarray(0, 6).toString("ascii");
+  if (header !== "GIF87a" && header !== "GIF89a") {
+    errors.push(`GIF expected: ${relativePath}`);
+    return null;
+  }
+  return {
+    width: buffer.readUInt16LE(6),
+    height: buffer.readUInt16LE(8)
+  };
+}
+
 function ensureReadyImage(item, relativePath, width, height, label) {
   if (item?.status !== "ready") {
     errors.push(`${label} must be marked ready`);
   }
   const size = readPngSize(relativePath);
+  if (size && (size.width !== width || size.height !== height)) {
+    errors.push(`${label} must be ${width}x${height}, got ${size.width}x${size.height}`);
+  }
+}
+
+function ensureReadyGif(item, relativePath, width, height, label) {
+  if (item?.status !== "ready") {
+    errors.push(`${label} must be marked ready`);
+  }
+  const size = readGifSize(relativePath);
   if (size && (size.width !== width || size.height !== height)) {
     errors.push(`${label} must be ${width}x${height}, got ${size.width}x${size.height}`);
   }
@@ -164,6 +192,34 @@ if (manifest && page) {
     for (const term of ["第一把就追榜", "三套 #1 全S", "奖励 3/3", "成就 11/11", "S连胜 x6"]) {
       if (!frameCopy.some((item) => item.includes(term))) {
         errors.push(`Leaderboard trailer frames should include ${term}`);
+      }
+    }
+    const animatedLoop = leaderboardPromo.animatedLoop;
+    if (!animatedLoop) {
+      errors.push("Leaderboard promo should include an animatedLoop GIF artifact");
+    } else {
+      ensureReadyGif(
+        animatedLoop,
+        animatedLoop.path,
+        animatedLoop.width,
+        animatedLoop.height,
+        "Leaderboard teaser loop"
+      );
+      if (animatedLoop.width !== 960 || animatedLoop.height !== 540) {
+        errors.push(`Leaderboard teaser loop should be 960x540, got ${animatedLoop.width}x${animatedLoop.height}`);
+      }
+      if (animatedLoop.frameDelayMs < 600 || animatedLoop.frameDelayMs > 1400) {
+        errors.push(`Leaderboard teaser loop frameDelayMs should stay readable, got ${animatedLoop.frameDelayMs}`);
+      }
+      const expectedFramePaths = frames.map((frame) => frame.path);
+      const loopFrames = animatedLoop.frames ?? [];
+      if (loopFrames.length !== expectedFramePaths.length) {
+        errors.push(`Leaderboard teaser loop should include ${expectedFramePaths.length} frames, got ${loopFrames.length}`);
+      }
+      for (const [index, expectedPath] of expectedFramePaths.entries()) {
+        if (loopFrames[index] !== expectedPath) {
+          errors.push(`Leaderboard teaser loop frame ${index + 1} should source ${expectedPath}, got ${loopFrames[index]}`);
+        }
       }
     }
   }

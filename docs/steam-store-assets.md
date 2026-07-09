@@ -116,6 +116,7 @@ npm run export:store-contact-sheet
 ```powershell
 npm run export:leaderboard-promo
 npm run export:leaderboard-frames
+npm run export:leaderboard-loop
 ```
 
 输出文件：
@@ -124,6 +125,7 @@ npm run export:leaderboard-frames
 - `desktop/steam/store-assets/review/leaderboard-frame-01-hook.png`：三帧短预告第 1 帧，强调第一把 30 秒追榜钩子。
 - `desktop/steam/store-assets/review/leaderboard-frame-02-builds.png`：三帧短预告第 2 帧，强调三套流派 #1 全 S。
 - `desktop/steam/store-assets/review/leaderboard-frame-03-rewards.png`：三帧短预告第 3 帧，强调奖励、连胜和成就回收。
+- `desktop/steam/store-assets/review/leaderboard-teaser-loop.gif`：960 x 540 三帧循环动图，可直接作为 Steam 公告或社媒预览的轻量榜单钩子。
 
 生成商店文案预览图：
 
