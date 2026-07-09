@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "reviewDate": "2026-07-07",
-  "steamPageGoal": "Lead with readable combat, immediately prove chapter-to-chapter combat variety, then show exploration, builds, persistence, and PC settings.",
+  "steamPageGoal": "Lead with readable combat, immediately prove chapter-to-chapter combat variety, then show exploration, builds, leaderboard-driven meta progression, and PC settings.",
   "screenshotOrder": [
     {
       "rank": 1,
@@ -54,8 +54,8 @@
     {
       "rank": 9,
       "id": "screenshot_01_start_menu",
-      "role": "meta_progression",
-      "reason": "Documents the start screen, chapter practice, save slot, and achievement counters."
+      "role": "leaderboard_meta_progression",
+      "reason": "Shows opening Top 5, per-build #1 records, claimed first-leader rewards, S streak, and the all-build leaderboard achievement as a replay loop."
     },
     {
       "rank": 10,

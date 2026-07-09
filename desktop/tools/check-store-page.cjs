@@ -94,6 +94,24 @@ if (manifest && page) {
     errors.push("PC settings screenshot should stay last as a support proof shot");
   }
 
+  const leaderboardMeta = screenshots.get("screenshot_01_start_menu");
+  const leaderboardOrder = order.find((entry) => entry.id === "screenshot_01_start_menu");
+  if (!leaderboardMeta) {
+    errors.push("Leaderboard/meta screenshot is missing from the manifest");
+  } else {
+    if (leaderboardMeta.captureUrl !== "index.html?storeShot=leaderboard") {
+      errors.push(`Leaderboard/meta screenshot should use storeShot=leaderboard, got ${leaderboardMeta.captureUrl}`);
+    }
+    for (const term of ["开场榜首", "三套流派榜首", "流派首榜", "S连胜", "三流派首榜"]) {
+      if (!leaderboardMeta.mustShow?.some((item) => String(item).includes(term))) {
+        errors.push(`Leaderboard/meta screenshot mustShow should include ${term}`);
+      }
+    }
+  }
+  if (leaderboardOrder?.role !== "leaderboard_meta_progression") {
+    errors.push(`Leaderboard/meta screenshot role should be leaderboard_meta_progression, got ${leaderboardOrder?.role}`);
+  }
+
   const capsules = new Map((manifest.capsules ?? []).map((capsule) => [capsule.id, capsule]));
   const capsuleUse = page.capsuleUse ?? {};
   for (const [slot, capsuleId] of Object.entries(capsuleUse)) {

@@ -5745,6 +5745,100 @@ function createStoreArchiveState() {
   };
 }
 
+function createStoreOpeningRushLeaderboardEntry(build, index = 0) {
+  if (!build) {
+    return null;
+  }
+  const scores = [100, 98, 96];
+  const elapsed = [18.4, 21.6, 24.2];
+  return normalizeOpeningRushLeaderboardEntry({
+    id: `store-opening-rush-${build.id}`,
+    score: scores[index] ?? 94,
+    elapsed: elapsed[index] ?? 25,
+    completedIds: ["anomaly", "surge", "first-strike", "overclock", "retry-route"],
+    sourceText: "首异常+28 / 裂隙+30 / 先手+8 / 超频+32 / 路线+10",
+    chiefChallenge: true,
+    starterBuildId: build.id,
+    at: Date.now() - index * 180000,
+  }, index);
+}
+
+function createStoreLeaderboardArchiveState() {
+  const now = Date.now();
+  const entries = starterBuilds
+    .map((build, index) => createStoreOpeningRushLeaderboardEntry(build, index))
+    .filter(Boolean);
+  const openingRushLeaderboard = normalizeOpeningRushLeaderboard(entries);
+  const openingRushBuildLeaderboards = Object.fromEntries(starterBuilds.map((build) => [
+    build.id,
+    normalizeOpeningRushLeaderboard(entries.filter((entry) => entry.starterBuildId === build.id), 3),
+  ]));
+  const topEntry = openingRushLeaderboard[0] ?? null;
+  const lastBuildEntry = openingRushBuildLeaderboards[starterBuilds.at(-1)?.id]?.[0]
+    ?? openingRushBuildLeaderboards[starterBuilds[0]?.id]?.[0]
+    ?? topEntry;
+
+  return {
+    ...createStoreArchiveState(),
+    calibrationShards: 48,
+    totalCalibrationEarned: 182,
+    bestOpeningRushScore: topEntry?.score ?? 100,
+    bestOpeningRushGrade: "S",
+    bestOpeningRushAt: now,
+    openingRushSBadgeUnlocked: true,
+    openingRushSBadgeAt: now,
+    openingRushSBadgeScore: topEntry?.score ?? 100,
+    lastOpeningRush: normalizeOpeningRushArchive(topEntry),
+    chiefOpeningChallengeCompletions: 6,
+    bestChiefOpeningChallengeScore: topEntry?.score ?? 100,
+    lastChiefOpeningChallengeReward: normalizeChiefOpeningChallengeReward({
+      amount: openingRushConfig.chiefChallengeRewardShards,
+      score: topEntry?.score ?? 100,
+      grade: "S",
+      completionCount: 6,
+      reason: "首席再巡挑战",
+      at: now,
+    }),
+    openingRushSStreak: 6,
+    bestOpeningRushSStreak: 6,
+    lastOpeningRushStreakReward: normalizeOpeningRushStreakReward({
+      amount: openingRushConfig.sStreakRewardShards,
+      streak: 6,
+      score: topEntry?.score ?? 100,
+      grade: "S",
+      reason: "开场S连胜",
+      at: now,
+    }),
+    openingRushLeaderboard,
+    lastOpeningRushLeaderboardEntry: topEntry,
+    openingRushBuildLeaderboards,
+    lastOpeningRushBuildLeaderboardEntry: lastBuildEntry,
+    completedOpeningRushBuildLeaderboardRewards: starterBuilds.map((build) => build.id),
+    lastOpeningRushBuildLeaderboardReward: normalizeOpeningRushBuildLeaderboardReward({
+      amount: openingRushConfig.buildLeaderboardRewardShards,
+      starterBuildId: lastBuildEntry?.starterBuildId ?? starterBuilds[0]?.id,
+      score: lastBuildEntry?.score ?? 96,
+      grade: "S",
+      rank: 1,
+      reason: "流派首榜",
+      at: now,
+    }),
+    lastRunShardGain: {
+      amount: openingRushConfig.sStreakRewardShards + openingRushConfig.buildLeaderboardRewardShards,
+      reason: "S连胜 + 三流派首榜",
+      at: now,
+    },
+  };
+}
+
+function writeStoreShotAchievements(ids = achievements.map((achievement) => achievement.steamApiName ?? achievement.id)) {
+  try {
+    writePlatformJson(ACHIEVEMENT_STORAGE_KEY, ids.filter(Boolean));
+  } catch {
+    // Store screenshot profiles are disposable; a failed write should not block capture.
+  }
+}
+
 function resetStoreRun(chapterIndex = 0, options = {}) {
   archiveState = createStoreArchiveState();
   runStats = {
@@ -6006,6 +6100,16 @@ function configureStoreShotMode() {
     openStartMenu();
     ui.startSummary.textContent = "Steam 商店截图模式：五章主线、章节练习、成就和本地档案已经准备好。";
     setLog("商店截图：档案柜、章节练习与本地成就统计。");
+    window.__variableCityStoreShotReady = true;
+    return;
+  }
+
+  if (storeShotMode === "leaderboard") {
+    archiveState = createStoreLeaderboardArchiveState();
+    writeStoreShotAchievements();
+    openStartMenu();
+    ui.startSummary.textContent = "30秒开场榜已跑起来：总榜 #1、三套流派首榜全领、S连胜和三流派首榜成就同屏，下一把还有可追的榜。";
+    setLog("商店截图：开场榜单、流派首榜奖励、S连胜和局外成长闭环。");
     window.__variableCityStoreShotReady = true;
     return;
   }
@@ -7312,15 +7416,7 @@ function renderStartMenu(options = {}) {
     ["最远章节", `${bestChapter}/${chapters.length}`],
     ["通关次数", `${archiveState.wins ?? 0}`],
     ["夜巡次数", `${archiveState.runs ?? 0}`],
-    ["累计击破", `${archiveState.totalEnemiesDefeated ?? 0}`],
     ["校准碎片", `${archiveState.calibrationShards ?? 0}`],
-    ["档案节点", `${metaProgressNodes.reduce((sum, node) => sum + getMetaLevel(node.id), 0)}/${metaProgressNodes.reduce((sum, node) => sum + node.maxLevel, 0)}`],
-    ["回声档案", `${echoSummary.discovered}/${echoSummary.total}`],
-    ["地标档案", `${cacheSummary.discovered}/${cacheSummary.total}`],
-    ["装置档案", `${interactiveSummary.activated}/${interactiveSummary.total}`],
-    ["平台", getPlatformDisplayLabel()],
-    ["存档", getStorageDisplayLabel()],
-    ["爆点委托", `${archiveState.nightHookCompletions ?? 0} 次`],
     ["最佳连段", `x${archiveState.bestTempoStreak ?? 0}`],
     ["最佳开场", formatOpeningRushArchiveBest(archiveState)],
     ["S级开场", formatOpeningRushSBadge(archiveState)],
@@ -7330,6 +7426,14 @@ function renderStartMenu(options = {}) {
     ["流派榜首", formatOpeningRushBuildLeaderboardTop(archiveState)],
     ["流派首榜", formatOpeningRushBuildRewardProgress(archiveState)],
     ["成就", `${readUnlockedAchievements().length}/${achievements.length}`],
+    ["累计击破", `${archiveState.totalEnemiesDefeated ?? 0}`],
+    ["档案节点", `${metaProgressNodes.reduce((sum, node) => sum + getMetaLevel(node.id), 0)}/${metaProgressNodes.reduce((sum, node) => sum + node.maxLevel, 0)}`],
+    ["回声档案", `${echoSummary.discovered}/${echoSummary.total}`],
+    ["地标档案", `${cacheSummary.discovered}/${cacheSummary.total}`],
+    ["装置档案", `${interactiveSummary.activated}/${interactiveSummary.total}`],
+    ["平台", getPlatformDisplayLabel()],
+    ["存档", getStorageDisplayLabel()],
+    ["爆点委托", `${archiveState.nightHookCompletions ?? 0} 次`],
   ];
   ui.startStats.innerHTML = "";
   for (const [label, value] of stats) {

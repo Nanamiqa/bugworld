@@ -90,7 +90,7 @@ npm run capture:store-screenshots -- screenshot_07_metro_combat_showcase
 
 输出文件：
 
-- `desktop/steam/store-assets/screenshots/01-start-menu.png`
+- `desktop/steam/store-assets/screenshots/01-start-menu.png`：开场榜单、三套流派首榜、首榜奖励与 S 连胜局外成长截图，来自 `storeShot=leaderboard`。
 - `desktop/steam/store-assets/screenshots/02-office-map.png`
 - `desktop/steam/store-assets/screenshots/03-roguelite-build.png`
 - `desktop/steam/store-assets/screenshots/04-boss-protocol-rider.png`
