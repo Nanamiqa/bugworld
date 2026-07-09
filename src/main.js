@@ -128,7 +128,7 @@ const ARCHIVE_STORAGE_KEY = "variableCityArchive";
 const RUN_SAVE_STORAGE_KEY = "variableCityRunSave";
 const SETTINGS_STORAGE_KEY = "variableCitySettings";
 const ACHIEVEMENT_STORAGE_KEY = "variableCityAchievements";
-const ARCHIVE_VERSION = 10;
+const ARCHIVE_VERSION = 11;
 const RUN_SAVE_VERSION = 2;
 const achievements = window.variableCityAchievementCatalog ?? [];
 const urlParams = new URLSearchParams(window.location.search);
@@ -2108,6 +2108,8 @@ function createArchiveFallback() {
     lastOpeningRushStreakReward: null,
     openingRushLeaderboard: [],
     lastOpeningRushLeaderboardEntry: null,
+    openingRushBuildLeaderboards: {},
+    lastOpeningRushBuildLeaderboardEntry: null,
     discoveredEchoes: [],
     completedEchoChapters: [],
     lastEchoDiscovery: null,
@@ -2417,6 +2419,7 @@ function normalizeLastRunReview(value) {
     chiefOpeningChallengeReward: normalizeChiefOpeningChallengeReward(value.chiefOpeningChallengeReward),
     openingRushStreakReward: normalizeOpeningRushStreakReward(value.openingRushStreakReward),
     openingRushLeaderboardEntry: normalizeOpeningRushLeaderboardEntry(value.openingRushLeaderboardEntry),
+    openingRushBuildLeaderboardEntry: normalizeOpeningRushLeaderboardEntry(value.openingRushBuildLeaderboardEntry),
     at: Number(value.at) || Date.now(),
   };
 }
@@ -2478,6 +2481,8 @@ function loadArchive() {
       lastOpeningRushStreakReward: normalizeOpeningRushStreakReward(saved.lastOpeningRushStreakReward),
       openingRushLeaderboard: normalizeOpeningRushLeaderboard(saved.openingRushLeaderboard),
       lastOpeningRushLeaderboardEntry: normalizeOpeningRushLeaderboardEntry(saved.lastOpeningRushLeaderboardEntry),
+      openingRushBuildLeaderboards: normalizeOpeningRushBuildLeaderboards(saved.openingRushBuildLeaderboards),
+      lastOpeningRushBuildLeaderboardEntry: normalizeOpeningRushLeaderboardEntry(saved.lastOpeningRushBuildLeaderboardEntry),
     };
     normalized.archiveVersion = ARCHIVE_VERSION;
     normalized.bestChapter = clamp(Number(normalized.bestChapter) || 1, 1, chapters.length);
@@ -3844,6 +3849,12 @@ function compareOpeningRushLeaderboardEntry(a, b) {
     || (b.at ?? 0) - (a.at ?? 0);
 }
 
+function getCurrentOpeningRushStarterBuild() {
+  return getStarterBuildById(runStats?.starterBuild)
+    ?? getStarterBuildForWeaponId(player?.weapon?.id)
+    ?? null;
+}
+
 function normalizeOpeningRushLeaderboardEntry(value, index = 0) {
   if (!value || typeof value !== "object") {
     return null;
@@ -3853,6 +3864,8 @@ function normalizeOpeningRushLeaderboardEntry(value, index = 0) {
     return null;
   }
   const at = Number(value.at) || Date.now();
+  const starterBuild = getStarterBuildById(value.starterBuildId);
+  const starterWeapon = getWeaponById(starterBuild?.weaponId);
   return {
     id: typeof value.id === "string" && value.id ? value.id : `opening-rush-${at}-${index}`,
     score: archive.score,
@@ -3865,33 +3878,52 @@ function normalizeOpeningRushLeaderboardEntry(value, index = 0) {
       ? value.sourceText
       : getOpeningRushSourceText(archive),
     chiefChallenge: Boolean(value.chiefChallenge),
+    starterBuildId: starterBuild?.id ?? null,
+    starterBuildTitle: starterBuild?.title ?? "",
+    starterBuildWeaponName: starterWeapon?.name ?? "",
     at,
     rank: Math.max(0, Math.trunc(Number(value.rank) || 0)),
   };
 }
 
-function normalizeOpeningRushLeaderboard(value = []) {
+function normalizeOpeningRushLeaderboard(value = [], limit = 5) {
   if (!Array.isArray(value)) {
     return [];
   }
+  const maxEntries = Math.max(1, Math.trunc(Number(limit) || 5));
   return value
     .map((entry, index) => normalizeOpeningRushLeaderboardEntry(entry, index))
     .filter(Boolean)
     .sort(compareOpeningRushLeaderboardEntry)
-    .slice(0, 5)
+    .slice(0, maxEntries)
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
 }
 
+function normalizeOpeningRushBuildLeaderboards(value = {}) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return Object.fromEntries(starterBuilds.map((build) => [
+    build.id,
+    normalizeOpeningRushLeaderboard(value[build.id], 3)
+      .filter((entry) => entry.starterBuildId === build.id)
+      .map((entry, index) => ({ ...entry, rank: index + 1 })),
+  ]));
+}
+
 function upsertOpeningRushLeaderboard(snapshot, options = {}) {
+  const starterBuild = getCurrentOpeningRushStarterBuild();
   const entry = normalizeOpeningRushLeaderboardEntry({
     ...snapshot,
     id: `opening-rush-${Date.now()}-${Math.max(0, Math.trunc(Number(snapshot?.score) || 0))}`,
     sourceText: getOpeningRushSourceText(snapshot),
     chiefChallenge: Boolean(options.chiefChallenge),
+    starterBuildId: starterBuild?.id ?? null,
     at: Date.now(),
   });
   if (!entry) {
     archiveState.lastOpeningRushLeaderboardEntry = null;
+    archiveState.lastOpeningRushBuildLeaderboardEntry = null;
     return null;
   }
   const leaderboard = normalizeOpeningRushLeaderboard([
@@ -3901,6 +3933,21 @@ function upsertOpeningRushLeaderboard(snapshot, options = {}) {
   archiveState.openingRushLeaderboard = leaderboard;
   const rankedEntry = leaderboard.find((item) => item.id === entry.id) ?? null;
   archiveState.lastOpeningRushLeaderboardEntry = rankedEntry;
+  archiveState.openingRushBuildLeaderboards = normalizeOpeningRushBuildLeaderboards(archiveState.openingRushBuildLeaderboards);
+  if (starterBuild) {
+    const buildLeaderboard = normalizeOpeningRushLeaderboard([
+      ...(archiveState.openingRushBuildLeaderboards[starterBuild.id] ?? []),
+      entry,
+    ], 3).filter((item) => item.starterBuildId === starterBuild.id);
+    archiveState.openingRushBuildLeaderboards[starterBuild.id] = buildLeaderboard.map((item, index) => ({
+      ...item,
+      rank: index + 1,
+    }));
+    archiveState.lastOpeningRushBuildLeaderboardEntry = archiveState.openingRushBuildLeaderboards[starterBuild.id]
+      .find((item) => item.id === entry.id) ?? null;
+  } else {
+    archiveState.lastOpeningRushBuildLeaderboardEntry = null;
+  }
   return rankedEntry;
 }
 
@@ -4071,12 +4118,14 @@ function recordOpeningRushInArchive(rush = runStats?.openingRush) {
   const leaderboardEntry = upsertOpeningRushLeaderboard(snapshot, {
     chiefChallenge: Boolean(chiefChallengeReward),
   });
+  const buildLeaderboardEntry = normalizeOpeningRushLeaderboardEntry(archiveState.lastOpeningRushBuildLeaderboardEntry);
   return {
     ...snapshot,
     sBadgeReward,
     chiefChallengeReward,
     streakReward,
     leaderboardEntry,
+    buildLeaderboardEntry,
   };
 }
 
@@ -4166,6 +4215,41 @@ function formatOpeningRushLeaderboardEntry(entry) {
   const seconds = normalized.elapsed > 0 ? `${normalized.elapsed}s` : "30秒内";
   const chief = normalized.chiefChallenge ? " · 首席再巡" : "";
   return `#${normalized.rank || "?"} ${normalized.grade} ${normalized.score}/100 · ${seconds}${chief}`;
+}
+
+function formatOpeningRushBuildLeaderboardEntry(entry) {
+  const normalized = normalizeOpeningRushLeaderboardEntry(entry);
+  if (!normalized || !normalized.starterBuildTitle) {
+    return "";
+  }
+  const seconds = normalized.elapsed > 0 ? `${normalized.elapsed}s` : "30秒内";
+  return `${normalized.starterBuildTitle} #${normalized.rank || "?"} ${normalized.grade} ${normalized.score}/100 · ${seconds}`;
+}
+
+function formatOpeningRushBuildLeaderboardTop(archive = archiveState) {
+  const boards = normalizeOpeningRushBuildLeaderboards(archive?.openingRushBuildLeaderboards);
+  const topEntries = starterBuilds
+    .map((build) => boards[build.id]?.[0] ?? null)
+    .filter(Boolean)
+    .sort(compareOpeningRushLeaderboardEntry);
+  if (!topEntries.length) {
+    return "暂无流派记录";
+  }
+  return formatOpeningRushBuildLeaderboardEntry({ ...topEntries[0], rank: 1 });
+}
+
+function formatStarterBuildLeaderboardLine(buildId, archive = archiveState) {
+  const build = getStarterBuildById(buildId);
+  if (!build) {
+    return "流派榜：暂无记录";
+  }
+  const boards = normalizeOpeningRushBuildLeaderboards(archive?.openingRushBuildLeaderboards);
+  const top = boards[build.id]?.[0] ?? null;
+  if (!top) {
+    return "流派榜：暂无记录";
+  }
+  const seconds = top.elapsed > 0 ? `${top.elapsed}s` : "30秒内";
+  return `流派榜：#1 ${top.grade} ${top.score}/100 · ${seconds}`;
 }
 
 function getOpeningRushCoachText(rush = runStats?.openingRush) {
@@ -5168,6 +5252,7 @@ function createRunReview(victory) {
     chiefOpeningChallengeReward: normalizeChiefOpeningChallengeReward(archiveState?.lastChiefOpeningChallengeReward),
     openingRushStreakReward: normalizeOpeningRushStreakReward(archiveState?.lastOpeningRushStreakReward),
     openingRushLeaderboardEntry: normalizeOpeningRushLeaderboardEntry(archiveState?.lastOpeningRushLeaderboardEntry),
+    openingRushBuildLeaderboardEntry: normalizeOpeningRushLeaderboardEntry(archiveState?.lastOpeningRushBuildLeaderboardEntry),
     at: Date.now(),
   };
 }
@@ -7077,6 +7162,7 @@ function renderStarterBuilds() {
     button.className = "choice-button starter-build-card with-media";
     const icon = weapon.assetKey ? `<img class="choice-icon weapon-icon" src="${assetUrl(weapon.assetKey)}" alt="" />` : "";
     const tags = build.tags.map((tag) => `<span>${tag}</span>`).join("");
+    const leaderboardLine = formatStarterBuildLeaderboardLine(build.id, archiveState);
     button.innerHTML = `
       ${icon}
       <span class="choice-copy">
@@ -7084,6 +7170,7 @@ function renderStarterBuilds() {
         <span class="choice-effect">${build.promise}</span>
         <span class="starter-build-tags">${tags}</span>
         <span class="specialization-line is-active">${build.perkText}</span>
+        <span class="specialization-line">${leaderboardLine}</span>
       </span>
     `;
     button.addEventListener("click", () => {
@@ -7137,6 +7224,7 @@ function renderStartMenu() {
     ["首席再巡", formatChiefOpeningChallenge(archiveState)],
     ["S连胜", formatOpeningRushSStreak(archiveState)],
     ["开场榜首", formatOpeningRushLeaderboardTop(archiveState)],
+    ["流派榜首", formatOpeningRushBuildLeaderboardTop(archiveState)],
     ["成就", `${readUnlockedAchievements().length}/${achievements.length}`],
   ];
   ui.startStats.innerHTML = "";
@@ -9859,6 +9947,7 @@ function renderResultStats(victory) {
   const chiefReward = normalizeChiefOpeningChallengeReward(archiveState?.lastChiefOpeningChallengeReward);
   const streakReward = normalizeOpeningRushStreakReward(archiveState?.lastOpeningRushStreakReward);
   const leaderboardEntry = normalizeOpeningRushLeaderboardEntry(archiveState?.lastOpeningRushLeaderboardEntry);
+  const buildLeaderboardEntry = normalizeOpeningRushLeaderboardEntry(archiveState?.lastOpeningRushBuildLeaderboardEntry);
   const stats = [
     ["章节", `${runStats?.chaptersCleared ?? 0}/${chapters.length}`],
     ["等级", `Lv.${runStats?.highestLevel ?? player.level}`],
@@ -9871,6 +9960,7 @@ function renderResultStats(victory) {
     ["首席再巡", chiefReward ? `+${chiefReward.amount}碎片` : formatChiefOpeningChallenge(archiveState)],
     ["S连胜", streakReward ? `x${streakReward.streak} +${streakReward.amount}碎片` : formatOpeningRushSStreak(archiveState)],
     ["开场榜", leaderboardEntry ? formatOpeningRushLeaderboardEntry(leaderboardEntry) : formatOpeningRushLeaderboardTop(archiveState)],
+    ["流派榜", buildLeaderboardEntry ? formatOpeningRushBuildLeaderboardEntry(buildLeaderboardEntry) : formatOpeningRushBuildLeaderboardTop(archiveState)],
     ["评级来源", getOpeningRushSourceText(runStats?.openingRush)],
     ["耗时", `${minutes}:${String(seconds).padStart(2, "0")}`],
     ["构筑", getBuildSummary()],
@@ -9953,6 +10043,14 @@ function renderResultInsights(review = archiveState?.lastRunReview) {
       "开场榜",
       formatOpeningRushLeaderboardEntry(normalized.openingRushLeaderboardEntry),
       `本局进入档案 Top 5。得分来源：${normalized.openingRushLeaderboardEntry.sourceText}。继续压缩裂隙用时可以刷新榜首。`,
+      "is-plan",
+    ]);
+  }
+  if (normalized.openingRushBuildLeaderboardEntry) {
+    cards.push([
+      "流派榜",
+      formatOpeningRushBuildLeaderboardEntry(normalized.openingRushBuildLeaderboardEntry),
+      `这套推荐流派进入自己的 Top 3。换一套流派也能刷榜，适合做下一张商店截图卖点。`,
       "is-plan",
     ]);
   }
@@ -14590,6 +14688,8 @@ function installAutomationTestHooks() {
     runStats = createRunStats();
     runStats.openingRush = createOpeningRushState();
     runStats.openingSprint = createOpeningSprintState();
+    runStats.starterBuild = "queue-barrage";
+    runStats.starterIgnition = createStarterIgnitionState(getStarterBuildById(runStats.starterBuild));
     world.mode = "playing";
     completeOpeningRushMilestone("anomaly");
     completeOpeningRushMilestone("first-strike");
@@ -14604,6 +14704,7 @@ function installAutomationTestHooks() {
     const streakReward = normalizeOpeningRushStreakReward(archiveState.lastOpeningRushStreakReward);
     const streakAchievementUnlocked = readUnlockedAchievements().includes("ACH_OPENING_S_STREAK");
     const leaderboardEntry = normalizeOpeningRushLeaderboardEntry(archiveState.lastOpeningRushLeaderboardEntry);
+    const buildLeaderboardEntry = normalizeOpeningRushLeaderboardEntry(archiveState.lastOpeningRushBuildLeaderboardEntry);
     saveArchive();
     world.mode = "menu";
     renderStartMenu();
@@ -14623,6 +14724,7 @@ function installAutomationTestHooks() {
       chiefOpeningChallengeReward: challengeReward,
       openingRushStreakReward: streakReward,
       openingRushLeaderboardEntry: leaderboardEntry,
+      openingRushBuildLeaderboardEntry: buildLeaderboardEntry,
       at: Date.now(),
     });
     renderResultInsights(review);
@@ -14636,6 +14738,8 @@ function installAutomationTestHooks() {
         && startStatsBefore.includes("x2")
         && startStatsBefore.includes("开场榜首")
         && startStatsBefore.includes("暂无记录")
+        && startStatsBefore.includes("流派榜首")
+        && startStatsBefore.includes("暂无流派记录")
         && metaSummaryBefore.includes("首席再巡")
         && metaSummaryBefore.includes("S连胜")
         && metaSummaryBefore.includes("x2")
@@ -14658,12 +14762,18 @@ function installAutomationTestHooks() {
         && archiveState.calibrationShards >= openingRushConfig.chiefChallengeRewardShards + openingRushConfig.sStreakRewardShards
         && leaderboardEntry?.rank === 1
         && leaderboardEntry?.score === 100
+        && archived.buildLeaderboardEntry?.starterBuildId === "queue-barrage"
+        && buildLeaderboardEntry?.rank === 1
+        && buildLeaderboardEntry?.starterBuildId === "queue-barrage"
+        && archiveState.openingRushBuildLeaderboards?.["queue-barrage"]?.length === 1
         && archiveState.openingRushLeaderboard.length === 1
         && startStatsAfter.includes("1次")
         && startStatsAfter.includes("S连胜")
         && startStatsAfter.includes("x3")
         && startStatsAfter.includes("开场榜首")
         && startStatsAfter.includes("#1 S 100/100")
+        && startStatsAfter.includes("流派榜首")
+        && startStatsAfter.includes("键盘弹幕流")
         && metaSummaryAfter.includes("1次")
         && metaSummaryAfter.includes("S连胜")
         && metaSummaryAfter.includes("x3")
@@ -14672,7 +14782,9 @@ function installAutomationTestHooks() {
         && insightsText.includes("S连胜")
         && insightsText.includes(`+${openingRushConfig.sStreakRewardShards} 校准碎片`)
         && insightsText.includes("开场榜")
-        && insightsText.includes("Top 5"),
+        && insightsText.includes("Top 5")
+        && insightsText.includes("流派榜")
+        && insightsText.includes("键盘弹幕流"),
       startSummaryBefore,
       startStatsBefore,
       metaSummaryBefore,
@@ -14683,6 +14795,7 @@ function installAutomationTestHooks() {
       streakReward,
       streakAchievementUnlocked,
       leaderboardEntry,
+      buildLeaderboardEntry,
       startStatsAfter,
       metaSummaryAfter,
       insightsText,
@@ -14695,6 +14808,7 @@ function installAutomationTestHooks() {
         bestStreak: archiveState.bestOpeningRushSStreak,
         streakReward,
         leaderboard: cloneForSave(archiveState.openingRushLeaderboard, []),
+        buildLeaderboards: cloneForSave(archiveState.openingRushBuildLeaderboards, {}),
       },
     };
     ui.resultInsights.innerHTML = "";
