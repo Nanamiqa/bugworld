@@ -166,4 +166,5 @@
 - [x] 把“开场榜首 + 流派榜首 + 首榜奖励 + S连胜 + 三流派首榜成就”做成商店截图里的榜单卖点：新增 `storeShot=leaderboard` 捕获路由，第 1 张 Steam 截图改为开场总榜、三套流派首榜、首榜奖励全领、S 连胜和成就计数同屏的局外成长证明图，并重新导出 PNG/contact sheet。
 - [x] 提升榜单截图一眼可读性：开始页在三套推荐流派都拿到 #1 时改用“三套 #1 全S · 断点/键盘/修正”的短摘要，商店截图 manifest 增加“三套 #1 全S”复核项，并重新捕获第 1 张 PNG/contact sheet。
 - [x] 把榜单闭环做成独立商店宣传图：新增 `leaderboard-meta-promo.png`，用“30秒开场榜 / 三套 #1 全S / S连胜 x6 / 首榜奖励 3/3 / 成就 11/11”压缩说明局外重开动力，并接入 `store-page.json` 复核资产、导出脚本和商店页校验。
-- [ ] 下一轮继续观察榜单传播力：如果宣传图仍不够抓眼，就把榜单闭环做成短动态预告帧序列或 Steam 公告头图版式。
+- [x] 将榜单闭环扩展成三帧短预告素材：新增 `leaderboard-frame-01-hook.png`、`leaderboard-frame-02-builds.png`、`leaderboard-frame-03-rewards.png`，分别讲第一把追榜、三套流派 #1 全 S、奖励/连胜/成就回收，并接入 `export:leaderboard-frames`、商店页校验和素材文档。
+- [ ] 下一轮继续观察榜单传播力：如果三帧预告仍不够抓眼，就把它们合成为 GIF/短视频或 Steam 公告头图版式。

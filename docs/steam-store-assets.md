@@ -115,11 +115,15 @@ npm run export:store-contact-sheet
 
 ```powershell
 npm run export:leaderboard-promo
+npm run export:leaderboard-frames
 ```
 
 输出文件：
 
 - `desktop/steam/store-assets/review/leaderboard-meta-promo.png`：30 秒开场榜传播图，突出总榜 #1、三套 #1 全 S、S 连胜、首榜奖励和成就证明。
+- `desktop/steam/store-assets/review/leaderboard-frame-01-hook.png`：三帧短预告第 1 帧，强调第一把 30 秒追榜钩子。
+- `desktop/steam/store-assets/review/leaderboard-frame-02-builds.png`：三帧短预告第 2 帧，强调三套流派 #1 全 S。
+- `desktop/steam/store-assets/review/leaderboard-frame-03-rewards.png`：三帧短预告第 3 帧，强调奖励、连胜和成就回收。
 
 生成商店文案预览图：
 

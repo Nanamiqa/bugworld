@@ -98,7 +98,45 @@
       "badges": ["总榜 #1 · S 100/100", "三套 #1 全S", "S连胜 x6", "首榜奖励 3/3", "成就 11/11"],
       "cardTitles": ["总榜冲刺", "三套流派", "重开动力", "成就证明"],
       "cardValues": ["#1 · 18.4s", "断点 / 键盘 / 修正", "S连胜 x6", "三流派首榜"],
-      "footerZhCN": "从第一把开始就有可追的榜、可领的碎片和可晒的成就。"
+      "footerZhCN": "从第一把开始就有可追的榜、可领的碎片和可晒的成就。",
+      "trailerFrames": [
+        {
+          "id": "leaderboard_frame_01_hook",
+          "path": "desktop/steam/store-assets/review/leaderboard-frame-01-hook.png",
+          "width": 1920,
+          "height": 1080,
+          "status": "ready",
+          "titleZhCN": "第一把就追榜",
+          "subtitleZhCN": "30 秒开场，把首个异常、快递裂隙和武器超频串成 S 级冲刺。",
+          "metricTitle": "总榜冲刺",
+          "metricValue": "#1 · 18.4s",
+          "tag": "HOOK"
+        },
+        {
+          "id": "leaderboard_frame_02_builds",
+          "path": "desktop/steam/store-assets/review/leaderboard-frame-02-builds.png",
+          "width": 1920,
+          "height": 1080,
+          "status": "ready",
+          "titleZhCN": "三套 #1 全S",
+          "subtitleZhCN": "断点、键盘、修正三种起手流派都能冲自己的榜首。",
+          "metricTitle": "流派榜",
+          "metricValue": "断点/键盘/修正",
+          "tag": "BUILDS"
+        },
+        {
+          "id": "leaderboard_frame_03_rewards",
+          "path": "desktop/steam/store-assets/review/leaderboard-frame-03-rewards.png",
+          "width": 1920,
+          "height": 1080,
+          "status": "ready",
+          "titleZhCN": "奖励 3/3 · 成就 11/11",
+          "subtitleZhCN": "S 连胜、首榜碎片和三流派首榜成就，把重开变成下一次目标。",
+          "metricTitle": "重开动力",
+          "metricValue": "S连胜 x6",
+          "tag": "REWARD"
+        }
+      ]
     }
   }
 }

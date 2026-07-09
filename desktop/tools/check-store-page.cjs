@@ -134,6 +134,38 @@ if (manifest && page) {
         errors.push(`Leaderboard promo copy should include ${term}`);
       }
     }
+    const frames = leaderboardPromo.trailerFrames ?? [];
+    if (frames.length !== 3) {
+      errors.push(`Leaderboard promo should include 3 trailer frames, got ${frames.length}`);
+    }
+    const frameIds = new Set();
+    for (const [index, frame] of frames.entries()) {
+      if (!frame.id || frameIds.has(frame.id)) {
+        errors.push(`Leaderboard trailer frame ${index + 1} has duplicate or missing id`);
+      }
+      frameIds.add(frame.id);
+      ensureReadyImage(frame, frame.path, frame.width, frame.height, `Leaderboard trailer frame ${index + 1}`);
+      if (frame.width !== 1920 || frame.height !== 1080) {
+        errors.push(`Leaderboard trailer frame ${index + 1} should be 1920x1080`);
+      }
+      for (const field of ["titleZhCN", "subtitleZhCN", "metricTitle", "metricValue", "tag"]) {
+        if (!frame[field]) {
+          errors.push(`Leaderboard trailer frame ${index + 1} is missing ${field}`);
+        }
+      }
+    }
+    const frameCopy = frames.flatMap((frame) => [
+      frame.titleZhCN,
+      frame.subtitleZhCN,
+      frame.metricTitle,
+      frame.metricValue,
+      frame.tag,
+    ]).map(String);
+    for (const term of ["第一把就追榜", "三套 #1 全S", "奖励 3/3", "成就 11/11", "S连胜 x6"]) {
+      if (!frameCopy.some((item) => item.includes(term))) {
+        errors.push(`Leaderboard trailer frames should include ${term}`);
+      }
+    }
   }
 
   const capsules = new Map((manifest.capsules ?? []).map((capsule) => [capsule.id, capsule]));
