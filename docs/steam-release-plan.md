@@ -171,4 +171,5 @@
 - [x] 追加 Steam 公告头图版式：新增 `leaderboard-announcement-header.png` 和 `export:leaderboard-header`，用 1920 x 622 首屏图强化“第一把就想追榜”的外部传播钩子，并接入商店页校验。
 - [x] 增加首局 30 秒短片分镜捕获：新增 `storeShot=opening-rush-trailer` 和 `opening-rush-trailer-board.png`，用真实游戏状态同屏呈现首异常、快递裂隙、先手截击和 S级开场，作为 6-8 秒实机短视频的剪辑板。
 - [x] 捕获首局 30 秒动态素材：新增 `storeShot=opening-rush-trailer&clip=1`、7 张实机帧和 `opening-rush-trailer-clip.gif`，用 6.3 秒循环检查黄框落点、接怪窗口、先手截击和 S 级评分在运动中是否仍然清楚。
-- [ ] 下一轮继续把动态素材转成更强传播闭环：根据 GIF 复核结果微调镜头焦点、文字密度和节奏，必要时导出 6-8 秒 WebM/MP4 用于 Steam/社媒。
+- [x] 生成首局 30 秒动态素材复核板：新增 `opening-rush-clip-review-sheet.png`，把 7 张实机帧、6.3 秒节奏、首秒目标/落点/先手/S级回收/重开结论和下一步视频建议合成到一张 1920 x 1080 复核图，并强化校验确保 7 帧不是同一张静态图。
+- [ ] 下一轮继续把动态素材转成更强传播闭环：根据复核板结论微调镜头焦点、文字密度和节奏，必要时导出 6-8 秒 WebM/MP4 用于 Steam/社媒。

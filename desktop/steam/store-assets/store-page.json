@@ -183,6 +183,16 @@
           "desktop/steam/store-assets/review/opening-rush-clip-06-reward.png",
           "desktop/steam/store-assets/review/opening-rush-clip-07-retry-route.png"
         ]
+      },
+      "reviewSheet": {
+        "path": "desktop/steam/store-assets/review/opening-rush-clip-review-sheet.png",
+        "width": 1920,
+        "height": 1080,
+        "status": "ready",
+        "purpose": "A one-page review sheet for judging whether the 6.3-second opening rush GIF sells the first anomaly, rift landing, first strike, S-rank reward, and replay loop.",
+        "sourceClip": "desktop/steam/store-assets/review/opening-rush-trailer-clip.gif",
+        "verdictZhCN": "可用于公告预览；下一步导出视频版前只需微调文字密度。",
+        "checks": ["首秒有目标", "落点可预判", "先手有奖励", "S级有回收", "结尾想重开"]
       }
     },
     "leaderboardPromo": {

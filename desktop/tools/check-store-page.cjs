@@ -1,4 +1,5 @@
 const fs = require("node:fs");
+const crypto = require("node:crypto");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "../..");
@@ -49,6 +50,15 @@ function readGifSize(relativePath) {
     width: buffer.readUInt16LE(6),
     height: buffer.readUInt16LE(8)
   };
+}
+
+function readFileHash(relativePath) {
+  const absolutePath = path.join(root, relativePath);
+  if (!fs.existsSync(absolutePath)) {
+    errors.push(`Missing file for hash: ${relativePath}`);
+    return null;
+  }
+  return crypto.createHash("sha256").update(fs.readFileSync(absolutePath)).digest("hex");
 }
 
 function ensureReadyImage(item, relativePath, width, height, label) {
@@ -316,6 +326,7 @@ if (manifest && page) {
       errors.push(`Opening rush trailer clip should include 7 captured frames, got ${clipFrames.length}`);
     }
     const clipFrameIds = new Set();
+    const clipFrameHashes = new Set();
     let previousCaptureAtMs = -1;
     for (const [index, frame] of clipFrames.entries()) {
       if (!frame.id || clipFrameIds.has(frame.id)) {
@@ -333,6 +344,13 @@ if (manifest && page) {
         errors.push(`Opening rush clip frame ${index + 1} must have increasing captureAtMs`);
       }
       previousCaptureAtMs = frame.captureAtMs;
+      const hash = readFileHash(frame.path);
+      if (hash) {
+        clipFrameHashes.add(hash);
+      }
+    }
+    if (clipFrameHashes.size !== clipFrames.length) {
+      errors.push(`Opening rush clip frames should be visually distinct captures, got ${clipFrameHashes.size} unique hashes for ${clipFrames.length} frames`);
     }
     const clipFrameCopy = clipFrames.flatMap((frame) => [frame.beat, frame.noteZhCN]).map(String);
     for (const term of ["首个异常", "裂隙落点", "先手截击", "S级开场", "再来"]) {
@@ -374,6 +392,35 @@ if (manifest && page) {
       for (const [index, expectedPath] of expectedFramePaths.entries()) {
         if (clipFramePaths[index] !== expectedPath) {
           errors.push(`Opening rush trailer clip frame ${index + 1} should source ${expectedPath}, got ${clipFramePaths[index]}`);
+        }
+      }
+    }
+
+    const reviewSheet = openingRushTrailerBoard.reviewSheet;
+    if (!reviewSheet) {
+      errors.push("Opening rush trailer board should include a reviewSheet PNG artifact");
+    } else {
+      ensureReadyImage(
+        reviewSheet,
+        reviewSheet.path,
+        reviewSheet.width,
+        reviewSheet.height,
+        "Opening rush clip review sheet"
+      );
+      if (reviewSheet.width !== 1920 || reviewSheet.height !== 1080) {
+        errors.push(`Opening rush clip review sheet should be 1920x1080, got ${reviewSheet.width}x${reviewSheet.height}`);
+      }
+      if (reviewSheet.sourceClip !== animatedClip?.path) {
+        errors.push(`Opening rush clip review sheet should source ${animatedClip?.path}, got ${reviewSheet.sourceClip}`);
+      }
+      const reviewCopy = [
+        reviewSheet.purpose,
+        reviewSheet.verdictZhCN,
+        ...(reviewSheet.checks ?? []),
+      ].map(String);
+      for (const term of ["首秒有目标", "落点可预判", "先手有奖励", "S级有回收", "结尾想重开"]) {
+        if (!reviewCopy.some((item) => item.includes(term))) {
+          errors.push(`Opening rush clip review sheet copy should include ${term}`);
         }
       }
     }

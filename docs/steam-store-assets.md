@@ -104,6 +104,12 @@ npm run capture:opening-rush-board
 npm run capture:opening-rush-clip
 ```
 
+把 7 张动态实机帧排成一张传播复核板：
+
+```powershell
+npm run export:opening-rush-clip-review
+```
+
 输出文件：
 
 - `desktop/steam/store-assets/screenshots/01-start-menu.png`：开场榜单、三套流派首榜、首榜奖励与 S 连胜局外成长截图，来自 `storeShot=leaderboard`。
@@ -119,6 +125,7 @@ npm run capture:opening-rush-clip
 - `desktop/steam/store-assets/review/opening-rush-trailer-board.png`：review-only 首局 30 秒短片分镜板，来自 `storeShot=opening-rush-trailer`。
 - `desktop/steam/store-assets/review/opening-rush-clip-01-anomaly.png` 至 `opening-rush-clip-07-retry-route.png`：review-only 首局 30 秒动态短片实机帧，来自 `storeShot=opening-rush-trailer&clip=1`。
 - `desktop/steam/store-assets/review/opening-rush-trailer-clip.gif`：960 x 540 / 6.3 秒首局 30 秒动态短片 GIF，可用于 Steam 公告或社媒预览前复核。
+- `desktop/steam/store-assets/review/opening-rush-clip-review-sheet.png`：1920 x 1080 动态短片传播复核板，把 7 帧、节奏、可读性结论和下一步视频导出建议放在同一张图里。
 
 生成当前页面顺序复核图：
 

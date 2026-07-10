@@ -19,6 +19,7 @@
     "capture:store-screenshots": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tools/capture-store-screenshots.ps1",
     "capture:opening-rush-board": "node desktop/tools/capture-store-screenshots.cjs --only-id screenshot_11_opening_rush_trailer_board --timeout-ms 15000",
     "capture:opening-rush-clip": "node desktop/tools/capture-opening-rush-clip.cjs --timeout-ms 18000 && powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tools/export-opening-rush-clip-gif.ps1",
+    "export:opening-rush-clip-review": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tools/export-opening-rush-clip-review-sheet.ps1",
     "check:electron-shell": "node desktop/tools/check-electron-shell.cjs",
     "desktop:install-electron": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tools/install-electron-binary.ps1",
     "export:store-capsules": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tools/export-store-capsules.ps1",
