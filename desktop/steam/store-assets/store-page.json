@@ -92,7 +92,98 @@
       "status": "ready",
       "purpose": "Review capture for a 6-second gameplay trailer cut: first anomaly, delivery rift, first strike, and S-rank opening.",
       "sourceScreenshotId": "screenshot_11_opening_rush_trailer_board",
-      "requiredBeats": ["首个异常", "快递裂隙", "先手截击", "S级开场"]
+      "requiredBeats": ["首个异常", "快递裂隙", "先手截击", "S级开场"],
+      "captureFrames": [
+        {
+          "id": "opening_rush_clip_01_anomaly",
+          "path": "desktop/steam/store-assets/review/opening-rush-clip-01-anomaly.png",
+          "width": 1920,
+          "height": 1080,
+          "status": "ready",
+          "captureAtMs": 0,
+          "beat": "首个异常",
+          "noteZhCN": "开场链 +1，第一秒就有目标。"
+        },
+        {
+          "id": "opening_rush_clip_02_rift_preview",
+          "path": "desktop/steam/store-assets/review/opening-rush-clip-02-rift-preview.png",
+          "width": 1920,
+          "height": 1080,
+          "status": "ready",
+          "captureAtMs": 900,
+          "beat": "裂隙预告",
+          "noteZhCN": "黄框和路线箭头提前告诉玩家下一波落点。"
+        },
+        {
+          "id": "opening_rush_clip_03_rift_landings",
+          "path": "desktop/steam/store-assets/review/opening-rush-clip-03-rift-landings.png",
+          "width": 1920,
+          "height": 1080,
+          "status": "ready",
+          "captureAtMs": 1800,
+          "beat": "裂隙落点",
+          "noteZhCN": "4 个真实落点和接怪区域同时可读。"
+        },
+        {
+          "id": "opening_rush_clip_04_first_strike",
+          "path": "desktop/steam/store-assets/review/opening-rush-clip-04-first-strike.png",
+          "width": 1920,
+          "height": 1080,
+          "status": "ready",
+          "captureAtMs": 2700,
+          "beat": "先手截击",
+          "noteZhCN": "接怪窗口内命中，奖励 +1 bug / +2 生命。"
+        },
+        {
+          "id": "opening_rush_clip_05_s_rank",
+          "path": "desktop/steam/store-assets/review/opening-rush-clip-05-s-rank.png",
+          "width": 1920,
+          "height": 1080,
+          "status": "ready",
+          "captureAtMs": 3600,
+          "beat": "S级开场",
+          "noteZhCN": "实时评级亮出 100/100。"
+        },
+        {
+          "id": "opening_rush_clip_06_reward",
+          "path": "desktop/steam/store-assets/review/opening-rush-clip-06-reward.png",
+          "width": 1920,
+          "height": 1080,
+          "status": "ready",
+          "captureAtMs": 4500,
+          "beat": "S级补给",
+          "noteZhCN": "S 级补给把奖励反馈接到下一次重开。"
+        },
+        {
+          "id": "opening_rush_clip_07_retry_route",
+          "path": "desktop/steam/store-assets/review/opening-rush-clip-07-retry-route.png",
+          "width": 1920,
+          "height": 1080,
+          "status": "ready",
+          "captureAtMs": 5400,
+          "beat": "再来路线",
+          "noteZhCN": "结尾保留排行榜与再来一把动机。"
+        }
+      ],
+      "animatedClip": {
+        "path": "desktop/steam/store-assets/review/opening-rush-trailer-clip.gif",
+        "width": 960,
+        "height": 540,
+        "status": "ready",
+        "frameDelayMs": 900,
+        "durationSeconds": 6.3,
+        "captureUrl": "index.html?storeShot=opening-rush-trailer&clip=1",
+        "purpose": "A 7-frame real gameplay GIF that checks whether the first anomaly, rift landing, first strike, and S-rank opening stay readable in motion.",
+        "frames": [
+          "desktop/steam/store-assets/review/opening-rush-clip-01-anomaly.png",
+          "desktop/steam/store-assets/review/opening-rush-clip-02-rift-preview.png",
+          "desktop/steam/store-assets/review/opening-rush-clip-03-rift-landings.png",
+          "desktop/steam/store-assets/review/opening-rush-clip-04-first-strike.png",
+          "desktop/steam/store-assets/review/opening-rush-clip-05-s-rank.png",
+          "desktop/steam/store-assets/review/opening-rush-clip-06-reward.png",
+          "desktop/steam/store-assets/review/opening-rush-clip-07-retry-route.png"
+        ]
+      }
     },
     "leaderboardPromo": {
       "path": "desktop/steam/store-assets/review/leaderboard-meta-promo.png",

@@ -63,6 +63,11 @@
       "id": "chapter-combat-showcase-candidates",
       "path": "desktop/steam/store-assets/review/chapter-combat-showcase-candidates-v1.png",
       "usage": ["store-page-review", "combat-screenshot-planning"]
+    },
+    {
+      "id": "opening-rush-trailer-clip",
+      "path": "desktop/steam/store-assets/review/opening-rush-trailer-clip.gif",
+      "usage": ["trailer-hook-review", "steam-announcement-preview"]
     }
   ],
   "capsules": [
@@ -265,7 +270,8 @@
       {
         "timecode": "00:00-00:07",
         "title": "Hook",
-        "shot": "Key art fade into the city rules engine waking up."
+        "shot": "Opening rush gameplay GIF: first anomaly, delivery rift, first strike, and S-rank opening.",
+        "reviewArtifact": "desktop/steam/store-assets/review/opening-rush-trailer-clip.gif"
       },
       {
         "timecode": "00:07-00:18",

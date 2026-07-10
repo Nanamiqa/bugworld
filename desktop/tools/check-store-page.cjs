@@ -310,6 +310,73 @@ if (manifest && page) {
         }
       }
     }
+
+    const clipFrames = openingRushTrailerBoard.captureFrames ?? [];
+    if (clipFrames.length !== 7) {
+      errors.push(`Opening rush trailer clip should include 7 captured frames, got ${clipFrames.length}`);
+    }
+    const clipFrameIds = new Set();
+    let previousCaptureAtMs = -1;
+    for (const [index, frame] of clipFrames.entries()) {
+      if (!frame.id || clipFrameIds.has(frame.id)) {
+        errors.push(`Opening rush clip frame ${index + 1} has duplicate or missing id`);
+      }
+      clipFrameIds.add(frame.id);
+      ensureReadyImage(frame, frame.path, frame.width, frame.height, `Opening rush clip frame ${index + 1}`);
+      if (frame.width !== 1920 || frame.height !== 1080) {
+        errors.push(`Opening rush clip frame ${index + 1} should be 1920x1080`);
+      }
+      if (!frame.beat || !frame.noteZhCN) {
+        errors.push(`Opening rush clip frame ${index + 1} needs beat and noteZhCN`);
+      }
+      if (!Number.isFinite(frame.captureAtMs) || frame.captureAtMs <= previousCaptureAtMs) {
+        errors.push(`Opening rush clip frame ${index + 1} must have increasing captureAtMs`);
+      }
+      previousCaptureAtMs = frame.captureAtMs;
+    }
+    const clipFrameCopy = clipFrames.flatMap((frame) => [frame.beat, frame.noteZhCN]).map(String);
+    for (const term of ["首个异常", "裂隙落点", "先手截击", "S级开场", "再来"]) {
+      if (!clipFrameCopy.some((item) => item.includes(term))) {
+        errors.push(`Opening rush clip frames should include ${term}`);
+      }
+    }
+
+    const animatedClip = openingRushTrailerBoard.animatedClip;
+    if (!animatedClip) {
+      errors.push("Opening rush trailer board should include an animatedClip GIF artifact");
+    } else {
+      ensureReadyGif(
+        animatedClip,
+        animatedClip.path,
+        animatedClip.width,
+        animatedClip.height,
+        "Opening rush trailer clip"
+      );
+      if (animatedClip.width !== 960 || animatedClip.height !== 540) {
+        errors.push(`Opening rush trailer clip should be 960x540, got ${animatedClip.width}x${animatedClip.height}`);
+      }
+      if (animatedClip.captureUrl !== "index.html?storeShot=opening-rush-trailer&clip=1") {
+        errors.push(`Opening rush trailer clip should capture the clip route, got ${animatedClip.captureUrl}`);
+      }
+      const frameDelayMs = Number(animatedClip.frameDelayMs) || 0;
+      const durationSeconds = ((animatedClip.frames?.length ?? 0) * frameDelayMs) / 1000;
+      if (frameDelayMs < 650 || frameDelayMs > 1100) {
+        errors.push(`Opening rush trailer clip frameDelayMs should stay readable, got ${animatedClip.frameDelayMs}`);
+      }
+      if (durationSeconds < 6 || durationSeconds > 8) {
+        errors.push(`Opening rush trailer clip should last 6-8 seconds, got ${durationSeconds.toFixed(1)}s`);
+      }
+      const expectedFramePaths = clipFrames.map((frame) => frame.path);
+      const clipFramePaths = animatedClip.frames ?? [];
+      if (clipFramePaths.length !== expectedFramePaths.length) {
+        errors.push(`Opening rush trailer clip should include ${expectedFramePaths.length} frames, got ${clipFramePaths.length}`);
+      }
+      for (const [index, expectedPath] of expectedFramePaths.entries()) {
+        if (clipFramePaths[index] !== expectedPath) {
+          errors.push(`Opening rush trailer clip frame ${index + 1} should source ${expectedPath}, got ${clipFramePaths[index]}`);
+        }
+      }
+    }
   }
 
   for (const [artifactId, artifact] of Object.entries(page.reviewArtifacts ?? {})) {

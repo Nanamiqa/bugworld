@@ -134,6 +134,7 @@ const achievements = window.variableCityAchievementCatalog ?? [];
 const urlParams = new URLSearchParams(window.location.search);
 const storeShotMode = urlParams.get("storeShot")?.trim() ?? "";
 const isStoreShotMode = Boolean(storeShotMode);
+const isOpeningRushClipMode = storeShotMode === "opening-rush-trailer" && urlParams.get("clip") === "1";
 const isAutomationMode = urlParams.get("automation") === "1";
 const world = {
   width: 1280,
@@ -6184,13 +6185,40 @@ function configureOpeningRushTrailerStoreShotMode() {
   runStats.openingRushTrailerBoard = {
     title: "6秒短片分镜",
     subtitle: "第一把：首异常 -> 裂隙落点 -> 先手截击 -> S级评分",
+    clip: isOpeningRushClipMode ? {
+      startedAtMs: performance.now(),
+      durationSeconds: 6.3,
+      frameDelayMs: 900,
+      label: "实机GIF采样",
+    } : null,
     frames: [
-      { time: "00:00", title: "首个异常", note: "开场链 +1", done: true },
-      { time: "00:02", title: "裂隙落点", note: "黄框 + 4个落点", done: true },
-      { time: "00:04", title: "先手截击", note: "+1 bug / +2生命", done: true },
-      { time: "00:06", title: "S级开场", note: "100/100 · S补给", done: true },
+      { at: 0, time: "00:00", title: "首个异常", note: "开场链 +1", done: !isOpeningRushClipMode },
+      { at: 1.8, time: "00:02", title: "裂隙落点", note: "黄框 + 4个落点", done: !isOpeningRushClipMode },
+      { at: 3.6, time: "00:04", title: "先手截击", note: "+1 bug / +2生命", done: !isOpeningRushClipMode },
+      { at: 5.4, time: "00:06", title: "S级开场", note: "100/100 · S补给", done: !isOpeningRushClipMode },
     ],
   };
+
+  if (isOpeningRushClipMode) {
+    window.__variableCitySetOpeningRushClipTime = (seconds = 0) => {
+      const board = runStats?.openingRushTrailerBoard;
+      const clip = board?.clip;
+      if (!clip) {
+        return null;
+      }
+      const elapsed = clamp(Number(seconds) || 0, 0, clip.durationSeconds ?? 6.3);
+      clip.overrideElapsedSeconds = elapsed;
+      world.animTime = 4.2 + elapsed;
+      if (runStats.openingShowcase) {
+        runStats.openingShowcase.flash = 0.8 + Math.sin(elapsed * 2.2) * 0.18;
+      }
+      draw(0);
+      return window.__variableCityOpeningRushClipProgress ?? {
+        elapsed,
+        duration: clip.durationSeconds ?? 6.3,
+      };
+    };
+  }
 
   centerCameraOnPlayer();
   syncHud();
@@ -13284,6 +13312,18 @@ function drawOpeningShowcaseOverlay(camera) {
   const flash = clamp(Number(showcase.flash) || 0, 0, 2.2);
   const hasChecklist = ["retry", "combat"].includes(showcase.phase);
   const checklist = createOpeningShowcaseChecklist(showcase.checklist);
+  const trailerBoard = runStats?.openingRushTrailerBoard;
+  const trailerClip = trailerBoard?.clip;
+  const trailerFrames = Array.isArray(trailerBoard?.frames) ? trailerBoard.frames : [];
+  const trailerClipElapsed = trailerClip
+    ? Number.isFinite(trailerClip.overrideElapsedSeconds)
+      ? clamp(trailerClip.overrideElapsedSeconds, 0, trailerClip.durationSeconds ?? 6.3)
+      : clamp((performance.now() - trailerClip.startedAtMs) / 1000, 0, trailerClip.durationSeconds ?? 6.3)
+    : null;
+  const trailerActiveIndex = trailerClip
+    ? Math.max(0, trailerFrames.findLastIndex((frame) => trailerClipElapsed + 0.18 >= (Number(frame.at) || 0)))
+    : -1;
+  const trailerActiveFrame = trailerActiveIndex >= 0 ? trailerFrames[trailerActiveIndex] : null;
   const checklistReadyCount = openingShowcaseChecklistItems.filter((item) => checklist[item.key]).length;
   const previewDelay = runStats?.openingSprint?.surge?.delayRemaining ?? openingSurgeConfig.spawnDelay;
   const progress = showcase.phase === "preview"
@@ -13294,7 +13334,18 @@ function drawOpeningShowcaseOverlay(camera) {
         ? checklistReadyCount / openingShowcaseChecklistItems.length
       : clamp((showcase.defeats ?? 0) / Math.max(1, showcase.targetDefeats ?? openingSurgeConfig.targetDefeats), 0, 1);
   const accent = showcase.completed ? "#5de2d1" : showcase.phase === "retry" ? "#72a5ff" : showcase.phase === "combat" ? "#f1c15b" : "#f1c15b";
-  const label = showcase.phase === "preview" ? "NEXT RIFT" : showcase.phase === "retry" ? "RETRY ROUTE" : showcase.phase === "combat" ? "COMBAT SHOT" : "FIRST WAVE";
+  const label = trailerClip
+    ? `CLIP ${trailerClipElapsed.toFixed(1)}S`
+    : showcase.phase === "preview" ? "NEXT RIFT" : showcase.phase === "retry" ? "RETRY ROUTE" : showcase.phase === "combat" ? "COMBAT SHOT" : "FIRST WAVE";
+  const titleText = trailerClip && trailerActiveFrame
+    ? `${trailerActiveFrame.time} ${trailerActiveFrame.title}`
+    : showcase.title;
+  const calloutText = trailerClip && trailerActiveFrame
+    ? trailerActiveFrame.note
+    : showcase.callout;
+  const focusText = trailerClip
+    ? "首异常 -> 裂隙 -> 先手 -> S级评分"
+    : showcase.focus;
 
   ctx.save();
   ctx.globalAlpha = 0.54 + flash * 0.08;
@@ -13381,11 +13432,11 @@ function drawOpeningShowcaseOverlay(camera) {
   ctx.fillText(label, cardX + 12, cardY + 22);
   ctx.fillStyle = "#17202a";
   ctx.font = "800 16px Microsoft YaHei, Segoe UI, sans-serif";
-  ctx.fillText(shortenText(showcase.title, 18), cardX + 12, cardY + 45);
+  ctx.fillText(shortenText(titleText, 18), cardX + 12, cardY + 45);
   ctx.fillStyle = "#526174";
   ctx.font = "12px Microsoft YaHei, Segoe UI, sans-serif";
-  ctx.fillText(shortenText(showcase.callout, 22), cardX + 12, cardY + 65);
-  ctx.fillText(shortenText(showcase.focus, 28), cardX + 12, cardY + 82);
+  ctx.fillText(shortenText(calloutText, 22), cardX + 12, cardY + 65);
+  ctx.fillText(shortenText(focusText, 28), cardX + 12, cardY + 82);
   if (hasChecklist) {
     ctx.fillStyle = "#26364d";
     ctx.font = "800 11px Microsoft YaHei, Segoe UI, sans-serif";
@@ -13410,6 +13461,24 @@ function drawOpeningRushTrailerBoard(camera) {
 
   const rush = getOpeningRushSnapshot(runStats.openingRush);
   const frames = Array.isArray(board.frames) ? board.frames : [];
+  const clip = board.clip;
+  const clipElapsed = clip
+    ? Number.isFinite(clip.overrideElapsedSeconds)
+      ? clamp(clip.overrideElapsedSeconds, 0, clip.durationSeconds ?? 6.3)
+      : clamp((performance.now() - clip.startedAtMs) / 1000, 0, clip.durationSeconds ?? 6.3)
+    : null;
+  const clipProgress = clip ? clamp(clipElapsed / Math.max(0.1, clip.durationSeconds ?? 6.3), 0, 1) : 1;
+  const activeIndex = clip
+    ? Math.max(0, frames.findLastIndex((frame) => clipElapsed + 0.18 >= (Number(frame.at) || 0)))
+    : -1;
+  if (clip) {
+    window.__variableCityOpeningRushClipProgress = {
+      elapsed: round(clipElapsed),
+      duration: round(clip.durationSeconds ?? 6.3),
+      activeIndex,
+      activeTitle: frames[activeIndex]?.title ?? "",
+    };
+  }
   const panelX = 54;
   const panelY = Math.max(112, world.viewHeight - 292);
   const panelW = Math.min(760, world.viewWidth - 108);
@@ -13426,13 +13495,22 @@ function drawOpeningRushTrailerBoard(camera) {
   ctx.strokeRect(panelX, panelY, panelW, panelH);
   ctx.fillStyle = accent;
   ctx.font = "800 16px Microsoft YaHei, Segoe UI, sans-serif";
-  ctx.fillText("REAL 6S GAMEPLAY BOARD", panelX + 24, panelY + 34);
+  ctx.fillText(clip ? "REAL 6S GAMEPLAY GIF" : "REAL 6S GAMEPLAY BOARD", panelX + 24, panelY + 34);
+  if (clip) {
+    ctx.fillStyle = "rgba(93, 226, 209, 0.2)";
+    ctx.fillRect(panelX + 24, panelY + 44, panelW - 48, 6);
+    ctx.fillStyle = cyan;
+    ctx.fillRect(panelX + 24, panelY + 44, (panelW - 48) * clipProgress, 6);
+    ctx.fillStyle = "#c6d8e5";
+    ctx.font = "800 12px Microsoft YaHei, Segoe UI, sans-serif";
+    ctx.fillText(`${board.clip.label ?? "实机采样"} ${clipElapsed.toFixed(1)}s / ${(clip.durationSeconds ?? 6.3).toFixed(1)}s`, panelX + 24, panelY + 63);
+  }
   ctx.fillStyle = "#f8fcff";
   ctx.font = "900 30px Microsoft YaHei, Segoe UI, sans-serif";
-  ctx.fillText(shortenText(board.title, 20), panelX + 24, panelY + 74);
+  ctx.fillText(shortenText(board.title, 20), panelX + 24, panelY + (clip ? 88 : 74));
   ctx.fillStyle = "#c6d8e5";
   ctx.font = "700 17px Microsoft YaHei, Segoe UI, sans-serif";
-  ctx.fillText(shortenText(board.subtitle, 40), panelX + 24, panelY + 104);
+  ctx.fillText(shortenText(board.subtitle, 40), panelX + 24, panelY + (clip ? 116 : 104));
 
   const scoreX = panelX + panelW - 214;
   const scoreY = panelY + 24;
@@ -13453,14 +13531,16 @@ function drawOpeningRushTrailerBoard(camera) {
   const cardW = (panelW - 48 - gap * 3) / 4;
   frames.slice(0, 4).forEach((frame, index) => {
     const x = panelX + 24 + index * (cardW + gap);
-    ctx.fillStyle = "rgba(247, 250, 255, 0.94)";
+    const isActive = index === activeIndex;
+    const isDone = clip ? clipElapsed + 0.24 >= (Number(frame.at) || 0) : frame.done;
+    ctx.fillStyle = isActive ? "rgba(255, 247, 218, 0.98)" : "rgba(247, 250, 255, 0.94)";
     ctx.fillRect(x, cardY, cardW, 78);
-    ctx.strokeStyle = frame.done ? cyan : "rgba(38, 54, 77, 0.2)";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = isActive ? accent : isDone ? cyan : "rgba(38, 54, 77, 0.2)";
+    ctx.lineWidth = isActive ? 3 : 2;
     ctx.strokeRect(x, cardY, cardW, 78);
-    ctx.fillStyle = frame.done ? "#0f9f95" : "#526174";
+    ctx.fillStyle = isActive ? "#b36a10" : isDone ? "#0f9f95" : "#526174";
     ctx.font = "900 12px Microsoft YaHei, Segoe UI, sans-serif";
-    ctx.fillText(`${frame.done ? "✓" : "○"} ${frame.time}`, x + 12, cardY + 22);
+    ctx.fillText(`${isDone ? "✓" : "○"} ${frame.time}`, x + 12, cardY + 22);
     ctx.fillStyle = "#17202a";
     ctx.font = "900 17px Microsoft YaHei, Segoe UI, sans-serif";
     ctx.fillText(shortenText(frame.title, 8), x + 12, cardY + 46);

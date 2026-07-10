@@ -76,6 +76,8 @@ npm run export:store-capsules
 
 另有一张 review-only 短片分镜捕获图 `screenshot_11_opening_rush_trailer_board`，使用 `storeShot=opening-rush-trailer` 从真实游戏状态搭建“首个异常 -> 快递裂隙 -> 先手截击 -> S级开场”6 秒短片板；它不进入正式截图排序，只用于 Steam 公告、GIF 或短视频剪辑前复核。
 
+动态版素材使用 `storeShot=opening-rush-trailer&clip=1` 捕获 7 张真实 1080p 游戏帧，再合成为 960 x 540 / 6.3 秒轻量 GIF，用来观察黄框落点、接怪窗口、先手截击和 S 级评分在运动中是否仍然清楚。
+
 捕获当前 10 张截图：
 
 ```powershell
@@ -96,6 +98,12 @@ npm run capture:store-screenshots -- screenshot_07_metro_combat_showcase
 npm run capture:opening-rush-board
 ```
 
+捕获首局 30 秒动态短片帧并合成 GIF：
+
+```powershell
+npm run capture:opening-rush-clip
+```
+
 输出文件：
 
 - `desktop/steam/store-assets/screenshots/01-start-menu.png`：开场榜单、三套流派首榜、首榜奖励与 S 连胜局外成长截图，来自 `storeShot=leaderboard`。
@@ -109,6 +117,8 @@ npm run capture:opening-rush-board
 - `desktop/steam/store-assets/screenshots/09-promise-combat-showcase.png`
 - `desktop/steam/store-assets/screenshots/10-whitebox-combat-showcase.png`
 - `desktop/steam/store-assets/review/opening-rush-trailer-board.png`：review-only 首局 30 秒短片分镜板，来自 `storeShot=opening-rush-trailer`。
+- `desktop/steam/store-assets/review/opening-rush-clip-01-anomaly.png` 至 `opening-rush-clip-07-retry-route.png`：review-only 首局 30 秒动态短片实机帧，来自 `storeShot=opening-rush-trailer&clip=1`。
+- `desktop/steam/store-assets/review/opening-rush-trailer-clip.gif`：960 x 540 / 6.3 秒首局 30 秒动态短片 GIF，可用于 Steam 公告或社媒预览前复核。
 
 生成当前页面顺序复核图：
 
