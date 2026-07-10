@@ -280,6 +280,38 @@ if (manifest && page) {
     );
   }
 
+  const openingRushTrailerBoard = page.reviewArtifacts?.openingRushTrailerBoard;
+  if (!openingRushTrailerBoard) {
+    errors.push("Opening rush trailer board review artifact is required");
+  } else {
+    ensureReadyImage(
+      openingRushTrailerBoard,
+      openingRushTrailerBoard.path,
+      openingRushTrailerBoard.width,
+      openingRushTrailerBoard.height,
+      "Opening rush trailer board"
+    );
+    const sourceScreenshot = screenshots.get(openingRushTrailerBoard.sourceScreenshotId);
+    if (!sourceScreenshot) {
+      errors.push(`Opening rush trailer board references unknown screenshot: ${openingRushTrailerBoard.sourceScreenshotId}`);
+    } else {
+      if (sourceScreenshot.status !== "review") {
+        errors.push(`Opening rush trailer board source should stay review-only, got ${sourceScreenshot.status}`);
+      }
+      if (sourceScreenshot.captureUrl !== "index.html?storeShot=opening-rush-trailer") {
+        errors.push(`Opening rush trailer board should use storeShot=opening-rush-trailer, got ${sourceScreenshot.captureUrl}`);
+      }
+      if (sourceScreenshot.targetFile !== openingRushTrailerBoard.path) {
+        errors.push(`Opening rush trailer board path should match source targetFile, got ${sourceScreenshot.targetFile}`);
+      }
+      for (const term of openingRushTrailerBoard.requiredBeats ?? []) {
+        if (!sourceScreenshot.mustShow?.some((item) => String(item).includes(term))) {
+          errors.push(`Opening rush trailer board source mustShow should include ${term}`);
+        }
+      }
+    }
+  }
+
   for (const [artifactId, artifact] of Object.entries(page.reviewArtifacts ?? {})) {
     if (artifactId === "contactSheet") {
       continue;

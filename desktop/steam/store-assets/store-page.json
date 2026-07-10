@@ -85,6 +85,15 @@
       "status": "ready",
       "purpose": "Second-to-fifth chapter combat screenshot candidates with device, enemy mechanic, boss window, and VFX checks."
     },
+    "openingRushTrailerBoard": {
+      "path": "desktop/steam/store-assets/review/opening-rush-trailer-board.png",
+      "width": 1920,
+      "height": 1080,
+      "status": "ready",
+      "purpose": "Review capture for a 6-second gameplay trailer cut: first anomaly, delivery rift, first strike, and S-rank opening.",
+      "sourceScreenshotId": "screenshot_11_opening_rush_trailer_board",
+      "requiredBeats": ["首个异常", "快递裂隙", "先手截击", "S级开场"]
+    },
     "leaderboardPromo": {
       "path": "desktop/steam/store-assets/review/leaderboard-meta-promo.png",
       "width": 1920,

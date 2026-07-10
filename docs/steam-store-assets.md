@@ -74,6 +74,8 @@ npm run export:store-capsules
 
 每张截图都在 `store-assets.json` 里记录 `mustShow` 检查项；第二至五章实战图使用 `storeShot=chapter-X-combat` 从可玩版本直接搭建装置、章节敌人机制、Boss 弱点窗口和武器特效。首屏排序和素材密度由 `check-store-first-impression.cjs` 自动校验，避免后续退回菜单/设置占据第一眼。
 
+另有一张 review-only 短片分镜捕获图 `screenshot_11_opening_rush_trailer_board`，使用 `storeShot=opening-rush-trailer` 从真实游戏状态搭建“首个异常 -> 快递裂隙 -> 先手截击 -> S级开场”6 秒短片板；它不进入正式截图排序，只用于 Steam 公告、GIF 或短视频剪辑前复核。
+
 捕获当前 10 张截图：
 
 ```powershell
@@ -88,6 +90,12 @@ npm run capture:store-screenshots -- screenshot_07_metro_combat_showcase
 
 直接运行 PowerShell 脚本时也可以使用 `-OnlyId screenshot_07_metro_combat_showcase`。
 
+只捕获首局 30 秒短片分镜板：
+
+```powershell
+npm run capture:opening-rush-board
+```
+
 输出文件：
 
 - `desktop/steam/store-assets/screenshots/01-start-menu.png`：开场榜单、三套流派首榜、首榜奖励与 S 连胜局外成长截图，来自 `storeShot=leaderboard`。
@@ -100,6 +108,7 @@ npm run capture:store-screenshots -- screenshot_07_metro_combat_showcase
 - `desktop/steam/store-assets/screenshots/08-hash-combat-showcase.png`
 - `desktop/steam/store-assets/screenshots/09-promise-combat-showcase.png`
 - `desktop/steam/store-assets/screenshots/10-whitebox-combat-showcase.png`
+- `desktop/steam/store-assets/review/opening-rush-trailer-board.png`：review-only 首局 30 秒短片分镜板，来自 `storeShot=opening-rush-trailer`。
 
 生成当前页面顺序复核图：
 

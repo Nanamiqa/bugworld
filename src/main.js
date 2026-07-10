@@ -6107,6 +6107,97 @@ function configureChapterCombatStoreShotMode(mode = storeShotMode) {
   return true;
 }
 
+function configureOpeningRushTrailerStoreShotMode() {
+  resetStoreRun(0, {
+    focus: { x: 780, y: 450 },
+    weaponIndex: 1,
+    objective: "6秒短片：首异常、快递裂隙、先手截击、S级评分",
+    log: "商店分镜：真实开局链路已搭好，首异常、裂隙落点、先手截击和S级评分同屏。",
+    stepIndex: 0,
+    resolvedInStep: 0,
+    bugPoints: 2,
+    hp: 86,
+    xp: 0,
+    level: 1,
+    projectileCount: 4,
+  });
+  archiveState = createStoreLeaderboardArchiveState();
+  runStats.eventsResolved = 1;
+  runStats.openingRush = createOpeningRushState();
+  runStats.openingSprint = createOpeningSprintState();
+  runStats.tempo = createCombatTempoState();
+  const build = getStarterBuildById("queue-barrage");
+  if (build) {
+    runStats.starterBuild = build.id;
+    runStats.starterIgnition = createStarterIgnitionState(build);
+  }
+
+  runStats.openingSprint.completedStepIds = [openingSprintSteps[0]?.id].filter(Boolean);
+  runStats.openingSprint.stepIndex = 1;
+  runStats.openingSprint.surge.delayRemaining = 0;
+  completeOpeningRushMilestone("anomaly");
+  updateOpeningRush(1.4);
+  updateOpeningSurge(openingSurgeConfig.spawnDelay + 0.08);
+  const spawned = enemies.filter((enemy) => enemy.openingSurge);
+  const firstStrikeTarget = spawned[0] ?? null;
+  if (firstStrikeTarget) {
+    claimOpeningSurgeFirstStrike(firstStrikeTarget, "probe");
+    fireWeaponAt({ x: firstStrikeTarget.x, y: firstStrikeTarget.y });
+  }
+  if (runStats.openingSprint?.surge) {
+    runStats.openingSprint.surge.defeats = 2;
+    runStats.openingSprint.surge.elapsed = 4.2;
+  }
+  updateOpeningRush(1.6);
+  completeOpeningRushMilestone("surge");
+  updateOpeningRush(1.2);
+  completeOpeningRushMilestone("overclock");
+  updateOpeningRush(0.9);
+  completeOpeningRushMilestone("retry-route");
+
+  if (runStats.starterIgnition) {
+    runStats.starterIgnition.defeats = Math.max(
+      runStats.starterIgnition.defeats ?? 0,
+      runStats.starterIgnition.targetDefeats ?? openingSurgeConfig.targetDefeats,
+    );
+    runStats.starterIgnition.completed = true;
+    runStats.starterIgnition.overclockApplied = true;
+    runStats.starterIgnition.overclockText = runStats.starterIgnition.overclockText || "宏队列预热：冷却 -8%，射程 +45。";
+  }
+
+  if (runStats.openingShowcase?.active) {
+    runStats.openingShowcase.phase = "combat";
+    runStats.openingShowcase.title = "6秒实机短片分镜";
+    runStats.openingShowcase.callout = "首异常 / 裂隙 / 先手 / S级评分同屏";
+    runStats.openingShowcase.focus = "看得到、打得到、想再试";
+    runStats.openingShowcase.rewardText = "先手 +1 bug点数 / S补给 +2 bug点数";
+    runStats.openingShowcase.checklist = createOpeningShowcaseChecklist({
+      compass: true,
+      enemies: true,
+      weaponFx: true,
+      reward: true,
+      effectLabel: "先手截击",
+      effectPulse: 1,
+    });
+  }
+
+  runStats.openingRushTrailerBoard = {
+    title: "6秒短片分镜",
+    subtitle: "第一把：首异常 -> 裂隙落点 -> 先手截击 -> S级评分",
+    frames: [
+      { time: "00:00", title: "首个异常", note: "开场链 +1", done: true },
+      { time: "00:02", title: "裂隙落点", note: "黄框 + 4个落点", done: true },
+      { time: "00:04", title: "先手截击", note: "+1 bug / +2生命", done: true },
+      { time: "00:06", title: "S级开场", note: "100/100 · S补给", done: true },
+    ],
+  };
+
+  centerCameraOnPlayer();
+  syncHud();
+  window.__variableCityStoreShotReady = true;
+  return true;
+}
+
 function configureStoreShotMode() {
   document.documentElement.dataset.storeShot = storeShotMode;
   gameSettings = {
@@ -6133,6 +6224,11 @@ function configureStoreShotMode() {
     ui.startSummary.textContent = "30秒开场榜已跑起来：总榜 #1、三套流派首榜全领、S连胜和三流派首榜成就同屏，下一把还有可追的榜。";
     setLog("商店截图：开场榜单、流派首榜奖励、S连胜和局外成长闭环。");
     window.__variableCityStoreShotReady = true;
+    return;
+  }
+
+  if (storeShotMode === "opening-rush-trailer") {
+    configureOpeningRushTrailerStoreShotMode();
     return;
   }
 
@@ -10377,6 +10473,7 @@ function draw(dt) {
   drawDeviceGuideCompass(camera);
   drawExplorationMiniMap(camera);
   drawOpeningShowcaseOverlay(camera);
+  drawOpeningRushTrailerBoard(camera);
   drawChapterShowcaseOverlay(camera);
   drawBossHud();
   ctx.restore();
@@ -13302,6 +13399,76 @@ function drawOpeningShowcaseOverlay(camera) {
       ctx.fillText(`${ok ? "✓" : "○"} ${item.label}`, x, y);
     });
   }
+  ctx.restore();
+}
+
+function drawOpeningRushTrailerBoard(camera) {
+  const board = runStats?.openingRushTrailerBoard;
+  if (storeShotMode !== "opening-rush-trailer" || !board || world.mode !== "playing") {
+    return;
+  }
+
+  const rush = getOpeningRushSnapshot(runStats.openingRush);
+  const frames = Array.isArray(board.frames) ? board.frames : [];
+  const panelX = 54;
+  const panelY = Math.max(112, world.viewHeight - 292);
+  const panelW = Math.min(760, world.viewWidth - 108);
+  const panelH = 238;
+  const accent = "#f1c15b";
+  const cyan = "#5de2d1";
+
+  ctx.save();
+  ctx.globalAlpha = 0.94;
+  ctx.fillStyle = "rgba(8, 18, 30, 0.92)";
+  ctx.fillRect(panelX, panelY, panelW, panelH);
+  ctx.strokeStyle = "rgba(93, 226, 209, 0.92)";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(panelX, panelY, panelW, panelH);
+  ctx.fillStyle = accent;
+  ctx.font = "800 16px Microsoft YaHei, Segoe UI, sans-serif";
+  ctx.fillText("REAL 6S GAMEPLAY BOARD", panelX + 24, panelY + 34);
+  ctx.fillStyle = "#f8fcff";
+  ctx.font = "900 30px Microsoft YaHei, Segoe UI, sans-serif";
+  ctx.fillText(shortenText(board.title, 20), panelX + 24, panelY + 74);
+  ctx.fillStyle = "#c6d8e5";
+  ctx.font = "700 17px Microsoft YaHei, Segoe UI, sans-serif";
+  ctx.fillText(shortenText(board.subtitle, 40), panelX + 24, panelY + 104);
+
+  const scoreX = panelX + panelW - 214;
+  const scoreY = panelY + 24;
+  ctx.fillStyle = "rgba(241, 193, 91, 0.12)";
+  ctx.fillRect(scoreX, scoreY, 168, 86);
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(scoreX, scoreY, 168, 86);
+  ctx.fillStyle = accent;
+  ctx.font = "800 13px Microsoft YaHei, Segoe UI, sans-serif";
+  ctx.fillText("开场评级", scoreX + 16, scoreY + 24);
+  ctx.fillStyle = "#f8fcff";
+  ctx.font = "900 30px Microsoft YaHei, Segoe UI, sans-serif";
+  ctx.fillText(`${rush.grade} ${rush.score}/100`, scoreX + 16, scoreY + 58);
+
+  const cardY = panelY + 134;
+  const gap = 14;
+  const cardW = (panelW - 48 - gap * 3) / 4;
+  frames.slice(0, 4).forEach((frame, index) => {
+    const x = panelX + 24 + index * (cardW + gap);
+    ctx.fillStyle = "rgba(247, 250, 255, 0.94)";
+    ctx.fillRect(x, cardY, cardW, 78);
+    ctx.strokeStyle = frame.done ? cyan : "rgba(38, 54, 77, 0.2)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, cardY, cardW, 78);
+    ctx.fillStyle = frame.done ? "#0f9f95" : "#526174";
+    ctx.font = "900 12px Microsoft YaHei, Segoe UI, sans-serif";
+    ctx.fillText(`${frame.done ? "✓" : "○"} ${frame.time}`, x + 12, cardY + 22);
+    ctx.fillStyle = "#17202a";
+    ctx.font = "900 17px Microsoft YaHei, Segoe UI, sans-serif";
+    ctx.fillText(shortenText(frame.title, 8), x + 12, cardY + 46);
+    ctx.fillStyle = "#526174";
+    ctx.font = "700 11px Microsoft YaHei, Segoe UI, sans-serif";
+    ctx.fillText(shortenText(frame.note, 14), x + 12, cardY + 64);
+  });
+
   ctx.restore();
 }
 

@@ -244,6 +244,16 @@
       "targetFile": "desktop/steam/store-assets/screenshots/06-pc-settings.png",
       "captureUrl": "index.html?storeShot=settings",
       "mustShow": ["设置界面", "音量", "手柄输入", "全屏偏好"]
+    },
+    {
+      "id": "screenshot_11_opening_rush_trailer_board",
+      "title": "首局30秒短片分镜板",
+      "width": 1920,
+      "height": 1080,
+      "status": "review",
+      "targetFile": "desktop/steam/store-assets/review/opening-rush-trailer-board.png",
+      "captureUrl": "index.html?storeShot=opening-rush-trailer",
+      "mustShow": ["首个异常", "快递裂隙", "先手截击", "S级开场"]
     }
   ],
   "trailer": {

@@ -17,6 +17,7 @@
     "check:meta-assets": "node desktop/tools/check-meta-assets.cjs",
     "check:chapter-map-assets": "node desktop/tools/check-chapter-map-assets.cjs",
     "capture:store-screenshots": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tools/capture-store-screenshots.ps1",
+    "capture:opening-rush-board": "node desktop/tools/capture-store-screenshots.cjs --only-id screenshot_11_opening_rush_trailer_board --timeout-ms 15000",
     "check:electron-shell": "node desktop/tools/check-electron-shell.cjs",
     "desktop:install-electron": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tools/install-electron-binary.ps1",
     "export:store-capsules": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tools/export-store-capsules.ps1",
