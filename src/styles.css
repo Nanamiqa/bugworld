@@ -701,6 +701,84 @@ h1 {
   background: linear-gradient(90deg, var(--cyan), var(--blue));
 }
 
+.case-tracker {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 8px 10px;
+  border: 1px solid rgba(62, 114, 216, 0.28);
+  border-radius: 8px;
+  background: rgba(242, 247, 255, 0.84);
+}
+
+.case-tracker.hidden {
+  display: none;
+}
+
+.case-tracker::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--case-progress, 100%);
+  height: 3px;
+  background: linear-gradient(90deg, var(--blue), var(--cyan));
+}
+
+.case-tracker span {
+  color: var(--blue);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.case-tracker strong,
+.case-tracker small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.case-tracker strong {
+  color: var(--text);
+  font-size: 0.84rem;
+}
+
+.case-tracker small {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.case-tracker.is-return {
+  border-color: rgba(15, 159, 149, 0.36);
+  background: rgba(239, 250, 249, 0.9);
+}
+
+.case-tracker.is-return span {
+  color: var(--cyan);
+}
+
+.case-tracker.is-archive {
+  border-color: rgba(201, 132, 22, 0.38);
+  background: rgba(255, 248, 232, 0.88);
+}
+
+.case-tracker.is-archive span {
+  color: var(--amber);
+}
+
+.case-tracker.is-whitebox {
+  border-color: rgba(217, 79, 92, 0.34);
+  background: rgba(255, 244, 245, 0.9);
+}
+
+.case-tracker.is-whitebox span {
+  color: var(--red);
+}
+
 @keyframes tempo-pop {
   0% {
     transform: translateY(-1px) scale(1.012);
@@ -993,6 +1071,10 @@ h1 {
   color: var(--teal-dark);
 }
 
+.echo-archive-head.is-case strong {
+  color: var(--blue);
+}
+
 .echo-archive-last {
   overflow: hidden;
   color: var(--muted);
@@ -1040,6 +1122,16 @@ h1 {
 .echo-chapter.is-device.is-complete {
   border-color: rgba(15, 159, 149, 0.36);
   background: rgba(218, 246, 243, 0.64);
+}
+
+.echo-chapter.is-case {
+  border-color: rgba(62, 114, 216, 0.2);
+  background: rgba(242, 247, 255, 0.76);
+}
+
+.echo-chapter.is-case.is-complete {
+  border-color: rgba(62, 114, 216, 0.38);
+  background: rgba(223, 235, 255, 0.7);
 }
 
 .echo-chapter.is-locked {

@@ -28,6 +28,7 @@ const ui = {
   tempoTracker: document.querySelector("#tempoTracker"),
   starterTracker: document.querySelector("#starterTracker"),
   deviceTracker: document.querySelector("#deviceTracker"),
+  caseTracker: document.querySelector("#caseTracker"),
   storyPanel: document.querySelector("#storyPanel"),
   storySpeaker: document.querySelector("#storySpeaker"),
   storyTitle: document.querySelector("#storyTitle"),
@@ -128,7 +129,7 @@ const ARCHIVE_STORAGE_KEY = "variableCityArchive";
 const RUN_SAVE_STORAGE_KEY = "variableCityRunSave";
 const SETTINGS_STORAGE_KEY = "variableCitySettings";
 const ACHIEVEMENT_STORAGE_KEY = "variableCityAchievements";
-const ARCHIVE_VERSION = 12;
+const ARCHIVE_VERSION = 13;
 const RUN_SAVE_VERSION = 2;
 const achievements = window.variableCityAchievementCatalog ?? [];
 const urlParams = new URLSearchParams(window.location.search);
@@ -1338,6 +1339,7 @@ const weaponDefinitions = gameData.weapons ?? [];
 const weaponUpgrades = gameData.weaponUpgrades ?? [];
 const chapterRelics = gameData.chapterRelics ?? [];
 const enemyTypes = gameData.enemyTypes ?? {};
+const caseFileDefinitions = gameData.caseFiles ?? [];
 const openingSprintSteps = [
   {
     id: "first-anomaly",
@@ -2074,6 +2076,7 @@ function createRunStats() {
     openingSprint: null,
     starterBuild: null,
     starterIgnition: null,
+    caseResolutions: {},
     highestLevel: 1,
     bestChapterReached: 0,
   };
@@ -2123,6 +2126,8 @@ function createArchiveFallback() {
     activatedMapInteractives: [],
     completedMapInteractiveChapters: [],
     lastMapInteractiveDiscovery: null,
+    caseFiles: {},
+    lastCaseResolution: null,
     metaUpgrades: Object.fromEntries(metaProgressNodes.map((node) => [node.id, 0])),
     lastRunShardGain: null,
     lastRunReview: null,
@@ -2484,6 +2489,189 @@ function normalizeFairWarningState(value = {}) {
   };
 }
 
+function getCaseFileDefinition(caseId) {
+  return caseFileDefinitions.find((caseFile) => caseFile.id === caseId) ?? null;
+}
+
+function getCaseDecisionDefinition(caseId, decisionId) {
+  const caseFile = getCaseFileDefinition(caseId);
+  return caseFile?.decisions?.find((decision) => decision.id === decisionId) ?? null;
+}
+
+function normalizeRunCaseResolutions(savedResolutions = {}) {
+  const source = savedResolutions && typeof savedResolutions === "object" ? savedResolutions : {};
+  const normalized = {};
+  for (const caseFile of caseFileDefinitions) {
+    const saved = source[caseFile.id];
+    const decisionId = typeof saved === "string" ? saved : saved?.decisionId ?? saved?.decision;
+    const decision = getCaseDecisionDefinition(caseFile.id, decisionId);
+    if (!decision) {
+      continue;
+    }
+    normalized[caseFile.id] = {
+      decisionId: decision.id,
+      at: Math.max(0, Number(saved?.at) || 0),
+    };
+  }
+  return normalized;
+}
+
+function normalizeCaseFiles(savedCaseFiles = {}) {
+  const source = savedCaseFiles && typeof savedCaseFiles === "object" ? savedCaseFiles : {};
+  const normalized = {};
+  for (const caseFile of caseFileDefinitions) {
+    const saved = source[caseFile.id] && typeof source[caseFile.id] === "object" ? source[caseFile.id] : {};
+    const decisions = [...new Set(Array.isArray(saved.decisions) ? saved.decisions : [])]
+      .filter((decisionId) => Boolean(getCaseDecisionDefinition(caseFile.id, decisionId)));
+    const lastDecision = getCaseDecisionDefinition(caseFile.id, saved.lastDecisionId);
+    if (!decisions.length && !lastDecision) {
+      continue;
+    }
+    normalized[caseFile.id] = {
+      decisions,
+      lastDecisionId: lastDecision?.id ?? decisions.at(-1) ?? null,
+      lastAt: Math.max(0, Number(saved.lastAt) || 0),
+    };
+  }
+  return normalized;
+}
+
+function normalizeLastCaseResolution(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const caseFile = getCaseFileDefinition(value.caseId);
+  const decision = getCaseDecisionDefinition(value.caseId, value.decisionId);
+  if (!caseFile || !decision) {
+    return null;
+  }
+  return {
+    caseId: caseFile.id,
+    decisionId: decision.id,
+    title: caseFile.title,
+    tracker: decision.tracker ?? decision.title,
+    archiveNote: decision.archiveNote ?? "",
+    shardReward: Math.max(0, Math.trunc(Number(value.shardReward) || 0)),
+    at: Math.max(0, Number(value.at) || 0),
+  };
+}
+
+function getRunCaseResolution(caseId) {
+  const saved = runStats?.caseResolutions?.[caseId];
+  const caseFile = getCaseFileDefinition(caseId);
+  const decision = getCaseDecisionDefinition(caseId, saved?.decisionId);
+  if (!caseFile || !decision) {
+    return null;
+  }
+  return {
+    caseFile,
+    decision,
+    decisionId: decision.id,
+    at: Math.max(0, Number(saved?.at) || 0),
+  };
+}
+
+function getCaseBossEffect(caseId, decisionId) {
+  return getCaseDecisionDefinition(caseId, decisionId)?.boss ?? {};
+}
+
+function getCaseArchiveSummary(archive = archiveState) {
+  const entries = normalizeCaseFiles(archive?.caseFiles);
+  const files = caseFileDefinitions.map((caseFile) => {
+    const entry = entries[caseFile.id] ?? null;
+    const decision = getCaseDecisionDefinition(caseFile.id, entry?.lastDecisionId);
+    return {
+      id: caseFile.id,
+      chapterIndex: caseFile.chapterIndex ?? 0,
+      title: caseFile.title,
+      shortTitle: caseFile.shortTitle ?? caseFile.title,
+      prompt: caseFile.prompt ?? "",
+      decisions: entry?.decisions ?? [],
+      lastDecision: decision ?? null,
+      lastAt: entry?.lastAt ?? 0,
+    };
+  });
+  return {
+    resolved: files.filter((caseFile) => Boolean(caseFile.lastDecision)).length,
+    total: files.length,
+    files,
+    last: normalizeLastCaseResolution(archive?.lastCaseResolution),
+  };
+}
+
+function recordCaseResolution(caseId, decisionId) {
+  const caseFile = getCaseFileDefinition(caseId);
+  const decision = getCaseDecisionDefinition(caseId, decisionId);
+  if (!caseFile || !decision || !runStats) {
+    return null;
+  }
+
+  const now = Date.now();
+  runStats.caseResolutions = normalizeRunCaseResolutions(runStats.caseResolutions);
+  runStats.caseResolutions[caseFile.id] = {
+    decisionId: decision.id,
+    at: now,
+  };
+
+  archiveState.caseFiles = normalizeCaseFiles(archiveState.caseFiles);
+  const previous = archiveState.caseFiles[caseFile.id] ?? {
+    decisions: [],
+    lastDecisionId: null,
+    lastAt: 0,
+  };
+  const isNewDecision = !previous.decisions.includes(decision.id);
+  const decisions = [...new Set([...previous.decisions, decision.id])];
+  const shardReward = isNewDecision ? Math.max(0, Math.trunc(Number(caseFile.archiveReward) || 0)) : 0;
+  if (shardReward > 0) {
+    grantCalibrationShards(shardReward, caseFile.title + "首次裁定");
+  }
+  archiveState.caseFiles[caseFile.id] = {
+    decisions,
+    lastDecisionId: decision.id,
+    lastAt: now,
+  };
+  archiveState.lastCaseResolution = {
+    caseId: caseFile.id,
+    decisionId: decision.id,
+    title: caseFile.title,
+    tracker: decision.tracker ?? decision.title,
+    archiveNote: decision.archiveNote ?? "",
+    shardReward,
+    at: now,
+  };
+  saveArchive();
+  setLog("案件裁定：" + (decision.tracker ?? decision.title) + (shardReward ? "。首次归档 +" + shardReward + " 校准碎片。" : "。"));
+  return {
+    caseFile,
+    decision,
+    isNewDecision,
+    shardReward,
+  };
+}
+
+function getBossVictoryStory(baseStory, defeatedBoss = null) {
+  const caseFileId = defeatedBoss?.caseFileId;
+  const decision = getCaseDecisionDefinition(caseFileId, defeatedBoss?.caseDecisionId);
+  const outcomeLines = Array.isArray(decision?.outcomeLines) ? decision.outcomeLines : [];
+  if (!outcomeLines.length) {
+    return baseStory;
+  }
+  const baseLines = Array.isArray(baseStory?.lines) && baseStory.lines.length > 0
+    ? baseStory.lines
+    : baseStory?.text
+      ? [{
+        speaker: baseStory.speaker,
+        title: baseStory.title,
+        text: baseStory.text,
+        avatar: baseStory.avatar,
+      }]
+      : [];
+  return {
+    ...baseStory,
+    lines: [...baseLines, ...outcomeLines],
+  };
+}
+
 function loadArchive() {
   const fallback = createArchiveFallback();
   try {
@@ -2508,6 +2696,8 @@ function loadArchive() {
       activatedMapInteractives: normalizeMapInteractiveIds(saved.activatedMapInteractives),
       completedMapInteractiveChapters: normalizeMapInteractiveChapterIds(saved.completedMapInteractiveChapters),
       lastMapInteractiveDiscovery: normalizeLastMapInteractiveDiscovery(saved.lastMapInteractiveDiscovery),
+      caseFiles: normalizeCaseFiles(saved.caseFiles),
+      lastCaseResolution: normalizeLastCaseResolution(saved.lastCaseResolution),
       lastOpeningRush: normalizeOpeningRushArchive(saved.lastOpeningRush),
       lastOpeningRushSBadgeReward: normalizeOpeningRushSBadgeReward(saved.lastOpeningRushSBadgeReward),
       lastChiefOpeningChallengeReward: normalizeChiefOpeningChallengeReward(saved.lastChiefOpeningChallengeReward),
@@ -4956,6 +5146,7 @@ function restoreRunSave(save) {
     fairWarning: normalizeFairWarningState(save.runStats?.fairWarning),
     distanceTraveled: Math.max(0, Number(save.runStats?.distanceTraveled) || 0),
     tempo: normalizeCombatTempoState(save.runStats?.tempo),
+    caseResolutions: normalizeRunCaseResolutions(save.runStats?.caseResolutions),
   };
   runStats.activeHook = normalizeNightHookState(save.runStats?.activeHook, currentChapterIndex);
   runStats.openingSprint = normalizeOpeningSprintState(save.runStats?.openingSprint);
@@ -6482,6 +6673,10 @@ function applyActions(actions = []) {
       gain(action);
     }
 
+    if (action.type === "resolveCase") {
+      recordCaseResolution(action.caseId, action.decision);
+    }
+
     if (action.type === "spawnEnemy") {
       spawnEnemyNear(player.x + (action.dx ?? 0), player.y + (action.dy ?? 0), action.enemyType);
     }
@@ -6841,6 +7036,10 @@ function startBossFight(bossId = null) {
   const chapter = currentChapter();
   const bossConfig = chapter.boss ?? {};
   const mapBossSpawn = currentMap().bossSpawn ?? {};
+  const caseFileId = bossConfig.caseFileId ?? null;
+  const caseResolution = getRunCaseResolution(caseFileId);
+  const caseEffect = getCaseBossEffect(caseFileId, caseResolution?.decisionId);
+  const bossMaxHp = Math.max(1, Math.round((bossConfig.hp ?? 1750) * (caseEffect.hpMultiplier ?? 1)));
   bugNodes = [];
   enemies = enemies.slice(0, 4);
   cleaners = [];
@@ -6854,8 +7053,8 @@ function startBossFight(bossId = null) {
     x: bossConfig.x ?? mapBossSpawn.x ?? 1034,
     y: bossConfig.y ?? mapBossSpawn.y ?? 548,
     radius: bossConfig.radius ?? 34,
-    hp: bossConfig.hp ?? 1750,
-    maxHp: bossConfig.hp ?? 1750,
+    hp: bossMaxHp,
+    maxHp: bossMaxHp,
     speed: bossConfig.speed ?? 112,
     damage: bossConfig.damage ?? 22,
     difficulty: bossConfig.difficulty ?? 1,
@@ -6875,10 +7074,14 @@ function startBossFight(bossId = null) {
     lastRoute: null,
     logTimer: 0,
     animPhase: random(0, Math.PI * 2),
+    caseFileId,
+    caseDecisionId: caseResolution?.decisionId ?? null,
+    caseEffect,
   };
   chapterState.stepIndex = bossConfig.stepIndex ?? chapterState.stepIndex;
   setChapterObjective(bossConfig.objective ?? "打断错误配送协议，救回外卖小哥周行");
-  setLog(bossConfig.startLog ?? "Boss 战开始：订单被误识别成网络数据包。躲开路线，打掉大件包。");
+  const bossIntro = bossConfig.startLog ?? "Boss 战开始：订单被误识别成网络数据包。躲开路线，打掉大件包。";
+  setLog(caseEffect.intro ? bossIntro + " " + caseEffect.intro : bossIntro);
   playAudioCue("boss-start");
   if (currentChapterIndex > 0) {
     activateChapterShowcase("boss", {
@@ -7363,6 +7566,7 @@ function renderEchoArchive() {
   const summary = getEchoArchiveSummary();
   const cacheSummary = getMapCacheArchiveSummary();
   const interactiveSummary = getMapInteractiveArchiveSummary();
+  const caseSummary = getCaseArchiveSummary();
   const last = summary.last?.id
     ? `最近：${summary.last.label}${summary.last.shardReward ? ` +${summary.last.shardReward}碎片` : ""}`
     : "最近：暂无记录";
@@ -7372,6 +7576,9 @@ function renderEchoArchive() {
   const interactiveLast = interactiveSummary.last?.id
     ? `最近：${interactiveSummary.last.label}${interactiveSummary.last.shardReward ? ` +${interactiveSummary.last.shardReward}碎片` : ""}`
     : "最近：暂无记录";
+  const caseLast = caseSummary.last?.caseId
+    ? `最近：${caseSummary.last.title} · ${caseSummary.last.tracker}${caseSummary.last.shardReward ? ` +${caseSummary.last.shardReward}碎片` : ""}`
+    : "最近：暂无裁定";
   const chapterCards = summary.chapters.map((chapter) => {
     const unlocked = chapter.chapterIndex === 0 || archiveState?.unlockedChapters?.includes(chapter.chapterIndex);
     const labels = chapter.echoes.map((echo) => {
@@ -7463,6 +7670,30 @@ function renderEchoArchive() {
       </div>
     `;
   }).join("");
+  const caseCards = caseSummary.files.map((caseFile) => {
+    const decision = caseFile.lastDecision;
+    const className = [
+      "echo-chapter",
+      "is-case",
+      decision ? "is-complete" : "",
+    ].filter(Boolean).join(" ");
+    const detail = decision
+      ? `${decision.title} · ${decision.tracker ?? decision.archiveNote ?? "裁定已写入"}`
+      : caseFile.prompt;
+    const note = decision
+      ? decision.archiveNote ?? "下一轮可选择另一种处理。"
+      : `第一章发现 ${caseFile.shortTitle} 后归档。`;
+    return `
+      <div class="${className}">
+        <div class="echo-chapter-top">
+          <span>${caseFile.title}</span>
+          <strong>${decision ? "已裁定" : "待处理"}</strong>
+        </div>
+        <p>${detail}</p>
+        <em>${note}</em>
+      </div>
+    `;
+  }).join("");
 
   ui.echoArchive.innerHTML = `
     <section class="echo-archive-section">
@@ -7497,6 +7728,17 @@ function renderEchoArchive() {
       </div>
       <div class="echo-archive-last">${interactiveLast}</div>
       <div class="echo-archive-grid">${interactiveCards}</div>
+    </section>
+    <section class="echo-archive-section">
+      <div class="echo-archive-head is-case">
+        <div>
+          <p class="event-kicker">案件档案</p>
+          <h3>你的裁定会改写战斗与真相</h3>
+        </div>
+        <strong>${caseSummary.resolved}/${caseSummary.total}</strong>
+      </div>
+      <div class="echo-archive-last">${caseLast}</div>
+      <div class="echo-archive-grid">${caseCards}</div>
     </section>
   `;
 }
@@ -7545,6 +7787,7 @@ function renderStartMenu(options = {}) {
   const echoSummary = getEchoArchiveSummary();
   const cacheSummary = getMapCacheArchiveSummary();
   const interactiveSummary = getMapInteractiveArchiveSummary();
+  const caseSummary = getCaseArchiveSummary();
   const lastReview = normalizeLastRunReview(archiveState.lastRunReview);
   const reviewBoostText = lastReview?.retryBoost ? `${lastReview.retryBoost.title}已备好。` : "";
   const reviewPlanText = lastReview?.retryPlan ? `${lastReview.retryPlan.title}已排好。` : "";
@@ -7577,6 +7820,7 @@ function renderStartMenu(options = {}) {
     ["回声档案", `${echoSummary.discovered}/${echoSummary.total}`],
     ["地标档案", `${cacheSummary.discovered}/${cacheSummary.total}`],
     ["装置档案", `${interactiveSummary.activated}/${interactiveSummary.total}`],
+    ["案件档案", `${caseSummary.resolved}/${caseSummary.total}`],
     ["平台", getPlatformDisplayLabel()],
     ["存档", getStorageDisplayLabel()],
     ["爆点委托", `${archiveState.nightHookCompletions ?? 0} 次`],
@@ -7767,6 +8011,33 @@ function renderDeviceGuideTracker() {
   `;
 }
 
+function renderCaseTracker() {
+  if (!ui.caseTracker) {
+    return;
+  }
+
+  const resolutions = Object.keys(runStats?.caseResolutions ?? {})
+    .map((caseId) => getRunCaseResolution(caseId))
+    .filter(Boolean)
+    .sort((left, right) => (right.at ?? 0) - (left.at ?? 0));
+  const latest = resolutions[0];
+  if (!latest || world.mode === "menu") {
+    ui.caseTracker.className = "case-tracker hidden";
+    ui.caseTracker.innerHTML = "";
+    ui.caseTracker.style.removeProperty("--case-progress");
+    return;
+  }
+
+  const bossLabel = latest.decision.boss?.label ? ` · ${latest.decision.boss.label}` : "";
+  ui.caseTracker.style.setProperty("--case-progress", "100%");
+  ui.caseTracker.className = `case-tracker is-${latest.decision.id}`;
+  ui.caseTracker.innerHTML = `
+    <span>案件裁定</span>
+    <strong>${shortenText(`${latest.caseFile.title} · ${latest.decision.title}`, 22)}</strong>
+    <small>${latest.decision.tracker ?? "裁定已写入"}${bossLabel}</small>
+  `;
+}
+
 function openStartMenu() {
   world.mode = "menu";
   hidePanels();
@@ -7891,6 +8162,7 @@ function renderRunPanel() {
   renderCombatTempoTracker();
   renderStarterIgnitionTracker();
   renderDeviceGuideTracker();
+  renderCaseTracker();
 }
 
 function syncHud() {
@@ -8605,7 +8877,7 @@ function updateBoss(dt) {
 
   if (boss.phase !== previousPhase) {
     const defaultPhaseLog = boss.phase === 2 ? "周行的外卖箱开始触发超时重传。" : "错误路线开始 DNS 解析，取餐区变成一张发烫的网。";
-    const phaseLog = boss.phaseLogs?.[boss.phase] ?? defaultPhaseLog;
+    const phaseLog = boss.caseEffect?.phaseLogs?.[boss.phase] ?? boss.phaseLogs?.[boss.phase] ?? defaultPhaseLog;
     setLog(phaseLog);
     world.cameraShake = 0.2;
     playAudioCue("boss-phase");
@@ -8660,16 +8932,17 @@ function driftBossTowardPlayer(dt) {
 function getBossTuning() {
   const base = bossPhaseTuning[boss?.phase ?? 1] ?? bossPhaseTuning[1];
   const difficulty = boss?.difficulty ?? 1;
+  const caseEffect = boss?.caseEffect ?? {};
   return {
     ...base,
-    speedMultiplier: base.speedMultiplier * (0.92 + difficulty * 0.08),
-    dashDamage: Math.ceil(base.dashDamage * difficulty),
-    retransmitDamage: Math.ceil(base.retransmitDamage * difficulty),
-    udpCount: Math.ceil(base.udpCount * difficulty),
+    speedMultiplier: base.speedMultiplier * (0.92 + difficulty * 0.08) * (caseEffect.speedMultiplier ?? 1),
+    dashDamage: Math.ceil(base.dashDamage * difficulty * (caseEffect.dashDamageMultiplier ?? 1)),
+    retransmitDamage: Math.ceil(base.retransmitDamage * difficulty * (caseEffect.retransmitDamageMultiplier ?? 1)),
+    udpCount: Math.max(1, Math.ceil(base.udpCount * difficulty * (caseEffect.udpCountMultiplier ?? 1)) + (caseEffect.udpCountAdd ?? 0)),
     udpDamage: Math.ceil(base.udpDamage * difficulty),
     ftpHp: Math.ceil(base.ftpHp * difficulty),
     ftpBlastDamage: Math.ceil(base.ftpBlastDamage * difficulty),
-    dnsCount: Math.ceil(base.dnsCount * difficulty),
+    dnsCount: Math.max(0, Math.ceil(base.dnsCount * difficulty * (caseEffect.dnsCountMultiplier ?? 1)) + (caseEffect.dnsCountAdd ?? 0)),
     dnsDamage: Math.ceil(base.dnsDamage * difficulty),
   };
 }
@@ -9185,6 +9458,7 @@ function startUdpBurst() {
 
 function startFtpTransfer() {
   const tuning = getBossTuning();
+  const caseEffect = boss?.caseEffect ?? {};
   const existingFtp = protocolHazards.some((hazard) => hazard.type === "ftp");
   if (!existingFtp) {
     const payloadPoint = currentMap().bossPayload ?? { x: 870, y: 348 };
@@ -9193,9 +9467,9 @@ function startFtpTransfer() {
       x: payloadPoint.x,
       y: payloadPoint.y,
       radius: 44,
-      hp: tuning.ftpHp,
-      maxHp: tuning.ftpHp,
-      timer: tuning.ftpTimer,
+      hp: Math.max(1, Math.ceil(tuning.ftpHp * (caseEffect.ftpHpMultiplier ?? 1))),
+      maxHp: Math.max(1, Math.ceil(tuning.ftpHp * (caseEffect.ftpHpMultiplier ?? 1))),
+      timer: Math.max(0.45, tuning.ftpTimer + (caseEffect.ftpTimerAdd ?? 0)),
       phase: boss.phase,
       blastDamage: tuning.ftpBlastDamage,
       destructible: true,
@@ -9437,7 +9711,8 @@ function checkBossDefeat() {
   enemyHazards = [];
   enemies = [];
   cleaners = [];
-  const victoryStory = currentChapter().bossVictory;
+  const defeatedBoss = cloneForSave(boss, null);
+  const victoryStory = getBossVictoryStory(currentChapter().bossVictory, defeatedBoss);
   burst(boss.x, boss.y, boss.themeColor ?? "#5de2d1", 48);
   boss = null;
   world.cameraShake = 0.28;
@@ -14379,6 +14654,7 @@ function installAutomationTestHooks() {
     const echoArchive = getEchoArchiveSummary();
     const mapCacheArchive = getMapCacheArchiveSummary();
     const mapInteractiveArchive = getMapInteractiveArchiveSummary();
+    const caseArchive = getCaseArchiveSummary();
     return {
       ...extra,
       build: getBuildSummary(),
@@ -14424,6 +14700,7 @@ function installAutomationTestHooks() {
         chapterIndex: chapterState?.chapterIndex ?? null,
         stepIndex: chapterState?.stepIndex ?? null,
         resolvedTotal: chapterState?.resolvedTotal ?? null,
+        caseResolutions: cloneForSave(runStats?.caseResolutions, {}),
         echoesCollected: cloneForSave(chapterState?.echoesCollected, []),
         mapCachesCollected: cloneForSave(chapterState?.mapCachesCollected, []),
         mapInteractivesActivated: cloneForSave(chapterState?.mapInteractivesActivated, []),
@@ -14445,6 +14722,9 @@ function installAutomationTestHooks() {
         activatedMapInteractives: mapInteractiveArchive.activated,
         totalMapInteractives: mapInteractiveArchive.total,
         completedMapInteractiveChapters: mapInteractiveArchive.completedChapters,
+        resolvedCaseFiles: caseArchive.resolved,
+        totalCaseFiles: caseArchive.total,
+        lastCaseResolution: cloneForSave(caseArchive.last, null),
         bestOpeningRush: formatOpeningRushArchiveBest(archiveState),
         openingRushSBadge: formatOpeningRushSBadge(archiveState),
       },
@@ -14492,8 +14772,156 @@ function installAutomationTestHooks() {
         phase: boss.phase,
         x: round(boss.x),
         y: round(boss.y),
+        caseFileId: boss.caseFileId ?? null,
+        caseDecisionId: boss.caseDecisionId ?? null,
       } : null,
     };
+  }
+
+  function runCaseFileProbe() {
+    const definition = getCaseFileDefinition("delivery-receipt");
+    if (!definition?.decisions?.length) {
+      return { ok: false, reason: "delivery-receipt case file missing", samples: [] };
+    }
+
+    const previous = {
+      archive: cloneForSave(archiveState, null),
+      runStats: cloneForSave(runStats, null),
+      player: cloneForSave(player, null),
+      chapterState: cloneForSave(chapterState, null),
+      currentChapterIndex,
+      boss: cloneForSave(boss, null),
+      bugNodes: cloneForSave(bugNodes, []),
+      bugPickups: cloneForSave(bugPickups, []),
+      enemies: cloneForSave(enemies, []),
+      cleaners: cloneForSave(cleaners, []),
+      bullets: cloneForSave(bullets, []),
+      particles: cloneForSave(particles, []),
+      protocolHazards: cloneForSave(protocolHazards, []),
+      enemyHazards: cloneForSave(enemyHazards, []),
+      activeEvent: cloneForSave(activeEvent, null),
+      storyState: cloneForSave(storyState, null),
+      nextUpgradeAt,
+      world: cloneForSave(world, {}),
+    };
+    const previousRunSave = loadRunSave();
+    let caseArchive = createArchiveFallback();
+    const samples = [];
+    let result = { ok: false, samples };
+
+    try {
+      for (const decision of definition.decisions) {
+        resetStoreRun(0, { stepIndex: 0, hp: 90, bugPoints: 0, weaponIndex: 0 });
+        archiveState = cloneForSave(caseArchive, createArchiveFallback());
+        const resolved = recordCaseResolution(definition.id, decision.id);
+        caseArchive = cloneForSave(archiveState, createArchiveFallback());
+        saveRunCheckpoint("case-file-probe");
+        const saved = loadRunSave();
+        startBossFight("delivery-rider");
+        const tuning = getBossTuning();
+        startFtpTransfer();
+        startUdpBurst();
+        startDnsError();
+        const payload = protocolHazards.find((hazard) => hazard.type === "ftp");
+        const udpPackets = protocolHazards.filter((hazard) => hazard.type === "package");
+        const dnsMarkers = protocolHazards.filter((hazard) => hazard.type === "dns");
+        const victory = getBossVictoryStory(chapters[0].bossVictory, boss);
+        const baseTuning = bossPhaseTuning[boss?.phase ?? 1] ?? bossPhaseTuning[1];
+        const difficulty = boss?.difficulty ?? 1;
+        const baseSpeed = baseTuning.speedMultiplier * (0.92 + difficulty * 0.08);
+        const baseUdp = Math.max(1, Math.ceil(baseTuning.udpCount * difficulty));
+        const baseDns = Math.max(0, Math.ceil(baseTuning.dnsCount * difficulty));
+        const outcomeText = decision.outcomeLines?.[0]?.text ?? "";
+        const mechanicMatches = decision.id === "return"
+          ? tuning.speedMultiplier < baseSpeed
+            && tuning.dashDamage < Math.ceil(baseTuning.dashDamage * difficulty)
+            && tuning.retransmitDamage < Math.ceil(baseTuning.retransmitDamage * difficulty)
+          : decision.id === "archive"
+            ? Boolean(payload)
+              && payload.hp < tuning.ftpHp
+              && payload.timer > tuning.ftpTimer
+            : tuning.udpCount === baseUdp + 1
+              && tuning.dnsCount === baseDns + 1
+              && udpPackets.length === baseUdp + 1
+              && dnsMarkers.length === baseDns + 1;
+        syncHud();
+        const trackerText = ui.caseTracker?.textContent ?? "";
+        const savedResolution = saved?.runStats?.caseResolutions?.[definition.id];
+        const sample = {
+          id: decision.id,
+          ok: Boolean(resolved)
+            && boss?.caseDecisionId === decision.id
+            && savedResolution?.decisionId === decision.id
+            && trackerText.includes(definition.title)
+            && trackerText.includes(decision.title)
+            && victory.lines?.some((line) => line.text === outcomeText)
+            && mechanicMatches,
+          savedDecisionId: savedResolution?.decisionId ?? null,
+          bossDecisionId: boss?.caseDecisionId ?? null,
+          trackerText,
+          mechanicMatches,
+          udpPackets: udpPackets.length,
+          dnsMarkers: dnsMarkers.length,
+          ftp: payload ? { hp: payload.hp, maxHp: payload.maxHp, timer: round(payload.timer) } : null,
+        };
+        samples.push(sample);
+      }
+      archiveState = caseArchive;
+      const summary = getCaseArchiveSummary();
+      const archivedFile = summary.files.find((caseFile) => caseFile.id === definition.id);
+      result = {
+        ok: samples.length === definition.decisions.length
+          && samples.every((sample) => sample.ok)
+          && summary.resolved === 1
+          && archivedFile?.decisions?.length === definition.decisions.length,
+        samples,
+        archive: {
+          resolved: summary.resolved,
+          total: summary.total,
+          last: cloneForSave(summary.last, null),
+          decisions: cloneForSave(archivedFile?.decisions, []),
+        },
+      };
+    } catch (error) {
+      result = {
+        ok: false,
+        reason: error instanceof Error ? error.message : String(error),
+        samples,
+      };
+    } finally {
+      archiveState = previous.archive ?? createArchiveFallback();
+      runStats = previous.runStats ?? createRunStats();
+      player = previous.player ?? { ...playerBase };
+      chapterState = previous.chapterState ?? createChapterState();
+      currentChapterIndex = previous.currentChapterIndex;
+      boss = previous.boss;
+      bugNodes = previous.bugNodes;
+      bugPickups = previous.bugPickups;
+      enemies = previous.enemies;
+      cleaners = previous.cleaners;
+      bullets = previous.bullets;
+      particles = previous.particles;
+      protocolHazards = previous.protocolHazards;
+      enemyHazards = previous.enemyHazards;
+      activeEvent = previous.activeEvent;
+      storyState = previous.storyState;
+      nextUpgradeAt = previous.nextUpgradeAt;
+      Object.assign(world, previous.world);
+      runPanelSignature = "";
+      try {
+        saveArchive();
+        if (previousRunSave) {
+          writePlatformJson(RUN_SAVE_STORAGE_KEY, previousRunSave);
+        } else {
+          removePlatformJson(RUN_SAVE_STORAGE_KEY);
+        }
+      } catch {
+        // Test hooks should never leave an unavailable storage adapter as a hard failure.
+      }
+      syncHud();
+    }
+
+    return result;
   }
 
   function runMetaProgressionProbe() {
@@ -16448,6 +16876,7 @@ function installAutomationTestHooks() {
     const failures = [];
     const chaptersCovered = [];
     const metaProgression = runMetaProgressionProbe();
+    const caseFile = runCaseFileProbe();
     const nightHook = runNightHookProbe();
     const combatTempo = runCombatTempoProbe();
     const echoArchive = runEchoArchiveProbe();
@@ -16470,6 +16899,9 @@ function installAutomationTestHooks() {
 
     if (!metaProgression.ok) {
       failures.push("meta progression bonuses failed");
+    }
+    if (!caseFile.ok) {
+      failures.push("case file branch probe failed");
     }
     if (!nightHook.ok) {
       failures.push("night hook completion failed");
@@ -16606,6 +17038,7 @@ function installAutomationTestHooks() {
       chapterCount: chapters.length,
       failures,
       metaProgression,
+      caseFile,
       nightHook,
       combatTempo,
       echoArchive,
@@ -16637,6 +17070,7 @@ function installAutomationTestHooks() {
     startBossForChapter,
     saveAndRestoreProbe,
     runMetaProgressionProbe,
+    runCaseFileProbe,
     runNightHookProbe,
     runCombatTempoProbe,
     runEchoArchiveProbe,

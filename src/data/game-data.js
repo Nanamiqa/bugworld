@@ -68,6 +68,107 @@ window.GameData = {
     },
   ],
 
+  caseFiles: [
+    {
+      id: "delivery-receipt",
+      chapterIndex: 0,
+      title: "0号回执",
+      shortTitle: "收件人不存在",
+      prompt: "一张写着安渡签名的超时回执正在重传。它既是周行醒来的线索，也是白箱最想收走的证据。",
+      archiveReward: 2,
+      decisions: [
+        {
+          id: "return",
+          title: "把回执还给周行",
+          tracker: "活证词已保留",
+          archiveNote: "你让一张无法投递的回执回到了当事人手里。",
+          boss: {
+            label: "活证词路线",
+            hpMultiplier: 0.94,
+            speedMultiplier: 0.86,
+            dashDamageMultiplier: 0.72,
+            retransmitDamageMultiplier: 0.72,
+            intro: "周行的耳机里传来迟到的确认：这单不是超时，是有人还在等他回去。",
+            phaseLogs: {
+              2: "周行听见回执里的名字，超时重传犹豫了一拍。",
+              3: "错误路线开始松动；每次重传都在问：这单真的该送吗？",
+            },
+          },
+          outcomeLines: [
+            {
+              speaker: "周行",
+              title: "收件人已签收",
+              text: "周行攥着回执，声音终于不再像系统提示：收件人不是地址，是一个被系统标成不存在的人。",
+            },
+            {
+              speaker: "乔柚",
+              title: "03:32 的签名",
+              text: "回执背面浮出一行确认：安渡，03:32。乔柚轻声说：这不是你的笔迹，但它认识你的名字。",
+            },
+          ],
+        },
+        {
+          id: "archive",
+          title: "封存为夜巡证物",
+          tracker: "证物包已封存",
+          archiveNote: "你把回执拆成了可用于反制协议的证物包。",
+          boss: {
+            label: "封存包弱点",
+            ftpHpMultiplier: 0.58,
+            ftpTimerAdd: 0.35,
+            intro: "回执被封进断点工牌，周行背后的大件传输包露出了一段可读的弱点索引。",
+            phaseLogs: {
+              2: "封存回执正在反向校验，超时重传的中央包变得更脆。",
+              3: "错误路线试图夺回证物；打掉大件包，就能让它失去上传理由。",
+            },
+          },
+          outcomeLines: [
+            {
+              speaker: "乔柚",
+              title: "封存副本",
+              text: "证物包里有一段被截断的签名：安渡 / 03:32 / 状态：未归档。它不像求救，更像有人故意留下的接口。",
+            },
+            {
+              speaker: "安渡",
+              title: "谁在给我留接口",
+              text: "安渡把工牌握紧：如果这是旧的我留下的，他到底想让我查到什么？",
+            },
+          ],
+        },
+        {
+          id: "whitebox",
+          title: "交给白箱暂存",
+          tracker: "白箱暂存中",
+          archiveNote: "你用一份证据换来了一条暂时安全的路线。",
+          boss: {
+            label: "白箱预测",
+            speedMultiplier: 1.15,
+            udpCountAdd: 1,
+            dnsCountAdd: 1,
+            retransmitDamageMultiplier: 1.16,
+            intro: "白箱收下回执后给出一条安全路线，却把周行的下一步也算得更准了。",
+            phaseLogs: {
+              2: "白箱暂存回执完成校验，周行的重传路线变得更像预演。",
+              3: "预测权限接管配送协议；错误坐标比刚才多了一层。",
+            },
+          },
+          outcomeLines: [
+            {
+              speaker: "白箱巡检员",
+              title: "暂存确认",
+              text: "白箱吐出一张白色凭条：证据已暂存。关联签名：安渡，03:32。风险等级：待复核。",
+            },
+            {
+              speaker: "老梁",
+              title: "别把暂存当答案",
+              text: "老梁的声音压得很低：它没删掉，不代表它会还。下个地方，得查清这签名从哪来的。",
+            },
+          ],
+        },
+      ],
+    },
+  ],
+
   enemyTypes: {
     stress: {
       name: "压力毛球",
@@ -456,7 +557,23 @@ window.GameData = {
     opening: {
       speaker: "安渡",
       title: "凌晨 03:32",
-      text: "安渡从键盘上惊醒。屏幕里的报表还停在错误代码那一行，手机却同时弹出一串外卖提醒：已超时 999 分钟。斜对面工位的工牌开始冒出不属于现实的弹幕。",
+      lines: [
+        {
+          speaker: "系统广播",
+          title: "午夜归档",
+          text: "凌晨 03:32。安渡从键盘上惊醒，所有外卖订单同时跳成：已超时 999 分钟。",
+        },
+        {
+          speaker: "未知订单",
+          title: "收件人不存在",
+          text: "斜对面工位的工牌冒出弹幕：请确认收件。收件人：不存在。请确认收件。请确认收件。",
+        },
+        {
+          speaker: "安渡",
+          title: "异常签名",
+          text: "订单末尾闪过一笔陌生签名：安渡。像是有人用他的名字，在半夜替整座办公室签收了什么。",
+        },
+      ],
       choices: [{ title: "起身查看异常", effect: "办公室异常开始显形", actions: [{ type: "startChapterStep", step: 0 }] }],
     },
     steps: [
@@ -465,9 +582,53 @@ window.GameData = {
         node: { eventId: "bullet-comments", x: 540, y: 190 },
         afterEvent: {
           speaker: "安渡",
-          title: "第一枚 bug点数",
-          text: "弹幕消散后，安渡掌心多了一点青蓝色碎光。胸前的断点工牌发烫，手机里的外卖地图却突然把办公室标成了取餐终点。",
-          choices: [{ title: "查看断点工牌", effect: "解锁旧版提示", actions: [{ type: "startChapterStep", step: 1 }] }],
+          title: "0号回执",
+          lines: [
+            {
+              speaker: "系统广播",
+              title: "投递失败",
+              text: "弹幕消散后，断点工牌吐出一张发烫的回执：收件人不存在，发件人未知，确认签名：安渡。",
+            },
+            {
+              speaker: "安渡",
+              title: "不属于我的字",
+              text: "安渡盯着最后一行时间：03:32。它和现在分秒不差，却像有人比他更早醒来。",
+            },
+            {
+              speaker: "未知订单",
+              title: "需要裁定",
+              text: "回执正在重传。把它还给当事人、封成证物，还是交给白箱暂存？每种处理都会留下不同的后果。",
+            },
+          ],
+          choices: [
+            {
+              title: "把回执还给周行",
+              effect: "生命 +12；Boss 冲刺与重传变慢",
+              actions: [
+                { type: "resolveCase", caseId: "delivery-receipt", decision: "return" },
+                { type: "gain", hp: 12 },
+                { type: "startChapterStep", step: 1 },
+              ],
+            },
+            {
+              title: "封存为夜巡证物",
+              effect: "bug点数 +3、经验 +3；Boss 大件包更脆",
+              actions: [
+                { type: "resolveCase", caseId: "delivery-receipt", decision: "archive" },
+                { type: "gain", bugPoints: 3, xp: 3 },
+                { type: "startChapterStep", step: 1 },
+              ],
+            },
+            {
+              title: "交给白箱暂存",
+              effect: "反噬 -18；Boss 获得更强预测路线",
+              actions: [
+                { type: "resolveCase", caseId: "delivery-receipt", decision: "whitebox" },
+                { type: "gain", backlash: -18 },
+                { type: "startChapterStep", step: 1 },
+              ],
+            },
+          ],
         },
       },
       {
@@ -1474,6 +1635,7 @@ window.GameData.chapterOne.enemyPools = {
 window.GameData.chapterOne.boss = {
   id: "delivery-rider",
   archetype: "delivery",
+  caseFileId: "delivery-receipt",
   name: "协议骑手·周行",
   objective: "打断错误配送协议，救回外卖小哥周行",
   startLog: "Boss 战开始：订单被误识别成网络数据包。躲开路线，打掉大件包。",
